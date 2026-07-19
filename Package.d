@@ -3838,14 +3838,14 @@ version(/+$DIDE_REGION Numeric+/all)
 			+/
 			
 			float f(float x) => superEllipticRamp(x, p); 
-			float g(float x) => f(((x<=.5)?(2*x):(2-2*x)))/2; 
+			float g(float x) => ((x<=.5)?(f(2*x)):(2-f(2-2*x)))/2; 
 			if(pattern&2) x = 1-abs(2*x-1); 
-			float res = ((pattern&1)?(f(x)):(g(x))); 
+			float res = ((pattern&1)?(g(x)):(f(x))); 
 			if(pattern&4) res = -res; return res; 
 		} 
 		
 		float superEllipticRampTarget(uint pattern)
-		{ ((pattern&2)?(0):(((pattern&4)?(-1):(1)))); } 
+		=> ((pattern&2)?(0):(((pattern&4)?(-1):(1)))); 
 		
 		
 	}version(/+$DIDE_REGION Bitwise+/all)

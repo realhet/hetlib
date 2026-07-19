@@ -3230,15 +3230,22 @@ Use SvgParser to prepare absolute SVG command stream!"
 			} 
 			
 			void drawShapeRect(B)(
-				in B bnd, uint shape, float chamfer=0, float aspect=0, 
+				in B bnd, uint shape, 
+				uint bevelType=0, float bevelParam=0, 
+				float chamfer=0, float aspect=0, 
 				float p0=0, float p1=0, float p2=0
 			)
 			{
 				begin(4+1, {}); synch_transform, synch_PALH, synch_colors; 
 				
-				uint extraFlags = 	(chamfer?1:0)|(aspect?2:0)|(p0?4:0)|(p1?8:0)|(p2?16:0)|
-					((shape&7)<<5); 
-				auto extra = assemble(bits(extraFlags, 5+3)); 
+				const isBevel = !!bevelType || !!bevelParam; 
+				uint extraFlags = (isBevel?1:0)|(chamfer?2:0)|(aspect?4:0)|(p0?8:0)|(p1?16:0)|(p2?32:0); 
+				auto extra = assemble(bits(extraFlags, 6), bits(shape, 3)); 
+				if(isBevel)
+				extra = assemble(
+					extra, 	bits(bevelType&7, 3), 
+						bits(((iround(bevelParam*16))+16).clamp(0, 31), 5)
+				); 
 				if(chamfer) extra = assemble(extra, bits((iround(chamfer.clamp(0, 1)*15)), 4)); 
 				if(aspect) extra = assemble(extra, aspect.to_snorm); 
 				
@@ -3412,7 +3419,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1AFD482886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1B0CF82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -3706,7 +3713,9 @@ Use SvgParser to prepare absolute SVG command stream!"
 			{ fillRect(bounds2(x0, y0, x1, y1)); } 
 			
 			void shapeRect(
-				in bounds2 b, uint shape, float chamfer=0, float aspect=0, 
+				in bounds2 b, uint shape, 
+				uint bevelType=0, float bevelParam=0, 
+				float chamfer=0, float aspect=0, 
 				float p0=0, float p1=0, float p2=0
 			)
 			{
@@ -3719,7 +3728,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 					gfx.synch_LW; 
 					gfx.synch_PC; 
 				}
-				gfx.drawShapeRect(b, shape, chamfer, aspect, p0); 
+				gfx.drawShapeRect(b, shape, bevelType, bevelParam, chamfer, aspect, p0, p1, p2); 
 			} 
 			
 			
@@ -5534,18 +5543,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2AABA82886ADB).檢(
+					((0x2AC0682886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2AB2C82886ADB))))
+				if((互!((bool),(0),(0x2AC7882886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2ABC082886ADB).檢((互!((float/+w=12+/),(1.000),(0x2ABD782886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2AD0C82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2AD2382886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5558,8 +5567,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2ADAC82886ADB).檢 (imVG)),
-					((0x2ADD282886ADB).檢 (imFPS)); 
+					((0x2AEF882886ADB).檢 (imVG)),
+					((0x2AF1E82886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -5579,12 +5588,12 @@ $(V_size+G_size)".text
 					training/api-without-secrets-introduction-to-vulkan-part-2.html
 				+/
 				
-				t1=QPS; 
 				
 				// Build the CPU/UI frame before touching the swapchain.  Modal Win32
 				// loops may dispatch paint/timer messages where no update frame is due.
 				if(!internalUpdate) { return; }//This calls: im.beginFrame(), onUpdate(), im.endFrame()
-				t2=QPS; 
+				
+				t1=QPS; 
 				
 				swapchain.acquireAndPresent
 					(
@@ -5592,6 +5601,7 @@ $(V_size+G_size)".text
 					{
 						try
 						{
+							t2=QPS; 
 							//remove textures right BEFORE drawing anything.
 							foreach(th; Texture.destroyedResidentTexHandles) { TB.remove(th); }
 							
@@ -5652,12 +5662,12 @@ $(V_size+G_size)".text
 			
 			//invalidate; no need.+/; 
 			const t6 = QPS; 
-			timeLine.addEvent(TimeLine.Event.Type.wait      , t0, t1); //gray: wait for swapChain
-			timeLine.addEvent(TimeLine.Event.Type.update    , t1, t2); //blue: update
+			timeLine.addEvent(TimeLine.Event.Type.update     , t0, t1); //blue: update
+			timeLine.addEvent(TimeLine.Event.Type.wait       , t1, t2); //gray: wait for swapChain
 			timeLine.addEvent(TimeLine.Event.Type.draw      , t2, t3); //lime: drawFrame
 			timeLine.addEvent(TimeLine.Event.Type.uploadGV  , t3, t4); //yellow: uploag VB+GB
 			timeLine.addEvent(TimeLine.Event.Type.uploadIT   , t4, t5); //orange: upload IB+TB
-			timeLine.addEvent(TimeLine.Event.Type.queue    , t5, t6); //aqua: queue
+			timeLine.addEvent(TimeLine.Event.Type.queue     , t5, t6); //aqua: queue
 			timeLine.addGcTime; //fuchsia
 			timeLine.restrictSize(174); 
 		} 
@@ -7999,13 +8009,14 @@ $(V_size+G_size)".text
 					{
 						P3 = P4; P4 = fetchFormattedPoint2D(bitStream); 
 						
-						uint shapeFlags = fetch_uint(bitStream, 5+3); 
-						if((shapeFlags & 1)!=0) setBits(shapeFlags,  8, 4, fetch_uint(bitStream, 4)); //chamfer
-						if((shapeFlags & 2)!=0) setBits(shapeFlags, 12, 8, fetch_uint(bitStream, 8)); //aspect
+						uint shapeFlags = fetch_uint(bitStream, 6+3); 
+						if((shapeFlags & 1)!=0) setBits(shapeFlags,  9, 8, fetch_uint(bitStream, 8)); //bevelType, bevelParam
+						if((shapeFlags & 2)!=0) setBits(shapeFlags, 17, 4, fetch_uint(bitStream, 4)); //chamfer
+						if((shapeFlags & 4)!=0) setBits(shapeFlags, 21, 8, fetch_uint(bitStream, 8)); //aspect
 						
-						const float param0 = (shapeFlags &  4)!=0 ? fetchFormattedPoint1D(bitStream) : 0.0; 
-						const float param1 = (shapeFlags &  8)!=0 ? fetchFormattedPoint1D(bitStream) : 0.0; 
-						const float param2 = (shapeFlags & 16)!=0 ? fetchFormattedPoint1D(bitStream) : 0.0; 
+						const float param0 = (shapeFlags &  8)!=0 ? fetchFormattedPoint1D(bitStream) : 0.0; 
+						const float param1 = (shapeFlags & 16)!=0 ? fetchFormattedPoint1D(bitStream) : 0.0; 
+						const float param2 = (shapeFlags & 32)!=0 ? fetchFormattedPoint1D(bitStream) : 0.0; 
 						
 						setFragMode(FragMode_shapeRect); 
 						fragFloats0.xy 	/*size*/	 = P4-P3,
@@ -8600,7 +8611,7 @@ $(V_size+G_size)".text
 						}
 					} 
 					
-					float superEllipticRamp(float x, float p)
+					float superEllipticRamp_impl(float x, float p)
 					{
 						float s = min((4.0 * p * p) / 3.0, 0.999); 
 						float q = (1.0 + s) / (1.0 - s); 
@@ -8612,7 +8623,17 @@ $(V_size+G_size)".text
 						return sel ? b : 1.0 - b; 
 					} 
 					
-					float depthShape(in uint shape, vec2 p, vec2 topLeft, vec2 size, float roundingRadius, float border, float chamfer, float aspect_, float p0)
+					float superEllipticRamp(float x, float p, uint pattern)
+					{
+						if((pattern&2)!=0) x = 1.0-abs(2.0*x-1.0); 
+						float res = (((pattern&1)!=0)?(((x<=.5)?(superEllipticRamp_impl(2.0*x, p)):(2.0-superEllipticRamp_impl(2.0-2.0*x, p)))/2.0):(superEllipticRamp_impl(x, p))); 
+						if((pattern&4)!=0) res = -res; return res; 
+					} 
+					
+					float superEllipticRampTarget(uint pattern)
+					{ return (((pattern&2)!=0)?(0.0):((((pattern&4)!=0)?(-1.0):(1.0)))); } 
+					
+					float depthShape(in uint shape, vec2 p, vec2 topLeft, vec2 size, float roundingRadius, float border, uint bevelType, float bevelParam, float chamfer, float aspect_, float p0)
 					{
 						float sharpBorder = chamfer * border; 
 						
@@ -8628,25 +8649,15 @@ $(V_size+G_size)".text
 							shape, aspect*p, 	aspect*(topLeft-sharpBorder-correction), 
 								aspect*(size+sharpBorder*2.+correction*2.), p0
 						)+sharpBorder; 
-						float nsd = (sd - (roundingRadius-border)) / border; //0..1 range is in the border area
+						float nsd = 1.0 - (sd - (roundingRadius-border)) / border; //0..1 range is in the border area
 						
-						bool isOutside = nsd >= 1.; if(isOutside) return border*-2.; //Todo: if border = 0, it will not return anything
-						bool isInside = nsd <= 0.; if(isInside) nsd = 0; 
-						
-						//nsd = 1.-nsd; 
-						
-						//nsd = 1.0-sqrt(1.0-sqr(nsd)); 
-						//nsd = 0.37*sqr(nsd) + 0.63*sqr(sqr(nsd)); //approximated quarter cicrle
-						
-						nsd = superEllipticRamp(1.0-nsd, 0.7); 
-						
-						//nsd = 1.-nsd; 
-						
-						return nsd*border; 
+						bool isOutside = nsd < 0.0; if(isOutside) return border*-2.; //Todo: if border = 0, it will not return anything
+						bool isInside = nsd >= 1.0; if(isInside) return superEllipticRampTarget(bevelType) * border; 
+						return superEllipticRamp(nsd, bevelParam, bevelType) * border; 
 					} 
 					
 					//'nd' means normal and depth: vec4(nx, ny, nz, d)
-					vec4 ndShape(in uint shape, vec2 p, vec2 topLeft, vec2 size, float roundingRadius, float border, float chamfer, float aspect, float p0)
+					vec4 ndShape(in uint shape, vec2 p, vec2 topLeft, vec2 size, float roundingRadius, float border, uint bevelType, float bevelParam, float chamfer, float aspect, float p0)
 					{
 						const float nearZero = 1e-7; 
 						roundingRadius = clamp(roundingRadius, nearZero, min(size.x, size.y)/2.0); 
@@ -8656,9 +8667,9 @@ $(V_size+G_size)".text
 						topLeft += roundingRadius; 
 						//size += border * 2.0;
 						//topLeft -= border;
-						float depth = depthShape(shape, p, topLeft, size, roundingRadius, border, chamfer, aspect, p0); 
+						float depth = depthShape(shape, p, topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0); 
 						
-						float microStep = border/1024.; 
+						float microStep = border/65536; 
 						
 						/*
 							//2 samples: It's fast, but bugs with 45deg chamfers
@@ -8669,10 +8680,10 @@ $(V_size+G_size)".text
 						
 						//this samplig fixes problems with 45deg chamfers when the light comes from the topLeft.
 						float nx, ny; 
-						float depthx =               depthShape(shape, p + vec2( microStep, 0), topLeft, size, roundingRadius, border, chamfer, aspect, p0); 
-						if(depthx<-border) { depthx = depthShape(shape, p + vec2(-microStep, 0), topLeft, size, roundingRadius, border, chamfer, aspect, p0); nx = depthx-depth; }else nx = depth-depthx; 
-						float depthy =               depthShape(shape, p + vec2(0,  microStep), topLeft, size, roundingRadius, border, chamfer, aspect, p0); 
-						if(depthy<-border) { depthy = depthShape(shape, p + vec2(0, -microStep), topLeft, size, roundingRadius, border, chamfer, aspect, p0); ny = depthy-depth; }else ny = depth-depthy; 
+						float depthx =               depthShape(shape, p + vec2( microStep, 0), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0); 
+						if(depthx<-border) { depthx = depthShape(shape, p + vec2(-microStep, 0), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0); nx = depthx-depth; }else nx = depth-depthx; 
+						float depthy =               depthShape(shape, p + vec2(0,  microStep), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0); 
+						if(depthy<-border) { depthy = depthShape(shape, p + vec2(0, -microStep), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0); ny = depthy-depth; }else ny = depth-depthy; 
 						
 						
 						/*Todo: When cleartype is on, it could be low quality using dfdx() and dfdy()*/
@@ -8692,21 +8703,25 @@ $(V_size+G_size)".text
 						const float param2        = fragFloats1.z; 
 						
 						const uint shapeFlags = floatBitsToUint(fragFloats1.w); 
-						const uint shape = getBits(shapeFlags, 5, 3); 
-						const float chamfer = (((shapeFlags & 1)!=0) ?(
-							(float(getBits(shapeFlags, 8, 4)))
+						const uint shape = getBits(shapeFlags, 6, 3); 
+						const uint bevelType = (((shapeFlags & 1)!=0) ?(getBits(shapeFlags, 9, 3)):(0)); 
+						const float bevelParam = (((shapeFlags & 1)!=0) ?(((float(getBits(shapeFlags, 12, 5)))-16.0)/16.0):(0.0)); 
+						const float chamfer = (((shapeFlags & 2)!=0) ?(
+							(float(getBits(shapeFlags, 17, 4)))
 							* (1.0/((1<<4)-1))
 						):(0.0)); 
-						const float aspect = (((shapeFlags & 2)!=0) ?(
+						const float aspect = (((shapeFlags & 4)!=0) ?(
 							max(
-								(float(getBits(int(shapeFlags), 12, 8)))
+								(float(getBits(int(shapeFlags), 21, 8)))
 								* (1.0/((1<<(8-1))-1)), -1
 							)
 						):(0.0)); 
 						
 						const vec4 nd = ndShape(
 							shape, p, vec2(0, 0), size, 
-							roundingRadius, border, chamfer, aspect, param0
+							roundingRadius, border, 
+							bevelType, bevelParam, 
+							chamfer, aspect, param0
 						); 
 						const vec3 n = nd.xyz; 
 						

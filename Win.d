@@ -662,13 +662,13 @@ version(/+$DIDE_REGION+/all) {
 			static struct Event
 			{
 				enum Type
-				{ wait, update, draw, uploadGV, uploadIT, queue} 
+				{update, wait, draw, uploadGV, uploadIT, queue} 
 				Type type; 
 				Time t0, t1; 
 				
 				auto color()
 				{
-					enum typeColors = [clGray, clBlue, clLime, clYellow, clOrange, clAqua]; 
+					enum typeColors = [clBlue, clGray, clLime, clYellow, clOrange, clAqua]; 
 					return typeColors[cast(int)type]; 
 				} 
 			} 
@@ -1432,7 +1432,9 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 		void* getGfxBuilder(); 
 		
 		void shapeRect(
-			in bounds2 b, uint shape, float chamfer=0, float aspect=0, 
+			in bounds2 b, uint shape, 
+			uint bevelType=0, float bevelParam=0, 
+			float chamfer=0, float aspect=0, 
 			float p0=0, float p1=0, float p2=0
 		); 
 		
