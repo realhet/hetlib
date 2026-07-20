@@ -8535,6 +8535,61 @@ $(V_size+G_size)".text
 					} 
 					
 					vec4 customShader(); 
+					/*
+						All SDF functions are the work of Inigo Quilez.
+						
+						The MIT License
+						
+						Copyright © 2020 Inigo Quilez
+						
+						Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
+						associated documentation files (the “Software”), to deal in the Software without restriction, including 
+						without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
+						copies of the Software, and to permit persons to whom the Software is furnished to do so, 
+						subject to the following conditions:
+						
+						The above copyright notice and this permission notice shall be included in all copies or substantial 
+						portions of the Software.
+						
+						THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+						INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A 
+						PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR 
+						COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN 
+						AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION 
+						WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+					*/
+					/*Link: https://iquilezles.org/articles/distfunctions2d/*/
+					/*Link: https://www.shadertoy.com/user/iq*/
+					
+					float opUnion( float a, float b )
+					{ return min(a,b); } 
+					float opSubtraction( float a, float b )
+					{ return max(a,-b); /*swapped order!!!*/} 
+					float opIntersection( float a, float b )
+					{ return max(a,b); } 
+					float opXor( float a, float b )
+					{ return max(min(a,b),-max(a,b)); } 
+					
+					float smin( float a, float b, float k )
+					{
+						k *= log(2.0); 
+						float x = b-a; 
+						return a + x/(1.0-exp2(x/k)); 
+					} 
+					
+					float smax(float a, float b, float k)
+					{ return -smin(-a, -b, k); } 
+					
+					float opsUnion(float a, float b, float k)
+					{ return smin(a,b,k); } 
+					float opsSubtraction(float a, float b, float k)
+					{ return smax(a,-b,k); } 
+					float opsIntersection(float a, float b, float k)
+					{ return smax(a,b,k); } 
+					float opsXor(float a, float b, float k)
+					{ return smax(smin(a,b,k),-smax(a,b,k),k); } 
+					
+					
 					float sdBox( in vec2 p, in vec2 b )
 					{
 						vec2 d = abs(p)-b; 
@@ -8576,7 +8631,7 @@ $(V_size+G_size)".text
 						vec2 cb = p - k1 + k2*clamp( dot(k1-p,k2)/dot2(k2), 0.0, 1.0 ); 
 						float s = (cb.x<0.0 && ca.y<0.0) ? -1.0 : 1.0; 
 						return s*sqrt(min(dot2(ca),dot2(cb))); 
-					} /*Todo:*/
+					} 
 					
 					float sdParallelogram( in vec2 p, float wi, float he, float sk )
 					{
@@ -8589,16 +8644,56 @@ $(V_size+G_size)".text
 						vec2  v = p - vec2(wi,0); v -= e*clamp(dot(v,e)/dot(e,e),-1.0,1.0); 
 						d = min(d, vec2(dot(v,v), wi*he-abs(s))); 
 						return sqrt(d.x)*sign(-d.y); 
-					} /*Todo:*/
+					} 
+					
+					float sdPianoKey(in vec2 p, in vec2 b, in float p0, in float p1, in float p2)
+					{
+						const float 	left 	= p.x - b.x*p0,
+							up 	= p.y - b.y*p1,
+							right 	= b.x*p2 - p.x; 
+						float res = sdBox(p, b); 
+						res = opSubtraction(res, opIntersection(left, up)); 
+						res = opSubtraction(res, opIntersection(right, up)); 
+						return res; 
+					} 
+					
+					// signed distance to a n-star polygon, with external angle w
+					float sdStar(in vec2 p, in float r, in float n, in float w)
+					{
+						// these 5 lines can be precomputed for a given shape
+						//float m = n*(1.0-w) + w*2.0;
+						float m = n + w*(2.0-n); 
+						
+						float an = 3.1415927/n; 
+						float en = 3.1415927/m; 
+						vec2  racs = r*vec2(cos(an),sin(an)); 
+						vec2   ecs =   vec2(cos(en),sin(en)); // ecs=vec2(0,1) and simplify, for regular polygon,
+						
+						// symmetry (optional)
+						p.x = abs(p.x); 
+						
+						// reduce to first sector
+						float bn = mod(atan(p.x,p.y),2.0*an) - an; 
+						p = length(p)*vec2(cos(bn),abs(sin(bn))); 
+						
+						// line sdf
+						p -= racs; 
+						p += ecs*clamp( -dot(p,ecs), 0.0, racs.y/ecs.y); 
+						return length(p)*sign(p.x); 
+					} 
 					
 					
 					#define Shape_indexMask 7
 					
 					#define Shape_box 0
 					#define Shape_chamferBox 1
-					#define Shape_rhombus 2
+					#define Shape_pianoKey 2
+					#define Shape_trapezoid 3
+					#define Shape_parallelogram 4
+					#define Shape_rhombus 5
+					#define Shape_polygon 6
 					
-					float sdShape(in uint shape, vec2 p, vec2 topLeft, vec2 size, float p0)
+					float sdShape(in uint shape, in vec2 p, in vec2 topLeft, in vec2 size, in float p0, in float p1, in float p2)
 					{
 						vec2 halfSize = size/2.; 
 						vec2 pp = p-(topLeft + halfSize); 
@@ -8606,7 +8701,11 @@ $(V_size+G_size)".text
 						{
 							case Shape_box: 	return sdBox(pp, halfSize); 
 							case Shape_chamferBox: 	return sdChamferBox(pp, halfSize, p0); 
+							case Shape_pianoKey: 	return sdPianoKey(pp, halfSize, p0, p1, p2); 
+							case Shape_trapezoid: 	return sdTrapezoid(pp, p0*halfSize.x, p1*halfSize.x, halfSize.y); 
+							case Shape_parallelogram: 	return sdParallelogram(pp, halfSize.x-abs(p0*halfSize.x), halfSize.y, -p0*halfSize.x); 
 							case Shape_rhombus: 	return sdRhombus(pp, halfSize); 
+							case Shape_polygon: 	return sdStar((p - (size+topLeft)/2)*vec2(1, -1), min(halfSize.x, halfSize.y)*p1, p0, p2); 
 							default: 	return 1e30; 
 						}
 					} 
@@ -8633,7 +8732,11 @@ $(V_size+G_size)".text
 					float superEllipticRampTarget(uint pattern)
 					{ return (((pattern&2)!=0)?(0.0):((((pattern&4)!=0)?(-1.0):(1.0)))); } 
 					
-					float depthShape(in uint shape, vec2 p, vec2 topLeft, vec2 size, float roundingRadius, float border, uint bevelType, float bevelParam, float chamfer, float aspect_, float p0)
+					float depthShape(
+						in uint shape, vec2 p, vec2 topLeft, vec2 size, 
+						float roundingRadius, float border, uint bevelType, float bevelParam, 
+						float chamfer, float aspect_, float p0, float p1, float p2
+					)
 					{
 						float sharpBorder = chamfer * border; 
 						
@@ -8647,7 +8750,7 @@ $(V_size+G_size)".text
 						vec2 correction = (vec2(1)-vec2(1)/aspect)*(mix(roundingRadius, roundingRadius-border,chamfer)); 
 						float sd = sdShape(
 							shape, aspect*p, 	aspect*(topLeft-sharpBorder-correction), 
-								aspect*(size+sharpBorder*2.+correction*2.), p0
+								aspect*(size+sharpBorder*2.+correction*2.), p0, p1, p2
 						)+sharpBorder; 
 						float nsd = 1.0 - (sd - (roundingRadius-border)) / border; //0..1 range is in the border area
 						
@@ -8657,7 +8760,7 @@ $(V_size+G_size)".text
 					} 
 					
 					//'nd' means normal and depth: vec4(nx, ny, nz, d)
-					vec4 ndShape(in uint shape, vec2 p, vec2 topLeft, vec2 size, float roundingRadius, float border, uint bevelType, float bevelParam, float chamfer, float aspect, float p0)
+					vec4 ndShape(in uint shape, vec2 p, vec2 topLeft, vec2 size, float roundingRadius, float border, uint bevelType, float bevelParam, float chamfer, float aspect, float p0, float p1, float p2)
 					{
 						const float nearZero = 1e-7; 
 						roundingRadius = clamp(roundingRadius, nearZero, min(size.x, size.y)/2.0); 
@@ -8667,7 +8770,7 @@ $(V_size+G_size)".text
 						topLeft += roundingRadius; 
 						//size += border * 2.0;
 						//topLeft -= border;
-						float depth = depthShape(shape, p, topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0); 
+						float depth = depthShape(shape, p, topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0, p1, p2); 
 						
 						float microStep = border/65536; 
 						
@@ -8680,10 +8783,10 @@ $(V_size+G_size)".text
 						
 						//this samplig fixes problems with 45deg chamfers when the light comes from the topLeft.
 						float nx, ny; 
-						float depthx =               depthShape(shape, p + vec2( microStep, 0), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0); 
-						if(depthx<-border) { depthx = depthShape(shape, p + vec2(-microStep, 0), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0); nx = depthx-depth; }else nx = depth-depthx; 
-						float depthy =               depthShape(shape, p + vec2(0,  microStep), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0); 
-						if(depthy<-border) { depthy = depthShape(shape, p + vec2(0, -microStep), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0); ny = depthy-depth; }else ny = depth-depthy; 
+						float depthx =               depthShape(shape, p + vec2( microStep, 0), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0, p1, p2); 
+						if(depthx<-border) { depthx = depthShape(shape, p + vec2(-microStep, 0), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0, p1, p2); nx = depthx-depth; }else nx = depth-depthx; 
+						float depthy =               depthShape(shape, p + vec2(0,  microStep), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0, p1, p2); 
+						if(depthy<-border) { depthy = depthShape(shape, p + vec2(0, -microStep), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0, p1, p2); ny = depthy-depth; }else ny = depth-depthy; 
 						
 						
 						/*Todo: When cleartype is on, it could be low quality using dfdx() and dfdy()*/
@@ -8721,9 +8824,9 @@ $(V_size+G_size)".text
 							shape, p, vec2(0, 0), size, 
 							roundingRadius, border, 
 							bevelType, bevelParam, 
-							chamfer, aspect, param0
+							chamfer, aspect, param0, param1, param2
 						); 
-						const vec3 n = nd.xyz; 
+						const vec3 n = nd.xyz; 
 						
 						// If normal is zero (outside), return black
 						if(n == vec3(0))
