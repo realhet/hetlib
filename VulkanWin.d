@@ -3240,7 +3240,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				const isBevel = !!bevelType || !!bevelParam; 
 				uint extraFlags = (isBevel?1:0)|(chamfer?2:0)|(aspect?4:0)|(p0?8:0)|(p1?16:0)|(p2?32:0); 
-				auto extra = assemble(bits(extraFlags, 6), bits(shape, 3)); 
+				auto extra = assemble(bits(extraFlags, 6), bits(shape, 4)); 
 				if(isBevel)
 				extra = assemble(
 					extra, 	bits(bevelType&7, 3), 
@@ -8009,10 +8009,10 @@ $(V_size+G_size)".text
 					{
 						P3 = P4; P4 = fetchFormattedPoint2D(bitStream); 
 						
-						uint shapeFlags = fetch_uint(bitStream, 6+3); 
-						if((shapeFlags & 1)!=0) setBits(shapeFlags,  9, 8, fetch_uint(bitStream, 8)); //bevelType, bevelParam
-						if((shapeFlags & 2)!=0) setBits(shapeFlags, 17, 4, fetch_uint(bitStream, 4)); //chamfer
-						if((shapeFlags & 4)!=0) setBits(shapeFlags, 21, 8, fetch_uint(bitStream, 8)); //aspect
+						uint shapeFlags = fetch_uint(bitStream, 6+4); 
+						if((shapeFlags & 1)!=0) setBits(shapeFlags, 10, 8, fetch_uint(bitStream, 8)); //bevelType, bevelParam
+						if((shapeFlags & 2)!=0) setBits(shapeFlags, 18, 4, fetch_uint(bitStream, 4)); //chamfer
+						if((shapeFlags & 4)!=0) setBits(shapeFlags, 22, 8, fetch_uint(bitStream, 8)); //aspect
 						
 						const float param0 = (shapeFlags &  8)!=0 ? fetchFormattedPoint1D(bitStream) : 0.0; 
 						const float param1 = (shapeFlags & 16)!=0 ? fetchFormattedPoint1D(bitStream) : 0.0; 
@@ -8682,8 +8682,77 @@ $(V_size+G_size)".text
 						return length(p)*sign(p.x); 
 					} 
 					
+					float sdRing(in vec2 p, in vec2 n, in float r, float th )
+					{
+						p.x = abs(p.x); 
+						p = mat2x2(n.x,n.y,-n.y,n.x)*p; 
+						return max(
+							 abs(length(p)-r)-th*0.5,
+							length(vec2(p.x,max(0.0,abs(r-p.y)-th*0.5)))*sign(p.x) 
+						); 
+					} 
 					
-					#define Shape_indexMask 7
+					float msign(in float x) { return (x<0.0)?-1.0:1.0; } 
+					float sdEllipse(vec2 p, in vec2 ab)
+					{
+						if(ab.x==ab.y) return length(p)-ab.x; 
+						
+						p = abs( p ); 
+						if(p.x>p.y) { p=p.yx; ab=ab.yx; }
+						
+						float l = ab.y*ab.y - ab.x*ab.x; 
+						float m = ab.x*p.x/l; float m2 = m*m; 
+						float n = ab.y*p.y/l; float n2 = n*n; 
+						float c = (m2+n2-1.0)/3.0; float c2 = c*c; float c3 = c*c2; 
+						float d = c3 + m2*n2; 
+						float q = d  + m2*n2; 
+						float g = m  + m *n2; 
+						
+						float co; 
+						
+						if(d<0.0)
+						{
+							float h = acos(q/c3)/3.0; 
+							float s = cos(h); s += 2.0; 
+							float t = sin(h); t *= sqrt(3.0); 
+							float rx = sqrt(m2-c*(s+t)); 
+							float ry = sqrt(m2-c*(s-t)); 
+							co = ry + sign(l)*rx + abs(g)/(rx*ry); 
+						}
+						else
+						{
+								// q>0
+							float h = 2.0*m*n*sqrt(d); 	// h>0
+							float s = pow(q+h, 1.0/3.0 ); 	// s>0
+							float t = c2/s; 	// t>0
+							float rx = -(s+t) - c*4.0 + 2.0*m2; 
+							float ry =  (s-t)*sqrt(3.0); 
+							float rm = sqrt( rx*rx + ry*ry ); 
+							co = ry/sqrt(rm-rx) + 2.0*g/rm; 
+						}
+						co = (co-m)/2.0; 
+						
+						float si = sqrt(max(1.0-co*co,0.0)); 
+						
+						vec2 r = ab * vec2(co,si); 
+						
+						return length(r-p) * msign(p.y-r.y); 
+					} 
+					
+					float sdHeart(in vec2 p)
+					{
+						p.x = abs(p.x); 
+						
+						if(p.y+p.x>1.0)
+						return sqrt(dot2(p-vec2(0.25,0.75))) - sqrt(2.0)/4.0; 
+						return sqrt(
+							min(
+								dot2(p-vec2(0.00,1.00)),
+								dot2(p-0.5*max(p.x+p.y,0.0))
+							)
+						) * sign(p.x-p.y); 
+					} 
+					
 					
 					#define Shape_box 0
 					#define Shape_chamferBox 1
@@ -8691,13 +8760,18 @@ $(V_size+G_size)".text
 					#define Shape_trapezoid 3
 					#define Shape_parallelogram 4
 					#define Shape_rhombus 5
-					#define Shape_polygon 6
+					#define Shape_ngon 6
+					#define Shape_pie 7
+					#define Shape_ellipse 8
+					#define Shape_symbol 9
 					
 					float sdShape(in uint shape, in vec2 p, in vec2 topLeft, in vec2 size, in float p0, in float p1, in float p2)
 					{
-						vec2 halfSize = size/2.; 
-						vec2 pp = p-(topLeft + halfSize); 
-						switch(shape & Shape_indexMask)
+						const vec2 halfSize = size/2.; 
+						const float r = min(halfSize.x, halfSize.y); 
+						const vec2 pp = p-(topLeft + halfSize); 
+						const vec2 ppRot = (pp*vec2(1, -1))*rotZ(-p2); //rotated around param2, flipped y to top.
+						switch(shape)
 						{
 							case Shape_box: 	return sdBox(pp, halfSize); 
 							case Shape_chamferBox: 	return sdChamferBox(pp, halfSize, p0); 
@@ -8705,7 +8779,17 @@ $(V_size+G_size)".text
 							case Shape_trapezoid: 	return sdTrapezoid(pp, p0*halfSize.x, p1*halfSize.x, halfSize.y); 
 							case Shape_parallelogram: 	return sdParallelogram(pp, halfSize.x-abs(p0*halfSize.x), halfSize.y, -p0*halfSize.x); 
 							case Shape_rhombus: 	return sdRhombus(pp, halfSize); 
-							case Shape_polygon: 	return sdStar(pp*vec2(1, -1), min(halfSize.x, halfSize.y)*p1, p0, p2); 
+							case Shape_ngon: 	return sdStar(ppRot, min(halfSize.x, halfSize.y), p0, ((p1!=0)?(p1):(1.0))); 
+							case Shape_pie: 	return sdRing(
+								ppRot, vec2(cos(p0), sin(p0)), 
+								r * (1.0 - ((p1!=0)?(p1):(1.0))/2),
+								r * ((p1!=0)?(p1):(1.0))
+							); 
+							case Shape_ellipse: 	return sdEllipse(ppRot, halfSize*vec2(((p0!=0)?(p0):(1.0)), ((p1!=0)?(p1):(1.0)))); 
+							case Shape_symbol: 	switch(int(floor(p0))) {
+								case 0: 	return sdHeart(ppRot/(r*1.48) + vec2(0, .55))*(r*1.48); 
+								default: 	return 1e30; 
+							}
 							default: 	return 1e30; 
 						}
 					} 
@@ -8772,22 +8856,21 @@ $(V_size+G_size)".text
 						//topLeft -= border;
 						float depth = depthShape(shape, p, topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0, p1, p2); 
 						
-						float microStep = border/65536; 
+						float microStep = border/4096; 
 						
-						/*
-							//2 samples: It's fast, but bugs with 45deg chamfers
-							vec2 d = microStep * vec2(p.x>topLeft.x+size.x/2.0 ? -1. : 1., p.y>topLeft.y+size.y/2.0 ? -1. : 1.);
-							float nx = sign(d.x) * (depth - depthShape(shp, p + vec2(d.x, 0), topLeft, size, roundingRadius, border, p0));
-							float ny = sign(d.y) * (depth - depthShape(shp, p + vec2(0, d.y), topLeft, size, roundingRadius, border, p0));
-						*/
+						//2 samples: It's fast, but bugs with 45deg chamfers
+						vec2 d = microStep * vec2(p.x>topLeft.x+size.x/2.0 ? -1. : 1., p.y>topLeft.y+size.y/2.0 ? -1. : 1.); 
+						float nx = sign(d.x) * (depth - depthShape(shape, p + vec2(d.x, 0), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0, p1, p2)); 
+						float ny = sign(d.y) * (depth - depthShape(shape, p + vec2(0, d.y), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0, p1, p2)); 
 						
 						//this samplig fixes problems with 45deg chamfers when the light comes from the topLeft.
-						float nx, ny; 
-						float depthx =               depthShape(shape, p + vec2( microStep, 0), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0, p1, p2); 
-						if(depthx<-border) { depthx = depthShape(shape, p + vec2(-microStep, 0), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0, p1, p2); nx = depthx-depth; }else nx = depth-depthx; 
-						float depthy =               depthShape(shape, p + vec2(0,  microStep), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0, p1, p2); 
-						if(depthy<-border) { depthy = depthShape(shape, p + vec2(0, -microStep), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0, p1, p2); ny = depthy-depth; }else ny = depth-depthy; 
-						
+						/*
+							float nx, ny; 
+							float depthx =               depthShape(shape, p + vec2( microStep, 0), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0, p1, p2); 
+							if(depthx<-border) { depthx = depthShape(shape, p + vec2(-microStep, 0), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0, p1, p2); nx = depthx-depth; }else nx = depth-depthx; 
+							float depthy =               depthShape(shape, p + vec2(0,  microStep), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0, p1, p2); 
+							if(depthy<-border) { depthy = depthShape(shape, p + vec2(0, -microStep), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0, p1, p2); ny = depthy-depth; }else ny = depth-depthy; 
+						*/
 						
 						/*Todo: When cleartype is on, it could be low quality using dfdx() and dfdy()*/
 						vec3 n = depth<-border ? vec3(0) : normalize(vec3(nx, ny, microStep)); 
@@ -8806,16 +8889,16 @@ $(V_size+G_size)".text
 						const float param2        = fragFloats1.z; 
 						
 						const uint shapeFlags = floatBitsToUint(fragFloats1.w); 
-						const uint shape = getBits(shapeFlags, 6, 3); 
-						const uint bevelType = (((shapeFlags & 1)!=0) ?(getBits(shapeFlags, 9, 3)):(0)); 
-						const float bevelParam = (((shapeFlags & 1)!=0) ?(((float(getBits(shapeFlags, 12, 5)))-16.0)/16.0):(0.0)); 
+						const uint shape = getBits(shapeFlags, 6, 4); 
+						const uint bevelType = (((shapeFlags & 1)!=0) ?(getBits(shapeFlags, 10, 3)):(0)); 
+						const float bevelParam = (((shapeFlags & 1)!=0) ?(((float(getBits(shapeFlags, 13, 5)))-16.0)/16.0):(0.0)); 
 						const float chamfer = (((shapeFlags & 2)!=0) ?(
-							(float(getBits(shapeFlags, 17, 4)))
+							(float(getBits(shapeFlags, 18, 4)))
 							* (1.0/((1<<4)-1))
 						):(0.0)); 
 						const float aspect = (((shapeFlags & 4)!=0) ?(
 							max(
-								(float(getBits(int(shapeFlags), 21, 8)))
+								(float(getBits(int(shapeFlags), 22, 8)))
 								* (1.0/((1<<(8-1))-1)), -1
 							)
 						):(0.0)); 
