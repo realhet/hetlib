@@ -8705,7 +8705,7 @@ $(V_size+G_size)".text
 							case Shape_trapezoid: 	return sdTrapezoid(pp, p0*halfSize.x, p1*halfSize.x, halfSize.y); 
 							case Shape_parallelogram: 	return sdParallelogram(pp, halfSize.x-abs(p0*halfSize.x), halfSize.y, -p0*halfSize.x); 
 							case Shape_rhombus: 	return sdRhombus(pp, halfSize); 
-							case Shape_polygon: 	return sdStar((p - (size+topLeft)/2)*vec2(1, -1), min(halfSize.x, halfSize.y)*p1, p0, p2); 
+							case Shape_polygon: 	return sdStar(pp*vec2(1, -1), min(halfSize.x, halfSize.y)*p1, p0, p2); 
 							default: 	return 1e30; 
 						}
 					} 
