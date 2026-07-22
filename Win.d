@@ -1355,6 +1355,7 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 	enum SamplerEffect : ubyte
 	{none, quad, karc} 
 	
+	
 	struct GlobalShaderParams {
 		float[] floats; 
 		bool[] bools; 
@@ -1430,14 +1431,6 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 		void fillTriangle(in vec2 a, in vec2 b, in vec2 c); //not important
 		
 		void* getGfxBuilder(); 
-		
-		void shapeRect(
-			in bounds2 b, uint shape, 
-			uint bevelType=0, float bevelParam=0, 
-			float chamfer=0, float aspect=0, 
-			float p0=0, float p1=0, float p2=0
-		); 
-		
 	} 
 	struct RectAlign
 	{

@@ -1824,7 +1824,48 @@ version(/+$DIDE_REGION+/all)
 				initiateLoad(bmp); 
 			} 
 		} 
-	}
+	}
+	enum ShapeKind : ubyte
+	{
+		box,
+		chamferBox,
+		pianoKey,
+		trapezoid,
+		parallelogram,
+		rhombus,
+		ngon,
+		pie,
+		ellipse,
+		symbol
+	} 
+	
+	enum ShapeSymbol : ubyte
+	{heart} 
+	
+	
+	struct BevelParams
+	{
+		float width=0, rounding=0; 
+		bool doubled, mirrored, inverted; 
+		float param=0; //-1..1
+		float chamfer=0; //0..1
+		float aspect=0; //-1..1
+		
+		@property uint type() const => ((doubled)?(1):(0))|
+		((mirrored)?(2):(0))|
+		((inverted)?(4):(0)); 
+		@property void type(uint value) {
+			doubled 	= !!(value & 1), 
+			mirrored 	= !!(value & 2), 
+			inverted 	= !!(value & 4); 
+		} 
+	} 
+	
+	struct ShapeParams
+	{
+		ShapeKind kind; 
+		float p0=0, p1=0, p2=0; 
+	} 
 }
 version(/+$DIDE_REGION+/all) {
 	struct GfxContent
@@ -3229,33 +3270,33 @@ Use SvgParser to prepare absolute SVG command stream!"
 				); 
 			} 
 			
-			void drawShapeRect(B)(
-				in B bnd, uint shape, 
-				uint bevelType=0, float bevelParam=0, 
-				float chamfer=0, float aspect=0, 
-				float p0=0, float p1=0, float p2=0
-			)
+			void drawShape(in bounds2 bnd, in ShapeParams shape, in BevelParams bevel=BevelParams.init)
 			{
-				begin(4+1, {}); synch_transform, synch_PALH, synch_colors; 
+				begin(4+1, {}); 
 				
-				const isBevel = !!bevelType || !!bevelParam; 
-				uint extraFlags = (isBevel?1:0)|(chamfer?2:0)|(aspect?4:0)|(p0?8:0)|(p1?16:0)|(p2?32:0); 
-				auto extra = assemble(bits(extraFlags, 6), bits(shape, 4)); 
+				
+				PS = bevel.rounding, LW = bevel.width; /+Todo: This craps PS and LW!+/
+				synch_transform, synch_PALH, synch_colors, synch_PS, synch_LW; 
+				
+				const isBevel = !!bevel.type || !!bevel.param; 
+				uint extraFlags = 	(isBevel?1:0)|(bevel.chamfer?2:0)|(bevel.aspect?4:0)|
+					(shape.p0?8:0)|(shape.p1?16:0)|(shape.p2?32:0); 
+				auto extra = assemble(bits(extraFlags, 6), bits(shape.kind, 4)); 
 				if(isBevel)
 				extra = assemble(
-					extra, 	bits(bevelType&7, 3), 
-						bits(((iround(bevelParam*16))+16).clamp(0, 31), 5)
+					extra, 	bits(bevel.type&7, 3), 
+						bits(((iround(bevel.param*16))+16).clamp(0, 31), 5)
 				); 
-				if(chamfer) extra = assemble(extra, bits((iround(chamfer.clamp(0, 1)*15)), 4)); 
-				if(aspect) extra = assemble(extra, aspect.to_snorm); 
+				if(bevel.chamfer) extra = assemble(extra, bits((iround(bevel.chamfer.clamp(0, 1)*15)), 4)); 
+				if(bevel.aspect) extra = assemble(extra, bevel.aspect.to_snorm); 
 				
 				emit(
 					mixin(舉!((Opcode),q{drawMove}))	, assemblePoint(bnd.topLeft    ),
 					mixin(舉!((Opcode),q{drawShapeRect}))	, assemblePoint(bnd.bottomRight), extra
 				); 
-				if(p0) emit(assemblePoint(p0)); 
-				if(p1) emit(assemblePoint(p1)); 
-				if(p2) emit(assemblePoint(p2)); 
+				if(shape.p0) emit(assemblePoint(shape.p0)); 
+				if(shape.p1) emit(assemblePoint(shape.p1)); 
+				if(shape.p2) emit(assemblePoint(shape.p2)); 
 			} 
 			
 			
@@ -3419,7 +3460,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1B0CF82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1B41B82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -3521,7 +3562,9 @@ Use SvgParser to prepare absolute SVG command stream!"
 		//entry point to setup custom variables for the customShader
 		
 		string Drawing_customShader; 
-	} 
+	} 
+	
+	
 	
 	deprecated class DrawingProxy : IDrawing
 	{
@@ -3712,24 +3755,6 @@ Use SvgParser to prepare absolute SVG command stream!"
 			void fillRect(float x0, float y0, float x1, float y1)
 			{ fillRect(bounds2(x0, y0, x1, y1)); } 
 			
-			void shapeRect(
-				in bounds2 b, uint shape, 
-				uint bevelType=0, float bevelParam=0, 
-				float chamfer=0, float aspect=0, 
-				float p0=0, float p1=0, float p2=0
-			)
-			{
-				{
-					gfx.PS = pointSize; 
-					gfx.LW = lineWidth; 
-					gfx.PC = color; 
-				}{
-					gfx.synch_PS; 
-					gfx.synch_LW; 
-					gfx.synch_PC; 
-				}
-				gfx.drawShapeRect(b, shape, bevelType, bevelParam, chamfer, aspect, p0, p1, p2); 
-			} 
 			
 			
 			
@@ -5543,18 +5568,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2AC0682886ADB).檢(
+					((0x2AD9D82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2AC7882886ADB))))
+				if((互!((bool),(0),(0x2AE0F82886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2AD0C82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2AD2382886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2AEA382886ADB).檢((互!((float/+w=12+/),(1.000),(0x2AEBA82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5567,8 +5592,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2AEF882886ADB).檢 (imVG)),
-					((0x2AF1E82886ADB).檢 (imFPS)); 
+					((0x2B08F82886ADB).檢 (imVG)),
+					((0x2B0B582886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -8753,17 +8778,8 @@ $(V_size+G_size)".text
 						) * sign(p.x-p.y); 
 					} 
 					
-					
-					#define Shape_box 0
-					#define Shape_chamferBox 1
-					#define Shape_pianoKey 2
-					#define Shape_trapezoid 3
-					#define Shape_parallelogram 4
-					#define Shape_rhombus 5
-					#define Shape_ngon 6
-					#define Shape_pie 7
-					#define Shape_ellipse 8
-					#define Shape_symbol 9
+					$(GEN_enumDefines!ShapeKind)
+					$(GEN_enumDefines!ShapeSymbol)
 					
 					float sdShape(in uint shape, in vec2 p, in vec2 topLeft, in vec2 size, in float p0, in float p1, in float p2)
 					{
@@ -8773,21 +8789,21 @@ $(V_size+G_size)".text
 						const vec2 ppRot = (pp*vec2(1, -1))*rotZ(-p2); //rotated around param2, flipped y to top.
 						switch(shape)
 						{
-							case Shape_box: 	return sdBox(pp, halfSize); 
-							case Shape_chamferBox: 	return sdChamferBox(pp, halfSize, p0); 
-							case Shape_pianoKey: 	return sdPianoKey(pp, halfSize, p0, p1, p2); 
-							case Shape_trapezoid: 	return sdTrapezoid(pp, p0*halfSize.x, p1*halfSize.x, halfSize.y); 
-							case Shape_parallelogram: 	return sdParallelogram(pp, halfSize.x-abs(p0*halfSize.x), halfSize.y, -p0*halfSize.x); 
-							case Shape_rhombus: 	return sdRhombus(pp, halfSize); 
-							case Shape_ngon: 	return sdStar(ppRot, min(halfSize.x, halfSize.y), p0, ((p1!=0)?(p1):(1.0))); 
-							case Shape_pie: 	return sdRing(
+							case ShapeKind_box: 	return sdBox(pp, halfSize); 
+							case ShapeKind_chamferBox: 	return sdChamferBox(pp, halfSize, p0); 
+							case ShapeKind_pianoKey: 	return sdPianoKey(pp, halfSize, p0, p1, p2); 
+							case ShapeKind_trapezoid: 	return sdTrapezoid(pp, p0*halfSize.x, p1*halfSize.x, halfSize.y); 
+							case ShapeKind_parallelogram: 	return sdParallelogram(pp, halfSize.x-abs(p0*halfSize.x), halfSize.y, -p0*halfSize.x); 
+							case ShapeKind_rhombus: 	return sdRhombus(pp, halfSize); 
+							case ShapeKind_ngon: 	return sdStar(ppRot, min(halfSize.x, halfSize.y), p0, ((p1!=0)?(p1):(1.0))); 
+							case ShapeKind_pie: 	return sdRing(
 								ppRot, vec2(cos(p0), sin(p0)), 
 								r * (1.0 - ((p1!=0)?(p1):(1.0))/2),
 								r * ((p1!=0)?(p1):(1.0))
 							); 
-							case Shape_ellipse: 	return sdEllipse(ppRot, halfSize*vec2(((p0!=0)?(p0):(1.0)), ((p1!=0)?(p1):(1.0)))); 
-							case Shape_symbol: 	switch(int(floor(p0))) {
-								case 0: 	return sdHeart(ppRot/(r*1.48) + vec2(0, .55))*(r*1.48); 
+							case ShapeKind_ellipse: 	return sdEllipse(ppRot, halfSize*vec2(((p0!=0)?(p0):(1.0)), ((p1!=0)?(p1):(1.0)))); 
+							case ShapeKind_symbol: 	switch(int(floor(p0))) {
+								case ShapeSymbol_heart: 	return sdHeart(ppRot/(r*1.48) + vec2(0, .55))*(r*1.48); 
 								default: 	return 1e30; 
 							}
 							default: 	return 1e30; 
@@ -8859,6 +8875,7 @@ $(V_size+G_size)".text
 						float microStep = border/4096; 
 						
 						//2 samples: It's fast, but bugs with 45deg chamfers
+						//260720 It looks ok.
 						vec2 d = microStep * vec2(p.x>topLeft.x+size.x/2.0 ? -1. : 1., p.y>topLeft.y+size.y/2.0 ? -1. : 1.); 
 						float nx = sign(d.x) * (depth - depthShape(shape, p + vec2(d.x, 0), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0, p1, p2)); 
 						float ny = sign(d.y) * (depth - depthShape(shape, p + vec2(0, d.y), topLeft, size, roundingRadius, border, bevelType, bevelParam, chamfer, aspect, p0, p1, p2)); 
