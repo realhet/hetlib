@@ -17,8 +17,6 @@ version(/+$DIDE_REGION+/all)
 	import std.bitmanip: bitfields; 
 	import std.traits, std.meta; 
 	
-	
-	
 	version(/+$DIDE_REGION OpenGL -> Vulkan transition+/all)
 	{
 		version(VulkanUI) {}else version = OpenGLUI; 
@@ -889,7 +887,7 @@ version(/+$DIDE_REGION+/all)
 	{ return cells.empty ? def : cells.map!"a.outerHeight".sum; } 
 	
 	float calcFlexSum(Cell[] cells)
-	{ return cells.map!"a.flex".sum; } 
+	{ return cells.map!"a.flex.value.value".sum; } 
 	
 	bool isWhite(const Cell c)
 	{ auto g = cast(const Glyph)c; return g && g.isWhite; } 
@@ -904,22 +902,24 @@ version(/+$DIDE_REGION+/all)
 		  //Padding, Margin ///////////////////////////////////////////////////
 		//alias all this; not working that way
 		
-		float top=0, right=0, bottom=0, left=0; 
+		//float top=0, right=0, bottom=0, left=0; 
+		
+		UpperFloat top, right, bottom, left; 
 		@property
 		{
 			float all() const
 			{ return avg(horz, vert); } 
 			void all(float a)
-			{ left = right = top = bottom = a; } 
+			{ left = a, right = left, top = left, bottom = left; } 
 			
 			float horz() const
 			{ return avg(left, right); } 
 			void horz(float a)
-			{ left = right = a; } 
+			{ left = a, right = left; } 
 			float vert() const
 			{ return avg(top, bottom); } 
 			void vert(float a)
-			{ top = bottom = a; } 
+			{ top = a, bottom = top; } 
 		} 
 		
 		private static float toF(string s)
@@ -930,12 +930,10 @@ version(/+$DIDE_REGION+/all)
 		
 		void setProps(in string s)
 		{
-			 //shorthand
-			if(s.empty)
-			return; 
+			//shorthand
+			if(s.empty) return; 
 			auto p = s.split(' ').filter!"!a.empty".array; 
-			if(p.empty)
-			return; 
+			if(p.empty) return; 
 			
 			float f()
 			{ auto a = toF(p[0]); p = p[1..$]; return a; } 
@@ -968,58 +966,111 @@ version(/+$DIDE_REGION+/all)
 		
 		void set(float a, float b)
 		{
-			top 	= bottom 	= a; 
-			left	= right	= b; 
+			top = bottom = a; 
+			left = right = b; 
 		} 
 		
 		void set(float a, float b, float c, float d)
-		{
-			top	= a; 
-			right	= b; 
-			bottom 	= c; 
-			left	= d; 
-		} 
+		{ top = a, right = b, bottom = c, left = d; } 
 		
-		void apply(T)(ref T r, float scale = 1)
+		void apply(T)(ref T r, float scale)
 		{
-			r.left 	+= scale*left; 
-			r.top 	+= scale*top; 
-			r.right 	-= scale*right; 
+			r.left 	+= scale*left,
+			r.top 	+= scale*top,
+			r.right 	-= scale*right,
 			r.bottom 	-= scale*bottom; 
+		} void apply(T)(ref T r)
+		{
+			r.left 	+= left,
+			r.top 	+= top,
+			r.right 	-= right,
+			r.bottom 	-= bottom; 
 		} 
 		
 		void unapply(T)(ref T r)
 		{ apply(r, -1); } 
+		
+		this(float a) { set(a); } 
+		this(float a, float b) { set(a, b); } 
+		this(float a, float b, float c, float d) { set(a, b, c, d); } 
 	} 
 	
-	alias Margin = Padding; 
+	alias Margin = Padding; 
 	
-	enum BorderStyle
-	{ none, normal, dot, dash, dashDot, dash2, dashDot2, double_} 
+	enum BorderStyle : ubyte
+	{none, normal, dot, dash, dashDot, dash2, dashDot2, double_} 
 	
 	auto toBorderStyle(string s)
 	{
-		 //Border ///////////////////////////
 		//synomyms
-				 if(s=="single")
+		if(s=="single")
 		s="normal"; 
 		else if(s=="double") s="double_"; 
 		return s.to!BorderStyle; 
 	} 
 	
+	struct UpperFloat
+	{
+		ushort _raw;  //Only store the 16 upper bits.  Enough for font sizes and such.
+		@property value() const 
+		=> uintBitsToFloat((cast(uint)(_raw))<<16);  @property value(float a)
+		{ _raw = (cast(ushort)(a.floatBitsToUint>>16)); } 
+		alias this = value; 
+		this(float a) { this.value = a; } 
+		
+		UpperFloat opAssign(float a)
+		{ this.value = a; return this; } 
+		
+		UpperFloat opOpAssign(string op)(float rhs)
+		{ this.value = mixin("this.value"~op~"rhs"); return this; } 
+	} 
+	
+	
 	struct Border
 	{
-		float width = 0; 
-		BorderStyle style = BorderStyle.normal;  //Todo: too many bits
+		//private ushort _width = 0 /+upper 16 bits of float, rest is 0+/; 
+		UpperFloat width; 
+		ubyte flags = 1; 
 		RGB color = clBlack; 
 		
-		bool inset;  //border has a size inside gap and margin
-		float ofs = 0; //border is offsetted by ofs*width
-		bool extendBottomRight; //for grid cells
-		bool borderFirst; //for code editor: it is possible to make round borders with it.
+		/+
+			@property width() const 
+				=> uintBitsToFloat((cast(uint)(_width))<<16); 	@property width(float a)
+				{ _width = (cast(ushort)(a.floatBitsToUint>>16)); } 
+		+/
+		
+		
+		@property style() const 
+		=> (cast(BorderStyle)(flags.getBits(0, 4))); 	@property style(BorderStyle a)
+		{ flags = (cast(ubyte)(flags.setBits(0, 4, a))); } 
+			
+		@property inset() const 
+		=> !!flags.getBit(4); 	@property inset(bool a)
+		{ flags = (cast(ubyte)(flags.setBits(4, 1, a))); } 
+		@property extendBottomRight() const 
+		=> !!flags.getBit(5); 	@property extendBottomRight(bool a)
+		{ flags = (cast(ubyte)(flags.setBits(5, 1, a))); } 
+		@property borderFirst() const 
+		=> !!flags.getBit(6); 	@property borderFirst(bool a)
+		{ flags = (cast(ubyte)(flags.setBits(6, 1, a))); } 
+		
+		this(
+			float width, BorderStyle style=BorderStyle.normal, RGB color = clBlack,
+			bool inset=false /+border has no allocated space, it is just painted over+/, 
+			bool extendBottomRight=false /+for grid cells+/, 
+			bool borderFirst=false /+for code editor: it is possible to make round borders with it.+/
+		)
+		{
+			this.width = width; 
+			this.color = color; 
+			this.style = style; 
+			this.inset = inset; 
+			this.extendBottomRight = extendBottomRight; 
+			this.borderFirst = borderFirst; 
+		} 
 		
 		float gapWidth() const
-		{ return inset ? 0 : width; } //effective borderWidth
+		=> inset ? 0 : width; //effective borderWidth
 		
 		void opAssign(in string s)
 		{ setProps(s); } 
@@ -1027,39 +1078,27 @@ version(/+$DIDE_REGION+/all)
 		void setProps(in string s)
 		{
 			//shortHand: [width] style [color]
-			if(s.empty)
-			return; 
+			
+			if(s.empty) return; 
 			auto p = s.split(' ').filter!"!a.empty".array; 
-			if(p.empty)
-			return; 
+			if(p.empty) return; 
 			
 			//Todo: the properties can be in any order.
 			//Todo: support the inset property
 			
-			//width
 			bool hasWidth; 
 			if(p[0][0].isDigit)
 			{
-				hasWidth = true; 
-				width = p[0].to!float; 
-				p = p[1..$]; 
-				if(p.empty)
-				return; 
+				hasWidth = true; width = p[0].to!float; 
+				p = p[1..$]; if(p.empty) return; 
 			}
 			
-			//style
 			style = p[0].toBorderStyle; 
 			if(!hasWidth && style!=BorderStyle.none)
-			width = 1; //default width
+			width = 1 /+default width+/; 
 			p = p[1..$]; 
-			if(p.empty)
-			{
-				color = g_actFontColor; //default color
-				return; 
-			}
 			
-			//color
-			color = p[0].toRGB; 
+			color = ((p.empty)?(g_actFontColor):(p[0].toRGB)); 
 		} 
 		
 		void setProps(string[string] p, string prefix)
@@ -1073,33 +1112,21 @@ version(/+$DIDE_REGION+/all)
 		
 		
 		bounds2 adjustBounds(in bounds2 bb)
-		{
-			bounds2 res = bb; 
-			if(extendBottomRight)
-			with(res.high)
-			{ x += width; y += width; }
-			return res; 
-		} 
+		{ bounds2 res = bb; if(extendBottomRight) res.high += width.value; return res; } 
 	} 
 	
-	auto toLineStyle(BorderStyle bs)
-	{
-		with(BorderStyle)
-		switch(bs)
-		{
-			case dot: 	   return LineStyle.dot; 
-			case dash: 	   return LineStyle.dash; 
-			case dashDot: 	   return LineStyle.dashDot; 
-			case dash2: 	   return LineStyle.dash2; 
-			case dashDot2: 	   return LineStyle.dashDot2; 
-			default: return LineStyle.normal; 
-		}
-		
-	} 
-	
+	LineStyle toLineStyle(BorderStyle style)
+	=> style.predSwitch(
+		BorderStyle.dot	, LineStyle.dot,
+		BorderStyle.dash	, LineStyle.dash,
+		BorderStyle.dashDot	, LineStyle.dashDot,
+		BorderStyle.dash2	, LineStyle.dash2,
+		BorderStyle.dashDot2	, LineStyle.dashDot2,
+			LineStyle.normal
+	); 
 	
 	struct _FlexValue
-	{ float val=0; alias val this; } //ganyolas
+	{ UpperFloat value=0; alias this = value; } //ganyolas
 	
 	///This struct is returned by locate()
 	struct CellLocation
@@ -1432,8 +1459,6 @@ version(/+$DIDE_REGION+/all)
 			dr.color = border.color; 
 			dr.lineWidth = bw * (border.style==BorderStyle.double_ ? 0.33f : 1); 
 			
-			if(border.ofs)
-			{ auto o = border.ofs *= bw; bb = bb.inflated(o, o); }
 			bb = border.adjustBounds(bb); 
 			
 			void doit(float sh=0)
@@ -1466,7 +1491,8 @@ version(/+$DIDE_REGION+/all)
 			
 		} 
 		
-	} 
+	} 
+	
 	
 	
 	//helper function to access a texture of a font character
@@ -3335,11 +3361,11 @@ version(/+$DIDE_REGION+/all)
 		{
 			public
 			{
-				 //Todo: ezt a publicot leszedni es megoldani szepen
+				//Todo: ezt a publicot leszedni es megoldani szepen
 				_FlexValue flex_; 
 				Margin margin_; 
-				Padding	padding_; 
-				Border	border_; 
+				Padding padding_; 
+				Border border_; 
 			} 
 		} 
 		
@@ -5353,7 +5379,26 @@ version(/+$DIDE_REGION+/all)
 		} 
 	} 
 	
+	
 	
+	/+
+		260718: Size reduction
+		Border: 20, Cell: 32, Glyph: 61, Container: 136, Row: 153, Column: 136
+		
+		After refactoring Border:
+		Border: 8, Cell:32, Glyph:61, Container:128, Row:145, Column:128
+		
+		Further refactor: 16bit upper float:
+		Border: 6, Cell:32, Glyph:61, Container:128, Row:145, Column:128
+		
+		Padding, Border uses UpperFloats:
+		Border: 6, Cell:32, Glyph:61, Container:112, Row:129, Column:112
+		
+		FlexValue -> UpperFloat
+		Border: 6, Cell:32, Glyph:61, Container:104, Row:121, Column:104 
+	+/
+	
+	pragma(msg,i"Border: $(Border.sizeof), Cell:$(__traits(classInstanceSize, Cell)), Glyph:$(__traits(classInstanceSize, Glyph)), Container:$(__traits(classInstanceSize, Container)), Row:$(__traits(classInstanceSize, Row)), Column:$(__traits(classInstanceSize, Column))".text.注); 
 }
 version(/+$DIDE_REGION+/all)
 {
