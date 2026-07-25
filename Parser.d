@@ -2850,9 +2850,30 @@ version(/+$DIDE_REGION Keywords+/all)
 	
 	struct SyntaxStyle
 	{
-		RGB fontColor, bkColor; 
-		int fontFlags; //1:b, 2:i, 4:u
+		RGB fontColor, bkColor; ushort fontFlags; //1:b, 2:i, 4:u
+		
+		/*
+			this(RGB fontColor, RGB bkColor, uint flags)
+				{
+					this.fontColor = fontColor; 
+					this.bkColor = bkColor; 
+					this.flags = (cast(ushort)(flags)); 
+				} 
+				
+				this(RGB fontColor, RGB bkColor, string flags="")
+				{
+					this(
+						fontColor, bkColor, 
+						(cast(ushort)(
+							(flags.canFind('b')?1:0)|
+							(flags.canFind('i')?2:0)|
+							(flags.canFind('u')?4:0)
+						))
+					); 
+				} 
+		*/
 	} 
+	static assert(SyntaxStyle.sizeof==8); 
 	
 	static if(0)
 	{
@@ -2955,39 +2976,95 @@ version(/+$DIDE_REGION Keywords+/all)
 	immutable SyntaxStyleRow[] syntaxTable =[
 		{"Whitespace"	, [{(RGB(clBlack))	,(RGB(clWhite))	,0}, { (RGB(clEgaYellow))	,(RGB(clEgaLowBlue))	,0}, { (RGB(clC64LBlue))	,(RGB(clC64Blue))	,0}, { (RGB(0xc7c5c5))	,(RGB(0x2f2f2f)) ,0}]},
 		{"Selected"	, [{ (RGB(clWhite))	,(RGB(10841427))	,0}, { (RGB(clEgaLowBlue))	,(RGB(clEgaLightGray))	,0}, { (RGB(clC64Blue))	,(RGB(clC64LBlue))	,0}, { (RGB(clBlack))	,(RGB(clPink)) ,0}]},
-		{"FoundAct"	, [{ (RGB(0xFCFDCD))	,clBlack	,0}, { (RGB(clEgaLightGray))	,(RGB(clEgaBlack))	,0}, { (RGB(clC64LGrey))	,(RGB(clC64Black))	,0}, { (RGB(clBlack))	,(RGB(clPink)) ,0}]},
-		{"FoundAlso"	, [{ clBlack	,0x78AAFF	,0}, { clEgaLightGray	,clEgaBrown	,0}, { clC64LGrey	,clC64DGrey	,0}, { clBlack	,clPink.darken(.25) ,0}]},
-		{"NavLink"	, [{ clBlue	,(RGB(clWhite))	,4}, { clEgaHighRed	,clEgaLowBlue	,4}, { clC64Red	,clC64Blue	,0}, { 0xFF8888	,0x2d2d2d ,4}]},
-		{"Number"	, [{ clBlue	,(RGB(clWhite))	,0}, { clEgaYellow	,clEgaLowBlue	,0}, { clC64Yellow	,clC64Blue	,0}, { 0x0094FA	,0x2d2d2d ,0}]},
-		{"String"	, [{ clBlue	,clSkyBlue	,0}, { clEgaHighCyan	,clEgaLowBlue	,0}, { clC64Cyan	,clC64Blue	,0}, { 0x64E000	,0x283f28 ,0}]},
-		{"Keyword"	, [{ clNavy	,(RGB(clWhite))	,1}, { clEgaWhite	,clEgaLowBlue	,1}, { clC64White	,clC64Blue	,0}, { 0x5C00F6	,0x2d2d2d ,1}]},
-		{"Symbol"	, [{ clBlack	,(RGB(clWhite))	,0}, { clEgaYellow	,clEgaLowBlue	,0}, { clC64Yellow	,clC64Blue	,0}, { 0x00E2E1	,0x2d2d2d ,0}]},
-		{"Comment"	, [{ clNavy	,clYellow	,2}, { clEgaLightGray	,clEgaLowBlue	,2}, { clC64LGrey	,clC64Blue	,0}, { 0xf75Dd5	,0x442d44 ,2}]},
-		{"Directive"	, [{ clTeal	,(RGB(clWhite))	,0}, { clEgaHighGreen	,clEgaLowBlue	,0}, { clC64Green	,clC64Blue	,0}, { 0x4Db5e6	,0x2d4444 ,0}]},
-		{"Identifier1"	, [{ clBlack	,(RGB(clWhite))	,0}, { clEgaYellow	,clEgaLowBlue	,0}, { clC64Yellow	,clC64Blue	,0}, { (RGB(0xc7c5c5))	,0x2d2d2d ,0}]},
-		{"Identifier2"	, [{ clGreen	,(RGB(clWhite))	,0}, { clEgaHighGreen	,clEgaLowBlue	,0}, { clC64LGreen	,clC64Blue	,0}, { clGreen	,0x2d2d2d ,0}]},
-		{"Identifier3"	, [{ clTeal	,(RGB(clWhite))	,0}, { clEgaHighCyan	,clEgaLowBlue	,0}, { clC64Cyan	,clC64Blue	,0}, { clTeal	,0x2d2d2d ,0}]},
-		{"Identifier4"	, [{ clPurple	,(RGB(clWhite))	,0}, { clEgaHighMagenta	,clEgaLowBlue	,0}, { clC64Purple	,clC64Blue	,0}, { (RGB(0x9136AA)), 0x2d2d2d ,0}]},
-		{"Identifier5"	, [{ 0x0040b0	,(RGB(clWhite))	,0}, { clEgaBrown	,clEgaLowBlue	,0}, { clC64Orange	,clC64Blue	,0}, { (RGB(0x0060f0))	,0x2d2d2d ,0}]},
-		{"Identifier6"	, [{ 0xb04000	,(RGB(clWhite))	,0}, { clEgaHighBlue	,clEgaLowBlue	,0}, { clC64LBlue	,clC64Blue	,0}, { (RGB(0xf06000))	,0x2d2d2d ,0}]},
-		{"Label"	, [{ clBlack	,0xDDFFEE	,4}, { clBlack	,clEgaHighCyan	,0}, { clBlack	,clC64Cyan	,0}, { 0xFFA43B	,0x2d2d2d ,2}]},
-		{"Attribute"	, [{ clPurple	,(RGB(clWhite))	,1}, { clEgaHighMagenta	,clEgaLowBlue	,1}, { clC64Purple	,clC64Blue	,1}, { 0xAAB42B	,0x2d2d2d ,1}]},
-		{"BasicType"	, [{ clTeal	,(RGB(clWhite))	,1}, { clEgaHighCyan	,clEgaLowBlue	,1}, { clC64Cyan	,clC64Blue	,1}, { (RGB(clWhite))	,0x2d2d2d ,1}]},
-		{"Binary1"	, [{ (RGB(clWhite))	,clBlue	,0}, { clEgaLowBlue	,clEgaYellow	,0}, { clC64Blue	,clC64Yellow	,0}, { 0x2d2d2d	,0x20bCFA ,0}]},
-		{"Error"	, [SyntaxStyle((RGB(clWhite))	,clRed     ,0)].replicate(4)},
-		{"Exception"	, [SyntaxStyle(clYellow	,clRed     ,0)].replicate(4)},
-		{"Warning"	, [SyntaxStyle(clBlack	,clYellow     ,0)].replicate(4)},
-		{"Deprecation"	, [SyntaxStyle(clBlack	,clAqua      ,0)].replicate(4)},
-		{"Note"	, [SyntaxStyle(clBlack	,clPostit,2)].replicate(4)},
-		{"Todo"	, [SyntaxStyle((RGB(clWhite))	,clWowBlue   ,2)].replicate(4)},
-		{"Opt"	, [SyntaxStyle((RGB(clWhite))	,clWowPurple	,2)].replicate(4)},
-		{"Bug"	, [SyntaxStyle((RGB(clWhite))	,clOrange	,2)].replicate(4)},
-		{"Link"	, [SyntaxStyle(clWowBlue	,(RGB(clWhite))    ,4)].replicate(4)},
+		{"FoundAct"	, [{ (RGB(0xFCFDCD))	,(RGB(clBlack))	,0}, { (RGB(clEgaLightGray))	,(RGB(clEgaBlack))	,0}, { (RGB(clC64LGrey))	,(RGB(clC64Black))	,0}, { (RGB(clBlack))	,(RGB(clPink)) ,0}]},
+		{"FoundAlso"	, [{ (RGB(clBlack))	,(RGB(0x78AAFF))	,0}, { clEgaLightGray	,clEgaBrown	,0}, { clC64LGrey	,clC64DGrey	,0}, { (RGB(clBlack))	,(RGB(clPink)).darken(.25) ,0}]},
+		{"NavLink"	, [{ (RGB(clBlue))	,(RGB(clWhite))	,4}, { clEgaHighRed	,clEgaLowBlue	,4}, { clC64Red	,clC64Blue	,0}, { (RGB(0xFF8888))	,(RGB(0x2d2d2d)) ,4}]},
+		{"Number"	, [{ (RGB(clBlue))	,(RGB(clWhite))	,0}, { clEgaYellow	,clEgaLowBlue	,0}, { clC64Yellow	,clC64Blue	,0}, { (RGB(0x0094FA))	,(RGB(0x2d2d2d)) ,0}]},
+		{"String"	, [{ (RGB(clBlue))	,(RGB(clSkyBlue))	,0}, { clEgaHighCyan	,clEgaLowBlue	,0}, { clC64Cyan	,clC64Blue	,0}, { (RGB(0x64E000))	,(RGB(0x283f28)) ,0}]},
+		{"Keyword"	, [{ (RGB(clNavy))	,(RGB(clWhite))	,1}, { clEgaWhite	,clEgaLowBlue	,1}, { clC64White	,clC64Blue	,0}, { (RGB(0x5C00F6))	,(RGB(0x2d2d2d)) ,1}]},
+		{"Symbol"	, [{ (RGB(clBlack))	,(RGB(clWhite))	,0}, { clEgaYellow	,clEgaLowBlue	,0}, { clC64Yellow	,clC64Blue	,0}, { (RGB(0x00E2E1))	,(RGB(0x2d2d2d)) ,0}]},
+		{"Comment"	, [{ (RGB(clNavy))	,(RGB(clYellow))	,2}, { clEgaLightGray	,clEgaLowBlue	,2}, { clC64LGrey	,clC64Blue	,0}, { (RGB(0xf75Dd5))	,(RGB(0x442d44)) ,2}]},
+		{"Directive"	, [{ (RGB(clTeal))	,(RGB(clWhite))	,0}, { clEgaHighGreen	,clEgaLowBlue	,0}, { clC64Green	,clC64Blue	,0}, { (RGB(0x4Db5e6))	,(RGB(0x2d4444)) ,0}]},
+		{"Identifier1"	, [{ (RGB(clBlack))	,(RGB(clWhite))	,0}, { clEgaYellow	,clEgaLowBlue	,0}, { clC64Yellow	,clC64Blue	,0}, { (RGB(0xc7c5c5))	,(RGB(0x2d2d2d)) ,0}]},
+		{"Identifier2"	, [{ (RGB(clGreen))	,(RGB(clWhite))	,0}, { clEgaHighGreen	,clEgaLowBlue	,0}, { clC64LGreen	,clC64Blue	,0}, { (RGB(clGreen))	,(RGB(0x2d2d2d)) ,0}]},
+		{"Identifier3"	, [{ (RGB(clTeal))	,(RGB(clWhite))	,0}, { clEgaHighCyan	,clEgaLowBlue	,0}, { clC64Cyan	,clC64Blue	,0}, { (RGB(clTeal))	,(RGB(0x2d2d2d)) ,0}]},
+		{"Identifier4"	, [{ (RGB(clPurple))	,(RGB(clWhite))	,0}, { clEgaHighMagenta	,clEgaLowBlue	,0}, { clC64Purple	,clC64Blue	,0}, { (RGB(0x9136AA)), (RGB(0x2d2d2d)) ,0}]},
+		{"Identifier5"	, [{ (RGB(0x0040b0))	,(RGB(clWhite))	,0}, { clEgaBrown	,clEgaLowBlue	,0}, { clC64Orange	,clC64Blue	,0}, { (RGB(0x0060f0))	,(RGB(0x2d2d2d)) ,0}]},
+		{"Identifier6"	, [{ (RGB(0xb04000))	,(RGB(clWhite))	,0}, { clEgaHighBlue	,clEgaLowBlue	,0}, { clC64LBlue	,clC64Blue	,0}, { (RGB(0xf06000))	,(RGB(0x2d2d2d)) ,0}]},
+		{"Label"	, [{ (RGB(clBlack))	,(RGB(0xDDFFEE))	,4}, { clBlack	,clEgaHighCyan	,0}, { clBlack	,clC64Cyan	,0}, { 0xFFA43B	,0x2d2d2d ,2}]},
+		{"Attribute"	, [{ (RGB(clPurple))	,(RGB(clWhite))	,1}, { clEgaHighMagenta	,clEgaLowBlue	,1}, { clC64Purple	,clC64Blue	,1}, { 0xAAB42B	,0x2d2d2d ,1}]},
+		{"BasicType"	, [{ (RGB(clTeal))	,(RGB(clWhite))	,1}, { clEgaHighCyan	,clEgaLowBlue	,1}, { clC64Cyan	,clC64Blue	,1}, { (RGB(clWhite))	,0x2d2d2d ,1}]},
+		{"Binary1"	, [{ (RGB(clWhite))	,(RGB(clBlue))	,0}, { clEgaLowBlue	,clEgaYellow	,0}, { clC64Blue	,clC64Yellow	,0}, { 0x2d2d2d	,0x20bCFA ,0}]},
+		{"Error"	, [SyntaxStyle((RGB(clWhite))	,(RGB(clRed))     ,0)].replicate(4)},
+		{"Exception"	, [SyntaxStyle((RGB(clYellow))	,(RGB(clRed))     ,0)].replicate(4)},
+		{"Warning"	, [SyntaxStyle((RGB(clBlack))	,(RGB(clYellow))     ,0)].replicate(4)},
+		{"Deprecation"	, [SyntaxStyle((RGB(clBlack))	,(RGB(clAqua))      ,0)].replicate(4)},
+		{"Note"	, [SyntaxStyle((RGB(clBlack))	,(RGB(clPostit)),2)].replicate(4)},
+		{"Todo"	, [SyntaxStyle((RGB(clWhite))	,(RGB(clWowBlue))   ,2)].replicate(4)},
+		{"Opt"	, [SyntaxStyle((RGB(clWhite))	,(RGB(clWowPurple))	,2)].replicate(4)},
+		{"Bug"	, [SyntaxStyle((RGB(clWhite))	,(RGB(clOrange))	,2)].replicate(4)},
+		{"Link"	, [SyntaxStyle((RGB(clWowBlue))	,(RGB(clWhite))    ,4)].replicate(4)},
 		{"Code"	, [SyntaxStyle((RGB(0xc7c5c5))	, mix((RGB(0x2f2f2f)), (RGB(0x442d44)), .33) ,0)].replicate(4)}, //code is actually a codeComment, not compileable code.
-		{"Console"	, [SyntaxStyle((RGB(clWhite)) ,clBlack,0)].replicate(4)},
-		{"Interact"	, [SyntaxStyle(clBlack ,(RGB(clWhite)),0)].replicate(4)},
-		{"Inherit"	, [SyntaxStyle(clBlack ,(RGB(clWhite)),0)].replicate(4)},
+		{"Console"	, [SyntaxStyle((RGB(clWhite)) ,(RGB(clBlack)),0)].replicate(4)},
+		{"Interact"	, [SyntaxStyle((RGB(clBlack)) ,(RGB(clWhite)),0)].replicate(4)},
+		{"Inherit"	, [SyntaxStyle((RGB(clBlack)) ,(RGB(clWhite)),0)].replicate(4)},
 	]; 
+	
+	/+
+		AI: /+
+			User: I have old messy code:
+			/+
+				Code: immutable syntaxPresetNames =	             ["Default"             , "Classic"                         , "C64"                   , "Dark"                     ]; 
+				immutable SyntaxStyleRow[] syntaxTable =[
+					{"Whitespace"	, [{(RGB(clBlack))	,(RGB(clWhite))	,0}, { (RGB(clEgaYellow))	,(RGB(clEgaLowBlue))	,0}, { (RGB(clC64LBlue))	,(RGB(clC64Blue))	,0}, { (RGB(0xc7c5c5))	,(RGB(0x2f2f2f)) ,0}]},
+					{"Selected"	, [{ (RGB(clWhite))	,(RGB(10841427))	,0}, { (RGB(clEgaLowBlue))	,(RGB(clEgaLightGray))	,0}, { (RGB(clC64Blue))	,(RGB(clC64LBlue))	,0}, { (RGB(clBlack))	,(RGB(clPink)) ,0}]},
+					{"FoundAct"	, [{ (RGB(0xFCFDCD))	,(RGB(clBlack))	,0}, { (RGB(clEgaLightGray))	,(RGB(clEgaBlack))	,0}, { (RGB(clC64LGrey))	,(RGB(clC64Black))	,0}, { (RGB(clBlack))	,(RGB(clPink)) ,0}]},
+					{"FoundAlso"	, [{ (RGB(clBlack))	,(RGB(0x78AAFF))	,0}, { clEgaLightGray	,clEgaBrown	,0}, { clC64LGrey	,clC64DGrey	,0}, { (RGB(clBlack))	,(RGB(clPink)).darken(.25) ,0}]},
+					{"NavLink"	, [{ (RGB(clBlue))	,(RGB(clWhite))	,4}, { clEgaHighRed	,clEgaLowBlue	,4}, { clC64Red	,clC64Blue	,0}, { (RGB(0xFF8888))	,(RGB(0x2d2d2d)) ,4}]},
+					{"Number"	, [{ (RGB(clBlue))	,(RGB(clWhite))	,0}, { clEgaYellow	,clEgaLowBlue	,0}, { clC64Yellow	,clC64Blue	,0}, { (RGB(0x0094FA))	,(RGB(0x2d2d2d)) ,0}]},
+					{"String"	, [{ (RGB(clBlue))	,(RGB(clSkyBlue))	,0}, { clEgaHighCyan	,clEgaLowBlue	,0}, { clC64Cyan	,clC64Blue	,0}, { (RGB(0x64E000))	,(RGB(0x283f28)) ,0}]},
+					{"Keyword"	, [{ (RGB(clNavy))	,(RGB(clWhite))	,1}, { clEgaWhite	,clEgaLowBlue	,1}, { clC64White	,clC64Blue	,0}, { (RGB(0x5C00F6))	,(RGB(0x2d2d2d)) ,1}]},
+					{"Symbol"	, [{ (RGB(clBlack))	,(RGB(clWhite))	,0}, { clEgaYellow	,clEgaLowBlue	,0}, { clC64Yellow	,clC64Blue	,0}, { (RGB(0x00E2E1))	,(RGB(0x2d2d2d)) ,0}]},
+					{"Comment"	, [{ (RGB(clNavy))	,(RGB(clYellow))	,2}, { clEgaLightGray	,clEgaLowBlue	,2}, { clC64LGrey	,clC64Blue	,0}, { (RGB(0xf75Dd5))	,(RGB(0x442d44)) ,2}]},
+					{"Directive"	, [{ (RGB(clTeal))	,(RGB(clWhite))	,0}, { clEgaHighGreen	,clEgaLowBlue	,0}, { clC64Green	,clC64Blue	,0}, { (RGB(0x4Db5e6))	,(RGB(0x2d4444)) ,0}]},
+					{"Identifier1"	, [{ (RGB(clBlack))	,(RGB(clWhite))	,0}, { clEgaYellow	,clEgaLowBlue	,0}, { clC64Yellow	,clC64Blue	,0}, { (RGB(0xc7c5c5))	,(RGB(0x2d2d2d)) ,0}]},
+					{"Identifier2"	, [{ (RGB(clGreen))	,(RGB(clWhite))	,0}, { clEgaHighGreen	,clEgaLowBlue	,0}, { clC64LGreen	,clC64Blue	,0}, { (RGB(clGreen))	,(RGB(0x2d2d2d)) ,0}]},
+					{"Identifier3"	, [{ (RGB(clTeal))	,(RGB(clWhite))	,0}, { clEgaHighCyan	,clEgaLowBlue	,0}, { clC64Cyan	,clC64Blue	,0}, { (RGB(clTeal))	,(RGB(0x2d2d2d)) ,0}]},
+					{"Identifier4"	, [{ (RGB(clPurple))	,(RGB(clWhite))	,0}, { clEgaHighMagenta	,clEgaLowBlue	,0}, { clC64Purple	,clC64Blue	,0}, { (RGB(0x9136AA)), (RGB(0x2d2d2d)) ,0}]},
+					{"Identifier5"	, [{ (RGB(0x0040b0))	,(RGB(clWhite))	,0}, { clEgaBrown	,clEgaLowBlue	,0}, { clC64Orange	,clC64Blue	,0}, { (RGB(0x0060f0))	,(RGB(0x2d2d2d)) ,0}]},
+					{"Identifier6"	, [{ (RGB(0xb04000))	,(RGB(clWhite))	,0}, { clEgaHighBlue	,clEgaLowBlue	,0}, { clC64LBlue	,clC64Blue	,0}, { (RGB(0xf06000))	,(RGB(0x2d2d2d)) ,0}]},
+					{"Label"	, [{ (RGB(clBlack))	,(RGB(0xDDFFEE))	,4}, { clBlack	,clEgaHighCyan	,0}, { clBlack	,clC64Cyan	,0}, { 0xFFA43B	,0x2d2d2d ,2}]},
+					{"Attribute"	, [{ (RGB(clPurple))	,(RGB(clWhite))	,1}, { clEgaHighMagenta	,clEgaLowBlue	,1}, { clC64Purple	,clC64Blue	,1}, { 0xAAB42B	,0x2d2d2d ,1}]},
+					{"BasicType"	, [{ (RGB(clTeal))	,(RGB(clWhite))	,1}, { clEgaHighCyan	,clEgaLowBlue	,1}, { clC64Cyan	,clC64Blue	,1}, { (RGB(clWhite))	,0x2d2d2d ,1}]},
+					{"Binary1"	, [{ (RGB(clWhite))	,(RGB(clBlue))	,0}, { clEgaLowBlue	,clEgaYellow	,0}, { clC64Blue	,clC64Yellow	,0}, { 0x2d2d2d	,0x20bCFA ,0}]},
+					{"Error"	, [SyntaxStyle((RGB(clWhite))	,(RGB(clRed))     ,0)].replicate(4)},
+					{"Exception"	, [SyntaxStyle((RGB(clYellow))	,(RGB(clRed))     ,0)].replicate(4)},
+					{"Warning"	, [SyntaxStyle((RGB(clBlack))	,(RGB(clYellow))     ,0)].replicate(4)},
+					{"Deprecation"	, [SyntaxStyle((RGB(clBlack))	,(RGB(clAqua))      ,0)].replicate(4)},
+					{"Note"	, [SyntaxStyle((RGB(clBlack))	,(RGB(clPostit)),2)].replicate(4)},
+					{"Todo"	, [SyntaxStyle((RGB(clWhite))	,(RGB(clWowBlue))   ,2)].replicate(4)},
+					{"Opt"	, [SyntaxStyle((RGB(clWhite))	,(RGB(clWowPurple))	,2)].replicate(4)},
+					{"Bug"	, [SyntaxStyle((RGB(clWhite))	,(RGB(clOrange))	,2)].replicate(4)},
+					{"Link"	, [SyntaxStyle((RGB(clWowBlue))	,(RGB(clWhite))    ,4)].replicate(4)},
+					{"Code"	, [SyntaxStyle((RGB(0xc7c5c5))	, mix((RGB(0x2f2f2f)), (RGB(0x442d44)), .33) ,0)].replicate(4)}, //code is actually a codeComment, not compileable code.
+					{"Console"	, [SyntaxStyle((RGB(clWhite)) ,(RGB(clBlack)),0)].replicate(4)},
+					{"Interact"	, [SyntaxStyle((RGB(clBlack)) ,(RGB(clWhite)),0)].replicate(4)},
+					{"Inherit"	, [SyntaxStyle((RGB(clBlack)) ,(RGB(clWhite)),0)].replicate(4)},
+				]; 
+			+/
+			
+			I want you to extract the data from it and make a nice table like this:
+			/+
+				Code: (表([
+					[q{/+Note: SyntaxKind+/},q{/+Note: Default+/},q{/+Note:+/},q{/+Note:+/},q{/+Note: Classic+/},q{/+Note:+/},q{/+Note:+/}],
+					[q{whitespace},q{(RGB(clBlack))},q{(RGB(clWhite))},q{""},q{(RGB(clEgaYellow))},q{(RGB(clEgaLowBlue))},q{""}],
+				]))
+			+/
+			The number (0, 2, 4, etc is there for fontstyle. Convert it to a "biu" string. Letters represent 1:b:Bold, 2:i:Italic, 4:u:Underline.
+			The replicate(4) parts must not be replicated, just don't emit any cells, only in the first 3 columns.
+		+/
+	+/
+	
 	
 	mixin(format!"enum SyntaxKind:ubyte   {%s}"(syntaxTable.map!"a.kindName".join(','))); 
 	mixin(format!"enum SyntaxPreset {%s}"(syntaxPresetNames.join(','))); 
@@ -4255,7 +4332,7 @@ version(/+$DIDE_REGION Keywords+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1FD90899FD657).檢(0x1D64BFDEAC48D)); 
+			((0x21708899FD657).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 

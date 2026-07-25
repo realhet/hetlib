@@ -10709,7 +10709,7 @@ version(/+$DIDE_REGION Colors+/all)
 			clAll	= clDelphi ~ clEga ~ clPet ~ clC64 ~ clWow ~ clVim ~ clRainbow ~ clSol ~ clAxis ~ clSticky; 
 		
 		
-		private RGB colorByName(string name, bool mustExists=false)
+		RGB colorByName(string name, bool mustExists=false)
 		{
 			
 			__gshared static RGB[string] map; 
@@ -10739,10 +10739,13 @@ version(/+$DIDE_REGION Colors+/all)
 		RGB toRGB(string s, bool mustExists=false)
 		{
 			s = s.strip; 
-			enforce(!s.empty, `Empty RGB literal.`); 
+			if(s.empty) {
+				if(mustExists)	enforce(false, `Empty RGB literal.`); 
+				else	return clFuchsia; 
+			}
 			
 			//decimal or hex number
-			if(s[0].inRange('0', '9')) return RGB(s.toInt); 
+			if(s[0].inRange('0', '9')) return RGB(s.toInt!uint); 
 			
 			//rgb(0,0,255)
 			if(s.isWild("*?(*?,*?,*?)"))

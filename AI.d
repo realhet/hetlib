@@ -200,13 +200,23 @@ class AiChat
 						/ 1e6 * 380 /+Todo: more accurate usd to huf+/
 					)~ before 260402
 				+/
+				/+
+					(
+						(
+							cached_prompt_tokens	*0.028*scale+
+							(prompt_tokens-cached_prompt_tokens)	*0.28*scale+
+							completion_tokens	*0.42*scale
+						)
+						/ 1e6 * 333 /+Todo: more accurate usd to huf+/
+					)~ before 260725
+				+/
 				(
 					(
-						cached_prompt_tokens	*0.028*scale+
-						(prompt_tokens-cached_prompt_tokens)	*0.28*scale+
-						completion_tokens	*0.42*scale
+						cached_prompt_tokens	*0.0028*scale+
+						(prompt_tokens-cached_prompt_tokens)	*0.14*scale+
+						completion_tokens	*0.28*scale
 					)
-					/ 1e6 * 333 /+Todo: more accurate usd to huf+/
+					/ 1e6 * 318/+1 usd to huf+/ /+Todo: more accurate usd to huf+/
 				)~
 				format!"price: %3d%%)"((scale*100).iround); 
 			} 
