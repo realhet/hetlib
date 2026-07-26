@@ -12,7 +12,7 @@ version(/+$DIDE_REGION+/all)
 	import het.inputs: 	rawMousePos, 
 		/+for slider:+/slowMouse, mouseMoveRelX, mouseMoveRelY, mouseLock, mouseUnlock; 
 	
-	import het.parser: SyntaxKind, SyntaxPreset, syntaxTable, defaultSyntaxPreset; 
+	import het.parser: SyntaxKind, syntaxStyle; 
 	
 	import std.bitmanip: bitfields; 
 	import std.traits, std.meta; 
@@ -176,10 +176,11 @@ version(/+$DIDE_REGION+/all)
 	
 	enum TargetSurface { world = 0, gui = 1 } 
 	
-	immutable DefaultFontName = //this is	the cached font
-		"Segoe UI"
+	immutable DefaultFontName = //this is the cached font
+	"Segoe UI"
 	//"Lucida Console"
 	//"Consolas" <- too curvy
+	//"Times New Roman"
 	; 
 	
 	immutable
@@ -263,7 +264,6 @@ version(/+$DIDE_REGION+/all)
 		im.textEditorState.wrappedLines = wrappedLines; 
 	} 
 	
-	
 	void drawTextEditorOverlay(Drawing dr, Row row)
 	{
 		import het.ui: im; 
@@ -540,17 +540,29 @@ version(/+$DIDE_REGION+/all)
 	{
 		Tp res = def; 
 		
-		enum isWrapperStruct = __traits(hasMember, Tp, "val") && Fields!Tp.length==1; //is it encapsulated in a wrapper struct?  -> struct{ type val; }
+		enum isWrapperStruct = __traits(hasMember, Tp, "val") && Fields!Tp.length==1; 
+		//is it encapsulated in a wrapper struct?  -> struct{ type val; }
 		
-		enum checkDuplicatedParams = q{
-			static assert(!__traits(compiles, duplicated_parameter), "Duplicated parameter type: %s%s".format(Tp.stringof, fallback ? "("~typeof(Tp.val).stringof~")" : "")); 
+		enum checkDuplicatedParams = 
+		q{
+			static assert(
+				!__traits(compiles, duplicated_parameter), 
+				"Duplicated parameter type: %s%s"
+				.format(Tp.stringof, fallback ? "("~typeof(Tp.val).stringof~")" : "")
+			); 
 			enum duplicated_parameter = 1; 
 		}; 
 		
 		static foreach_reverse(idx, t; T)
 		{
-			//check simple types/structs
-			static if(isCompatible!(typeof(res), t, __traits(compiles,	res = args[idx]), __traits(compiles, res = args[idx].toDelegate)))
+			static if(
+				//check simple types/structs
+				isCompatible!(
+					typeof(res), t, 
+					__traits(compiles,	res = args[idx]), 
+					__traits(compiles, res = args[idx].toDelegate)
+				)
+			)
 			{
 				static if(__traits(compiles, res = args[idx]))
 				res = args[idx]; else
@@ -558,7 +570,13 @@ version(/+$DIDE_REGION+/all)
 				mixin(checkDuplicatedParams); 
 			}
 			else static if(
-				fallback && isWrapperStruct && isCompatible!(typeof(res.val), t, __traits(compiles,	res.val = args[idx]), __traits(compiles, res.val = args[idx].toDelegate))//check fallback struct.val
+				//check fallback struct.val
+				fallback && isWrapperStruct && 
+				isCompatible!(
+					typeof(res.val), t, 
+					__traits(compiles,	res.val = args[idx]), 
+					__traits(compiles, res.val = args[idx].toDelegate)
+				)
 			)
 			{
 				static if(__traits(compiles, res.val = args[idx]))
@@ -612,7 +630,10 @@ version(/+$DIDE_REGION+/all)
 		{
 			static foreach(t; T)
 			{
-				static if((isFunctionPointer!t || isDelegate!t) && Parameters!t.length==0 && !is(ReturnType!t==void) && __traits(compiles, res = args[idx]().to!Tr))
+				static if(
+					(isFunctionPointer!t || isDelegate!t) && Parameters!t.length==0 
+					&& !is(ReturnType!t==void) && __traits(compiles, res = args[idx]().to!Tr)
+				)
 				{ res = args[idx]().to!Tr; }else static if(isPointer!t && __traits(compiles, res = (*args[idx]).to!Tr))
 				{ res = (*args[idx]).to!Tr; }
 			}
@@ -626,16 +647,16 @@ version(/+$DIDE_REGION+/all)
 		{
 			static foreach(t; T)
 			{
-				static if((isFunctionPointer!t || isDelegate!t) && Parameters!t.length==1 && is(ReturnType!t==void) && __traits(compiles, args[idx](val.to!Tr)))
+				static if(
+					(isFunctionPointer!t || isDelegate!t) && Parameters!t.length==1 
+					&& is(ReturnType!t==void) && __traits(compiles, args[idx](val.to!Tr))
+				)
 				{ args[idx](val.to!Tr); }else static if(isPointer!t && __traits(compiles, *args[idx] = val.to!Tr))
 				{ *args[idx] = val.to!Tr; }
 			}
 		}
 	} 
-	
-	
-	
-	//TextStyle ////////////////////////////////////
+	
 	struct TextStyle
 	{
 		string font = DefaultFontName; 
@@ -674,7 +695,26 @@ version(/+$DIDE_REGION+/all)
 		} 
 		void modify(string cmdLine)
 		{ modify(commandLineToMap(cmdLine)); } 
-	} 
+		
+		/// Lookup a syntax style and apply it to a TextStyle reference
+		void applySyntax(Flag!"bkColor" setBkColor = Yes.bkColor)(SyntaxKind syntax)
+		in(syntax<=SyntaxKind.max)
+		{
+			const ref fmt = syntaxStyle(syntax); 
+			this.fontColor = fmt.fontColor; 
+			if(setBkColor) this.bkColor = fmt.bkColor; 
+			this.bold = fmt.fontFlags.getBit(0); 
+			this.italic = fmt.fontFlags.getBit(1); 
+			this.underline = fmt.fontFlags.getBit(2); 
+		} 
+		
+		void applySyntax_noBk(SyntaxKind syntax)
+		{ applySyntax!(No.bkColor)(syntax); } 
+	} 
+	
+	auto tsSyntax(SyntaxKind syntax)
+	{ auto ts = tsNormal; ts.applySyntax(syntax); return ts; } 
+	
 	
 	mixin((
 		(表([
@@ -2588,6 +2628,10 @@ version(/+$DIDE_REGION+/all)
 			
 		}
 	} 
+	/+
+		This appendCode() stuff is not used by DIDE anymore. ->CodeColumnBuilder
+		I keep it for simple syntax highlighting.
+	+/
 	
 	/*
 		*
@@ -2601,8 +2645,9 @@ version(/+$DIDE_REGION+/all)
 	*/
 	
 	void appendCode(
-		Container cntr, string text, in ubyte[] syntax, 
-		void delegate(ubyte) applySyntax, ref TextStyle ts, int nonStringTabToSpaces=-1
+		Container cntr, string text, in SyntaxKind[] syntax, 
+		void delegate(SyntaxKind) applySyntax, ref TextStyle ts, 
+		int nonStringTabToSpaces=-1
 	)
 	in(text.length == syntax.length)
 	{
@@ -2629,8 +2674,8 @@ version(/+$DIDE_REGION+/all)
 	} 
 	
 	bool updateSyntax(TC:Container)(
-		TC cntr, string text, in ubyte[] syntax, 
-		void delegate(ubyte) applySyntax, 
+		TC cntr, string text, in SyntaxKind[] syntax, 
+		void delegate(SyntaxKind) applySyntax, 
 		ref TextStyle ts, out bool wasWidthChange, 
 		int nonStringTabToSpaces=-1
 	)
@@ -2727,39 +2772,6 @@ version(/+$DIDE_REGION+/all)
 	//Todo: Refactor the whole Row/Glyph/Syntax mystery
 	
 	
-	
-	
-	/// Lookup a syntax style and apply it to a TextStyle reference
-	void applySyntax(Flag!"bkColor" bkColor = Yes.bkColor)(ref TextStyle ts, uint syntax, SyntaxPreset preset)
-	in(syntax<syntaxTable.length)
-	{
-		auto fmt = &syntaxTable[syntax].formats[preset]; 
-		ts.fontColor = fmt.fontColor; 
-		if(bkColor)
-		ts.bkColor   = fmt.bkColor; 
-		ts.bold	= fmt.fontFlags.getBit(0); 
-		ts.italic	= fmt.fontFlags.getBit(1); 
-		ts.underline	= fmt.fontFlags.getBit(2); 
-	} 
-	
-	
-	/// Shorthand with global default preset
-	void applySyntax(Flag!"bkColor" bkColor = Yes.bkColor)(ref TextStyle ts, uint syntax)
-	{ applySyntax!bkColor(ts, syntax, defaultSyntaxPreset); } 
-	
-	auto tsSyntax(uint syntax, SyntaxPreset preset)
-	{
-		auto ts = tsNormal; 
-		applySyntax(ts, syntax, preset); 
-		return ts; 
-	} 
-	
-	auto tsSyntax(uint syntax)
-	{
-		auto ts = tsNormal; 
-		applySyntax(ts, syntax, defaultSyntaxPreset); 
-		return ts; 
-	} 
 	
 	private struct WrappedLine
 	{

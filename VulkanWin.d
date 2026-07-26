@@ -6767,6 +6767,7 @@ $(V_size+G_size)".text
 					#version 430
 					
 					//Todo: check the warnings!
+					//Todo: Try the new shader language and compiler: SLANG
 					
 					//common stuff
 					#define nan (uintBitsToFloat(0x7fc00000u))
