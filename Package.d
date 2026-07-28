@@ -2895,8 +2895,6 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				return format!q{enum %s {%s} }(name, items.join(", "))~'\n'; 
 			} 
 			
-			
-			
 			version(/+$DIDE_REGION GEN_StructureScanner+/all)
 			{
 				
@@ -3250,6 +3248,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			}.text; 
 		} 
 		
+		string GEN_ReturnCases(表 table)
+		=> table.rows.map!((r)=>(iq{case $(r[0]): return $(r[1]); }.text)).join; 
+		
 		
 		
 		bool waitForZeroAndSet(T)(T* reference, T newValue, int numTries)
@@ -3321,15 +3322,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A14F59F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A1BB59F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A21759F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A28359F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1A2C159F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1A33659F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1A32D59F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1A3A259F156A1})); 
 						+/
 					+/
 				+/
@@ -10425,6 +10426,32 @@ version(/+$DIDE_REGION Colors+/all)
 			clWowPink	= (RGB(0xBA8CF4)),
 			clWowGold	= (RGB(0x80cce5)); 
 		}
+		
+		version(/+$DIDE_REGION Piko palette+/all)
+		{
+			immutable
+			clPiko_G940 	= (RGB(139,  59,  43)),
+			clPiko_G239 	= (RGB(245, 156,   0)),
+			clPiko_G231 	= (RGB(238, 114,   3)),
+			clPiko_G119 	= (RGB(221,  11,  47)),
+			clPiko_G115 	= (RGB(222,   0, 126)),
+			clPiko_G107 	= (RGB(158,  25, 129)),
+			clPiko_G62 	= (RGB( 92,  36, 131)),
+			clPiko_R1 	= (RGB( 22, 186, 231)),
+			clPiko_R2 	= (RGB(  0, 134, 192)),
+			clPiko_R3 	= (RGB(  0, 105, 180)),
+			clPiko_R4 	= (RGB(  0,  79, 159)),
+			clPiko_R9 	= (RGB(  0,  48,  93)),
+			clPiko_W 	= (RGB(134, 188,  37)),
+			clPiko_BW 	= (RGB(101, 179,  46)),
+			clPiko_W3 	= (RGB(  0, 120,  88)),
+			clPiko_WY 	= (RGB(  0, 169, 132)),
+			clPiko_K15 	= (RGB(255, 227, 126)),
+			clPiko_K30 	= (RGB(255, 237,   0)),
+			clPiko_DKW 	= (RGB(255, 204,   0)),
+			clPiko_GE31 	= (RGB(157, 157, 156)); 
+		}
+		 
 		
 		version(/+$DIDE_REGION VIMpalette+/all)
 		{
@@ -10510,8 +10537,7 @@ version(/+$DIDE_REGION Colors+/all)
 			clStickyOrange	= (RGB(0x489dff)),
 			clStickyPink	= (RGB(0xbb94ea)),
 			clStickyRed	= (RGB(0x7f6cf1)),
-			clStickyPurple	= (RGB(0xbbb384))
-			/+Todo: NiceExpressions, hex RGB+/; 
+			clStickyPurple	= (RGB(0xbbb384)); 
 		}
 		
 		version(/+$DIDE_REGION Windows.UI.Colors+/all)

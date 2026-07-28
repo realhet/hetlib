@@ -2267,87 +2267,229 @@ version(/+$DIDE_REGION Tokenizer+/all)
 	} 
 }
 
-version(/+$DIDE_REGION Syntax Highlight Presets+/all)
+version(/+$DIDE_REGION Syntax Presets+/all)
 {
+	private enum TBL_DefaultSyntaxPreset = 
+	(表([
+		[q{Whitespace},q{(RGB(0xc7c5c5))},q{(RGB(0x2f2f2f))},q{""}],
+		[q{Selected},q{(RGB(clBlack))},q{(RGB(clPink))},q{""}],
+		[q{FoundAct},q{(RGB(clBlack))},q{(RGB(clPink))},q{""}],
+		[q{FoundAlso},q{(RGB(clBlack))},q{(RGB(0x9890BF))},q{""}],
+		[q{NavLink},q{(RGB(0xFF8888))},q{(RGB(0x2d2d2d))},q{"u"}],
+		[q{Number},q{(RGB(0x0094FA))},q{(RGB(0x2d2d2d))},q{""}],
+		[q{String},q{(RGB(0x64E000))},q{(RGB(0x283f28))},q{""}],
+		[q{Keyword},q{(RGB(0x5C00F6))},q{(RGB(0x2d2d2d))},q{"b"}],
+		[q{Symbol},q{(RGB(0x00E2E1))},q{(RGB(0x2d2d2d))},q{""}],
+		[q{Comment},q{(RGB(0xf75Dd5))},q{(RGB(0x442d44))},q{"i"}],
+		[q{Directive},q{(RGB(0x4Db5e6))},q{(RGB(0x2d4444))},q{""}],
+		[q{Identifier1},q{(RGB(0xc7c5c5))},q{(RGB(0x2d2d2d))},q{""}],
+		[q{Identifier2},q{(RGB(clGreen))},q{(RGB(0x2d2d2d))},q{""}],
+		[q{Identifier3},q{(RGB(clTeal))},q{(RGB(0x2d2d2d))},q{""}],
+		[q{Identifier4},q{(RGB(0x9136AA))},q{(RGB(0x2d2d2d))},q{""}],
+		[q{Identifier5},q{(RGB(0x0060f0))},q{(RGB(0x2d2d2d))},q{""}],
+		[q{Identifier6},q{(RGB(0xf06000))},q{(RGB(0x2d2d2d))},q{""}],
+		[q{Label},q{(RGB(0xFFA43B))},q{(RGB(0x2d2d2d))},q{"i"}],
+		[q{Attribute},q{(RGB(0xAAB42B))},q{(RGB(0x2d2d2d))},q{"b"}],
+		[q{BasicType},q{(RGB(clWhite))},q{(RGB(0x2d2d2d))},q{"b"}],
+		[q{Binary1},q{(RGB(0x2d2d2d))},q{(RGB(0x20bCFA))},q{""}],
+		[],
+		[q{Error},q{(RGB(clWhite))},q{(RGB(clRed))},q{""}],
+		[q{Exception},q{(RGB(clYellow))},q{(RGB(clRed))},q{""}],
+		[q{Warning},q{(RGB(clBlack))},q{(RGB(clYellow))},q{""}],
+		[q{Deprecation},q{(RGB(clBlack))},q{(RGB(clAqua))},q{""}],
+		[q{Note},q{(RGB(clBlack))},q{(RGB(clPostit))},q{"i"}],
+		[q{Todo},q{(RGB(clWhite))},q{(RGB(clWowBlue))},q{"i"}],
+		[q{Opt},q{(RGB(clWhite))},q{(RGB(clWowPurple))},q{"i"}],
+		[q{Bug},q{(RGB(clWhite))},q{(RGB(clOrange))},q{"i"}],
+		[q{Link},q{(RGB(clWowBlue))},q{(RGB(clWhite))},q{"u"}],
+		[q{Code},q{(RGB(0xc7c5c5))},q{(RGB(0x362E36))},q{""}],
+		[q{Console},q{(RGB(clWhite))},q{(RGB(clBlack))},q{""}],
+		[q{Interact},q{(RGB(clBlack))},q{(RGB(clWhite))},q{""}],
+		[q{Inherit},q{(RGB(clBlack))},q{(RGB(clWhite))},q{""}],
+	]))
+	,
+	TBL_LightSyntaxPreset =
+	(表([
+		[q{Whitespace},q{(RGB(clBlack))},q{(RGB(clWhite))},q{""}],
+		[q{Selected},q{(RGB(clWhite))},q{(RGB(10841427))},q{""}],
+		[q{FoundAct},q{(RGB(0xFCFDCD))},q{(RGB(clBlack))},q{""}],
+		[q{FoundAlso},q{(RGB(clBlack))},q{(RGB(0x78AAFF))},q{""}],
+		[q{NavLink},q{(RGB(clBlue))},q{(RGB(clWhite))},q{"u"}],
+		[q{Number},q{(RGB(clBlue))},q{(RGB(clWhite))},q{""}],
+		[q{String},q{(RGB(clBlue))},q{(RGB(clSkyBlue))},q{""}],
+		[q{Keyword},q{(RGB(clNavy))},q{(RGB(clWhite))},q{"b"}],
+		[q{Symbol},q{(RGB(clBlack))},q{(RGB(clWhite))},q{""}],
+		[q{Comment},q{(RGB(clNavy))},q{(RGB(clYellow))},q{"i"}],
+		[q{Directive},q{(RGB(clTeal))},q{(RGB(clWhite))},q{""}],
+		[q{Identifier1},q{(RGB(clBlack))},q{(RGB(clWhite))},q{""}],
+		[q{Identifier2},q{(RGB(clGreen))},q{(RGB(clWhite))},q{""}],
+		[q{Identifier3},q{(RGB(clTeal))},q{(RGB(clWhite))},q{""}],
+		[q{Identifier4},q{(RGB(clPurple))},q{(RGB(clWhite))},q{""}],
+		[q{Identifier5},q{(RGB(0x0040b0))},q{(RGB(clWhite))},q{""}],
+		[q{Identifier6},q{(RGB(0xb04000))},q{(RGB(clWhite))},q{""}],
+		[q{Label},q{(RGB(clBlack))},q{(RGB(0xDDFFEE))},q{"u"}],
+		[q{Attribute},q{(RGB(clPurple))},q{(RGB(clWhite))},q{"b"}],
+		[q{BasicType},q{(RGB(clTeal))},q{(RGB(clWhite))},q{"b"}],
+		[q{Binary1},q{(RGB(clWhite))},q{(RGB(clBlue))},q{""}],
+	]))
+	,
+	TBL_ClassicSyntaxPreset =
+	(表([
+		[q{Whitespace},q{(RGB(clEgaYellow))},q{(RGB(clEgaLowBlue))},q{""}],
+		[q{Selected},q{(RGB(clEgaLowBlue))},q{(RGB(clEgaLightGray))},q{""}],
+		[q{FoundAct},q{(RGB(clEgaLightGray))},q{(RGB(clEgaBlack))},q{""}],
+		[q{FoundAlso},q{(RGB(clEgaLightGray))},q{(RGB(clEgaBrown))},q{""}],
+		[q{NavLink},q{(RGB(clEgaHighRed))},q{(RGB(clEgaLowBlue))},q{"u"}],
+		[q{Number},q{(RGB(clEgaYellow))},q{(RGB(clEgaLowBlue))},q{""}],
+		[q{String},q{(RGB(clEgaHighCyan))},q{(RGB(clEgaLowBlue))},q{""}],
+		[q{Keyword},q{(RGB(clEgaWhite))},q{(RGB(clEgaLowBlue))},q{"b"}],
+		[q{Symbol},q{(RGB(clEgaYellow))},q{(RGB(clEgaLowBlue))},q{""}],
+		[q{Comment},q{(RGB(clEgaLightGray))},q{(RGB(clEgaLowBlue))},q{"i"}],
+		[q{Directive},q{(RGB(clEgaHighGreen))},q{(RGB(clEgaLowBlue))},q{""}],
+		[q{Identifier1},q{(RGB(clEgaYellow))},q{(RGB(clEgaLowBlue))},q{""}],
+		[q{Identifier2},q{(RGB(clEgaHighGreen))},q{(RGB(clEgaLowBlue))},q{""}],
+		[q{Identifier3},q{(RGB(clEgaHighCyan))},q{(RGB(clEgaLowBlue))},q{""}],
+		[q{Identifier4},q{(RGB(clEgaHighMagenta))},q{(RGB(clEgaLowBlue))},q{""}],
+		[q{Identifier5},q{(RGB(clEgaBrown))},q{(RGB(clEgaLowBlue))},q{""}],
+		[q{Identifier6},q{(RGB(clEgaHighBlue))},q{(RGB(clEgaLowBlue))},q{""}],
+		[q{Label},q{(RGB(clBlack))},q{(RGB(clEgaHighCyan))},q{""}],
+		[q{Attribute},q{(RGB(clEgaHighMagenta))},q{(RGB(clEgaLowBlue))},q{"b"}],
+		[q{BasicType},q{(RGB(clEgaHighCyan))},q{(RGB(clEgaLowBlue))},q{"b"}],
+		[q{Binary1},q{(RGB(clEgaLowBlue))},q{(RGB(clEgaYellow))},q{""}],
+	]))
+	,
+	TBL_C64SyntaxPreset =
+	(表([
+		[q{Whitespace},q{(RGB(clC64LBlue))},q{(RGB(clC64Blue))},q{""}],
+		[q{Selected},q{(RGB(clC64Blue))},q{(RGB(clC64LBlue))},q{""}],
+		[q{FoundAct},q{(RGB(clC64LGrey))},q{(RGB(clC64Black))},q{""}],
+		[q{FoundAlso},q{(RGB(clC64LGrey))},q{(RGB(clC64DGrey))},q{""}],
+		[q{NavLink},q{(RGB(clC64Red))},q{(RGB(clC64Blue))},q{""}],
+		[q{Number},q{(RGB(clC64Yellow))},q{(RGB(clC64Blue))},q{""}],
+		[q{String},q{(RGB(clC64Cyan))},q{(RGB(clC64Blue))},q{""}],
+		[q{Keyword},q{(RGB(clC64White))},q{(RGB(clC64Blue))},q{""}],
+		[q{Symbol},q{(RGB(clC64Yellow))},q{(RGB(clC64Blue))},q{""}],
+		[q{Comment},q{(RGB(clC64LGrey))},q{(RGB(clC64Blue))},q{""}],
+		[q{Directive},q{(RGB(clC64Green))},q{(RGB(clC64Blue))},q{""}],
+		[q{Identifier1},q{(RGB(clC64Yellow))},q{(RGB(clC64Blue))},q{""}],
+		[q{Identifier2},q{(RGB(clC64LGreen))},q{(RGB(clC64Blue))},q{""}],
+		[q{Identifier3},q{(RGB(clC64Cyan))},q{(RGB(clC64Blue))},q{""}],
+		[q{Identifier4},q{(RGB(clC64Purple))},q{(RGB(clC64Blue))},q{""}],
+		[q{Identifier5},q{(RGB(clC64Orange))},q{(RGB(clC64Blue))},q{""}],
+		[q{Identifier6},q{(RGB(clC64LBlue))},q{(RGB(clC64Blue))},q{""}],
+		[q{Label},q{(RGB(clBlack))},q{(RGB(clC64Cyan))},q{""}],
+		[q{Attribute},q{(RGB(clC64Purple))},q{(RGB(clC64Blue))},q{"b"}],
+		[q{BasicType},q{(RGB(clC64Cyan))},q{(RGB(clC64Blue))},q{"b"}],
+		[q{Binary1},q{(RGB(clC64Blue))},q{(RGB(clC64Yellow))},q{""}],
+	])); 
 	
-	struct SyntaxStyle
-	{
-		RGB fontColor, bkColor; ushort fontFlags; //1:b, 2:i, 4:u
-	} 
-	static assert(SyntaxStyle.sizeof==8); 
-	
-	struct SyntaxStyleRow
-	{
-		string kindName; 
-		SyntaxStyle[] formats; 
-	} 
-	
-	//Todo: these should be uploaded to the gpu
-	//Todo: from the program this is NOT extendable
-	//Todo: Get the accent color from WM_DWMCOLORIZATIONCOLORCHANGED 
-	
-	immutable syntaxPresetNames =	             ["Default"             , "Classic"                         , "C64"                   , "Dark"                     ]; 
-	immutable SyntaxStyleRow[] syntaxTable =
-	[
-		{"Whitespace"	, [{(RGB(clBlack))	,(RGB(clWhite))	,0}, { (RGB(clEgaYellow))	,(RGB(clEgaLowBlue))	,0}, { (RGB(clC64LBlue))	,(RGB(clC64Blue))	,0}, { (RGB(0xc7c5c5))	,(RGB(0x2f2f2f)) ,0}]},
-		{"Selected"	, [{ (RGB(clWhite))	,(RGB(10841427))	,0}, { (RGB(clEgaLowBlue))	,(RGB(clEgaLightGray))	,0}, { (RGB(clC64Blue))	,(RGB(clC64LBlue))	,0}, { (RGB(clBlack))	,(RGB(clPink)) ,0}]},
-		{"FoundAct"	, [{ (RGB(0xFCFDCD))	,(RGB(clBlack))	,0}, { (RGB(clEgaLightGray))	,(RGB(clEgaBlack))	,0}, { (RGB(clC64LGrey))	,(RGB(clC64Black))	,0}, { (RGB(clBlack))	,(RGB(clPink)) ,0}]},
-		{"FoundAlso"	, [{ (RGB(clBlack))	,(RGB(0x78AAFF))	,0}, { clEgaLightGray	,clEgaBrown	,0}, { clC64LGrey	,clC64DGrey	,0}, { (RGB(clBlack))	,(RGB(clPink)).darken(.25) ,0}]},
-		{"NavLink"	, [{ (RGB(clBlue))	,(RGB(clWhite))	,4}, { clEgaHighRed	,clEgaLowBlue	,4}, { clC64Red	,clC64Blue	,0}, { (RGB(0xFF8888))	,(RGB(0x2d2d2d)) ,4}]},
-		{"Number"	, [{ (RGB(clBlue))	,(RGB(clWhite))	,0}, { clEgaYellow	,clEgaLowBlue	,0}, { clC64Yellow	,clC64Blue	,0}, { (RGB(0x0094FA))	,(RGB(0x2d2d2d)) ,0}]},
-		{"String"	, [{ (RGB(clBlue))	,(RGB(clSkyBlue))	,0}, { clEgaHighCyan	,clEgaLowBlue	,0}, { clC64Cyan	,clC64Blue	,0}, { (RGB(0x64E000))	,(RGB(0x283f28)) ,0}]},
-		{"Keyword"	, [{ (RGB(clNavy))	,(RGB(clWhite))	,1}, { clEgaWhite	,clEgaLowBlue	,1}, { clC64White	,clC64Blue	,0}, { (RGB(0x5C00F6))	,(RGB(0x2d2d2d)) ,1}]},
-		{"Symbol"	, [{ (RGB(clBlack))	,(RGB(clWhite))	,0}, { clEgaYellow	,clEgaLowBlue	,0}, { clC64Yellow	,clC64Blue	,0}, { (RGB(0x00E2E1))	,(RGB(0x2d2d2d)) ,0}]},
-		{"Comment"	, [{ (RGB(clNavy))	,(RGB(clYellow))	,2}, { clEgaLightGray	,clEgaLowBlue	,2}, { clC64LGrey	,clC64Blue	,0}, { (RGB(0xf75Dd5))	,(RGB(0x442d44)) ,2}]},
-		{"Directive"	, [{ (RGB(clTeal))	,(RGB(clWhite))	,0}, { clEgaHighGreen	,clEgaLowBlue	,0}, { clC64Green	,clC64Blue	,0}, { (RGB(0x4Db5e6))	,(RGB(0x2d4444)) ,0}]},
-		{"Identifier1"	, [{ (RGB(clBlack))	,(RGB(clWhite))	,0}, { clEgaYellow	,clEgaLowBlue	,0}, { clC64Yellow	,clC64Blue	,0}, { (RGB(0xc7c5c5))	,(RGB(0x2d2d2d)) ,0}]},
-		{"Identifier2"	, [{ (RGB(clGreen))	,(RGB(clWhite))	,0}, { clEgaHighGreen	,clEgaLowBlue	,0}, { clC64LGreen	,clC64Blue	,0}, { (RGB(clGreen))	,(RGB(0x2d2d2d)) ,0}]},
-		{"Identifier3"	, [{ (RGB(clTeal))	,(RGB(clWhite))	,0}, { clEgaHighCyan	,clEgaLowBlue	,0}, { clC64Cyan	,clC64Blue	,0}, { (RGB(clTeal))	,(RGB(0x2d2d2d)) ,0}]},
-		{"Identifier4"	, [{ (RGB(clPurple))	,(RGB(clWhite))	,0}, { clEgaHighMagenta	,clEgaLowBlue	,0}, { clC64Purple	,clC64Blue	,0}, { (RGB(0x9136AA)), (RGB(0x2d2d2d)) ,0}]},
-		{"Identifier5"	, [{ (RGB(0x0040b0))	,(RGB(clWhite))	,0}, { clEgaBrown	,clEgaLowBlue	,0}, { clC64Orange	,clC64Blue	,0}, { (RGB(0x0060f0))	,(RGB(0x2d2d2d)) ,0}]},
-		{"Identifier6"	, [{ (RGB(0xb04000))	,(RGB(clWhite))	,0}, { clEgaHighBlue	,clEgaLowBlue	,0}, { clC64LBlue	,clC64Blue	,0}, { (RGB(0xf06000))	,(RGB(0x2d2d2d)) ,0}]},
-		{"Label"	, [{ (RGB(clBlack))	,(RGB(0xDDFFEE))	,4}, { clBlack	,clEgaHighCyan	,0}, { clBlack	,clC64Cyan	,0}, { 0xFFA43B	,0x2d2d2d ,2}]},
-		{"Attribute"	, [{ (RGB(clPurple))	,(RGB(clWhite))	,1}, { clEgaHighMagenta	,clEgaLowBlue	,1}, { clC64Purple	,clC64Blue	,1}, { 0xAAB42B	,0x2d2d2d ,1}]},
-		{"BasicType"	, [{ (RGB(clTeal))	,(RGB(clWhite))	,1}, { clEgaHighCyan	,clEgaLowBlue	,1}, { clC64Cyan	,clC64Blue	,1}, { (RGB(clWhite))	,0x2d2d2d ,1}]},
-		{"Binary1"	, [{ (RGB(clWhite))	,(RGB(clBlue))	,0}, { clEgaLowBlue	,clEgaYellow	,0}, { clC64Blue	,clC64Yellow	,0}, { 0x2d2d2d	,0x20bCFA ,0}]},
-		{"Error"	, [SyntaxStyle((RGB(clWhite))	,(RGB(clRed))     ,0)].replicate(4)},
-		{"Exception"	, [SyntaxStyle((RGB(clYellow))	,(RGB(clRed))     ,0)].replicate(4)},
-		{"Warning"	, [SyntaxStyle((RGB(clBlack))	,(RGB(clYellow))     ,0)].replicate(4)},
-		{"Deprecation"	, [SyntaxStyle((RGB(clBlack))	,(RGB(clAqua))      ,0)].replicate(4)},
-		{"Note"	, [SyntaxStyle((RGB(clBlack))	,(RGB(clPostit)),2)].replicate(4)},
-		{"Todo"	, [SyntaxStyle((RGB(clWhite))	,(RGB(clWowBlue))   ,2)].replicate(4)},
-		{"Opt"	, [SyntaxStyle((RGB(clWhite))	,(RGB(clWowPurple))	,2)].replicate(4)},
-		{"Bug"	, [SyntaxStyle((RGB(clWhite))	,(RGB(clOrange))	,2)].replicate(4)},
-		{"Link"	, [SyntaxStyle((RGB(clWowBlue))	,(RGB(clWhite))    ,4)].replicate(4)},
-		{"Code"	, [SyntaxStyle((RGB(0xc7c5c5))	, mix((RGB(0x2f2f2f)), (RGB(0x442d44)), .33) ,0)].replicate(4)}, //code is actually a codeComment, not compileable code.
-		{"Console"	, [SyntaxStyle((RGB(clWhite)) ,(RGB(clBlack)),0)].replicate(4)},
-		{"Interact"	, [SyntaxStyle((RGB(clBlack)) ,(RGB(clWhite)),0)].replicate(4)},
-		{"Inherit"	, [SyntaxStyle((RGB(clBlack)) ,(RGB(clWhite)),0)].replicate(4)},
-	]; 
-	
-	
-	
-	mixin(format!"enum SyntaxKind:ubyte   {%s}"(syntaxTable.map!"a.kindName".join(','))); 
-	mixin(format!"enum SyntaxPreset {%s}"(syntaxPresetNames.join(','))); 
-	
-	static foreach(m; EnumMembers!SyntaxKind)
-	mixin("alias sk* = SyntaxKind.*;".replace('*', m.text)); 
-	
-	__gshared defaultSyntaxPreset = SyntaxPreset.Dark; 
-	
-	ref syntaxStyle(SyntaxKind syntax)
-	=> syntaxTable[syntax].formats[defaultSyntaxPreset]; 
-	
-	auto syntaxFontColor(SyntaxKind syntax)
-	=> syntaxStyle(syntax).fontColor; 
-	auto syntaxBkColor  (SyntaxKind syntax)
-	=> syntaxStyle(syntax).bkColor; 
-	
-	//Opt: slow, needs a color theme struct, and needs an enum for the syntaxkind.
-	//Todo: this is a good example for table view in DIDE2
-	
-	auto clCodeBackground	()
-	=> syntaxBkColor(skWhitespace); 
+	version(/+$DIDE_REGION+/all) {
+		RGB structuredColor(string name, RGB def = clGray)
+		{
+			switch(name)
+			{
+				mixin((
+					(表([
+						[q{"template" },q{(RGB(174,  74,  54))}],
+						[q{"enum" },q{(RGB(245, 156,   0))}],
+						[q{"alias" },q{(RGB(238, 114,   3))}],
+						[q{"if", "switch", "final switch", "else"},q{(RGB(255,  19,  79))}],
+						[q{"for", "do", "while", "foreach", "foreach_reverse"},q{(RGB(255,  79,  39))}],
+						[q{
+							"version", "debug", "static if", "static foreach", 
+							"static foreach_reverse", "static assert"
+						},q{(RGB(255,  10, 119))}],
+						[q{"module", "import"},q{(RGB(178,  28, 145))}],
+						[q{"unittest" },q{(RGB(115,  45, 164))}],
+						[q{"section",},q{(RGB( 22, 186, 231))}],
+						[q{"with" },q{(RGB(  0, 134, 192))}],
+						[q{"__attr" },q{(RGB(  0,  79, 159))}],
+						[q{"class" },q{(RGB(134, 188,  37))}],
+						[q{"interface" },q{(RGB(101, 179,  46))}],
+						[q{"struct" },q{(RGB(  0, 120,  88))}],
+						[q{"union" },q{(RGB(  0, 169, 132))}],
+						[q{"mixin template" },q{(RGB(255, 227, 126))}],
+						[q{"mixin" },q{(RGB(255,  62,  47))}],
+						[q{"statement" },q{(RGB(128, 128, 128))}],
+						[q{"function", "invariant"},q{(RGB(192, 192, 192))}],
+						[q{"__region" },q{(RGB(128, 128, 128))}],
+						[q{"layout" },q{(RGB( 85, 135, 166))}],
+						[q{"try" },q{(RGB(200, 250, 189))}],
+						[q{"scope" },q{(RGB( 50, 250, 189))}],
+						[q{
+							"assert", "break", "continue", "goto", 
+							"goto case", "return", "enforce"
+						},q{(RGB(251, 128, 174))}],
+						[q{"auto" },q{(RGB(  0, 255, 255))}],
+					]))
+				).調!(GEN_ReturnCases)); 
+				default: 	return def; 
+			}
+		} 
+		
+		struct SyntaxStyle
+		{
+			RGB fontColor, bkColor; ushort fontFlags; //1:b, 2:i, 4:u
+			
+			this(RGB fontColor, RGB bkColor, uint fontFlags=0)
+			{
+				this.fontColor = fontColor; 
+				this.bkColor = bkColor; 
+				this.fontFlags = (cast(ushort)(fontFlags)); 
+			} 
+			
+			this(RGB fontColor, RGB bkColor, string fontFlags="")
+			{
+				uint f(char ch, uint val) => fontFlags.canFind(ch)?val:0; 
+				this(fontColor, bkColor, (cast(ushort)(f('b', 1) | f('i', 2) | f('u', 4)))); 
+			} 
+		} 
+		
+		private string GEN_SyntaxPresetFields(表 TBL, char separ)
+		=> TBL.rows.map!((r)=>(r[0]~separ~`SyntaxStyle(`~r[1..4].join(',')~`)`)).join(','); 
+		
+		mixin(iq{
+			enum SyntaxKind : ubyte
+			{$(TBL_DefaultSyntaxPreset.rows.map!"a[0]".join(','))} 
+			struct SyntaxPreset
+			{
+				align(1): string presetName = "Dark";  
+				SyntaxStyle $(GEN_SyntaxPresetFields(TBL_DefaultSyntaxPreset, '=')); 
+				ref const(SyntaxStyle) opIndex(SyntaxKind s) => (&Whitespace)[s]; 
+			} 
+		}.text); 
+		
+		static foreach(m; EnumMembers!SyntaxKind)
+		mixin("alias sk* = SyntaxKind.*;".replace('*', m.text)); 
+		
+		private string GEN_SyntaxPreset(string name, 表 TBL)
+		=> iq{SyntaxPreset($(name.quoted),$(GEN_SyntaxPresetFields(TBL, ':')))}.text; 
+		
+		static immutable builtinSyntaxPresets = 
+		[
+			SyntaxPreset(), 
+			mixin(GEN_SyntaxPreset("Light", TBL_LightSyntaxPreset)), 
+			mixin(GEN_SyntaxPreset("Classic", TBL_ClassicSyntaxPreset)), 
+			mixin(GEN_SyntaxPreset("C64", TBL_C64SyntaxPreset))
+		]; 
+		
+		__gshared SyntaxPreset g_syntaxPreset = builtinSyntaxPresets[0]; 
+		
+		ref const(SyntaxStyle) syntaxStyle(SyntaxKind syntax)
+		=> g_syntaxPreset[syntax]; 
+		
+		RGB syntaxFontColor(SyntaxKind syntax)
+		=> syntaxStyle(syntax).fontColor; 
+		
+		RGB syntaxBkColor  (SyntaxKind syntax)
+		=> syntaxStyle(syntax).bkColor; 
+		
+		RGB clCodeBackground	()
+		=> syntaxBkColor(skWhitespace); 
+		
+		
+		
+	}
 }version(/+$DIDE_REGION Keywords+/all)
 {
 	
@@ -4155,7 +4297,7 @@ version(/+$DIDE_REGION Syntax Highlight Presets+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x1F525899FD657).檢(0x1D64BFDEAC48D)); 
+			((0x2051F899FD657).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 

@@ -8670,7 +8670,7 @@ $(V_size+G_size)".text
 						vec2  v = p - vec2(wi,0); v -= e*clamp(dot(v,e)/dot(e,e),-1.0,1.0); 
 						d = min(d, vec2(dot(v,v), wi*he-abs(s))); 
 						return sqrt(d.x)*sign(-d.y); 
-					} 
+					} 
 					
 					float sdPianoKey(in vec2 p, in vec2 b, in float p0, in float p1, in float p2)
 					{
@@ -8777,7 +8777,7 @@ $(V_size+G_size)".text
 								dot2(p-0.5*max(p.x+p.y,0.0))
 							)
 						) * sign(p.x-p.y); 
-					} 
+					} 
 					
 					$(GEN_enumDefines!ShapeKind)
 					$(GEN_enumDefines!ShapeSymbol)
@@ -8942,19 +8942,22 @@ $(V_size+G_size)".text
 							float ambient = ambientStrength; 
 							
 							// Diffuse
-							float diffuseStrength = .8; 
+							float diffuseStrength = 0.9; 
 							float diffuse = diffuseStrength * max(dot(n, lightDir), 0.0); 
 							
 							// Specular
-							lightDir = normalize(vec3(rotZ(UB.iTime*4.)*vec2(-.6, -.9), 1.0)); 
+							//lightDir = normalize(vec3(rotZ(UB.iTime*4.)*vec2(-.6, -.9), 1.0)); 
+							float specStrength = 0.5; 
+							float shininess = 20.0; 
+							vec3 specColor = vec3(1.0, 1.0, 1.0); 
+							
+							
 							vec3 viewDir = vec3(0.0, 0.0, 1.0); 
 							vec3 halfDir = normalize(lightDir + viewDir); 
-							float specStrength = 0.5; 
-							float shininess = (sin(UB.iTime*19.)/2.+.5)*32.+1.0; 
 							float specular = specStrength * pow(max(dot(n, halfDir), 0.0), shininess); 
 							
 							// Combine
-							vec3 finalColor = (ambient + diffuse)*fragColor.rgb + specular * vec3(1.0, 0, .0); 
+							vec3 finalColor = (ambient + diffuse)*fragColor.rgb + specular * specColor; 
 							
 							return vec4(finalColor, fragColor.a); 
 						}

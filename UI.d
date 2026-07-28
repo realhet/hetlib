@@ -1038,7 +1038,10 @@ version(/+$DIDE_REGION+/all)
 	alias Margin = Padding; 
 	
 	enum BorderStyle : ubyte
-	{none, normal, dot, dash, dashDot, dash2, dashDot2, double_} 
+	{
+		none, normal, dot, dash, dashDot, dash2, dashDot2, double_,
+		halfFilletIn, halfFilletOut, fullFilletIn, fullFilletOut
+	} 
 	
 	auto toBorderStyle(string s)
 	{
@@ -1493,6 +1496,26 @@ version(/+$DIDE_REGION+/all)
 		{
 			if(!border.width || border.style == BorderStyle.none)
 			return; 
+			
+			if(
+				const bs = border.style.among(
+					BorderStyle.halfFilletIn, BorderStyle.halfFilletOut, 
+					BorderStyle.fullFilletIn, BorderStyle.fullFilletOut, 
+				)
+			)
+			{
+				static bevel = mixin(體!((BevelParams),q{param : .5})); 
+				bevel.rounding = bevel.width = border.width/2; 
+				if(bs<=2) bevel.width /= 2; 
+				bevel.inverted = !!bs.among(1, 3); 
+				static shape = mixin(體!((ShapeParams),q{})); 
+				
+				auto gfx = (cast(GfxBuilder)(dr.getGfxBuilder)); 
+				gfx.PC = border.color; 
+				gfx.drawShape(borderBounds_outer, shape, bevel); 
+				return; 
+			}
+			
 			
 			auto bw = border.width, bb = borderBounds; 
 			dr.lineStyle = border.style.toLineStyle; 
