@@ -1,4 +1,4 @@
-module het.draw2d; 
+deprecated module het.draw2d; 
 version(/+$DIDE_REGION+/all)
 {
 	import het.opengl; 

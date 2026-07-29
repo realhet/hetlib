@@ -1,4 +1,4 @@
-module het.opengl; /+DIDE+/
+deprecated module het.opengl; /+DIDE+/
 
 pragma(lib, "opengl32.lib"); 
 

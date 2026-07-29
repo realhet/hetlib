@@ -1,4 +1,4 @@
-module het.opencl;
+deprecated module het.opencl;
 
 public import het.utils;
 import std.traits, core.sys.windows.windows;
