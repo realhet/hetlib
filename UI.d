@@ -1061,6 +1061,9 @@ version(/+$DIDE_REGION+/all)
 		alias this = value; 
 		this(float a) { this.value = a; } 
 		
+		bool opCast(B:bool)() const
+		=> !!_raw /+just a nonzero check+/; 
+		
 		UpperFloat opAssign(float a)
 		{ this.value = a; return this; } 
 		
@@ -1071,22 +1074,13 @@ version(/+$DIDE_REGION+/all)
 	
 	struct Border
 	{
-		//private ushort _width = 0 /+upper 16 bits of float, rest is 0+/; 
 		UpperFloat width; 
-		ubyte flags = 1; 
+		ubyte flags; 
 		RGB color = clBlack; 
-		
-		/+
-			@property width() const 
-				=> uintBitsToFloat((cast(uint)(_width))<<16); 	@property width(float a)
-				{ _width = (cast(ushort)(a.floatBitsToUint>>16)); } 
-		+/
-		
 		
 		@property style() const 
 		=> (cast(BorderStyle)(flags.getBits(0, 4))); 	@property style(BorderStyle a)
 		{ flags = (cast(ubyte)(flags.setBits(0, 4, a))); } 
-			
 		@property inset() const 
 		=> !!flags.getBit(4); 	@property inset(bool a)
 		{ flags = (cast(ubyte)(flags.setBits(4, 1, a))); } 
@@ -1096,6 +1090,13 @@ version(/+$DIDE_REGION+/all)
 		@property borderFirst() const 
 		=> !!flags.getBit(6); 	@property borderFirst(bool a)
 		{ flags = (cast(ubyte)(flags.setBits(6, 1, a))); } 
+		
+		@property isLineBorder() => mixin(界3(q{mixin(舉!((BorderStyle),q{normal}))},q{style},q{mixin(舉!((BorderStyle),q{double_}))})); 
+		@property isShadedBorder() => style>mixin(舉!((BorderStyle),q{double_})); 
+		@property valid() const
+		=> !!style && !!width; bool opCast(B:bool)() const
+		=> valid; 
+		
 		
 		this(
 			float width, BorderStyle style=BorderStyle.normal, RGB color = clBlack,
@@ -1155,7 +1156,61 @@ version(/+$DIDE_REGION+/all)
 		
 		
 		bounds2 adjustBounds(in bounds2 bb)
-		{ bounds2 res = bb; if(extendBottomRight) res.high += width.value; return res; } 
+		{ bounds2 res = bb; if(extendBottomRight) res.high += width.value; return res; } 
+		void drawLineBorder(Drawing dr, in bounds2 bCenter)
+		{
+			const float bw = width; 
+			const isDouble = style==BorderStyle.double_; 
+			
+			dr.lineStyle = style.toLineStyle; 
+			dr.color = color; 
+			dr.lineWidth = bw * (isDouble ? 0.33f : 1); 
+			
+			const bb = adjustBounds(bCenter); 
+			
+			void doit(float sh=0)
+			{
+				const m = bw*sh; 
+				auto r = ((m)?(bb.inflated(m)):(bb)); 
+				if(!r.empty)	{ dr.drawRect(r); }
+				else	{
+					dr.line(r.topLeft, r.bottomLeft); 
+					/+
+						Just a vertical line. 
+						Can be used as a separator.
+					+/
+				}
+			} 
+			
+			if(isDouble)	{
+				doit(-0.333f); 
+				doit( 0.333f); 
+			}else	{ doit; }
+		} 
+		
+		void drawShadedBorder(Drawing dr, in bounds2 bOuter)
+		{
+			with(BorderStyle)
+			if(
+				const bs = style.among(
+					halfFilletIn, halfFilletOut, 
+					fullFilletIn, fullFilletOut
+				)
+			)
+			{
+				const float bw = width; 
+				
+				static bevel = mixin(體!((BevelParams),q{param : .5})); 
+				bevel.rounding = bevel.width = bw/2; 
+				if(bs<=2) bevel.width /= 2; 
+				bevel.inverted = !!bs.among(1, 3); 
+				static shape = mixin(體!((ShapeParams),q{})); 
+				
+				auto gfx = (cast(GfxBuilder)(dr.getGfxBuilder)); 
+				gfx.PC = color; 
+				gfx.drawShape(bOuter, shape, bevel); 
+			}
+		} 
 	} 
 	
 	LineStyle toLineStyle(BorderStyle style)
@@ -1494,51 +1549,13 @@ version(/+$DIDE_REGION+/all)
 		
 		final void drawBorder(Drawing dr)
 		{
-			if(!border.width || border.style == BorderStyle.none)
-			return; 
-			
-			if(
-				const bs = border.style.among(
-					BorderStyle.halfFilletIn, BorderStyle.halfFilletOut, 
-					BorderStyle.fullFilletIn, BorderStyle.fullFilletOut, 
-				)
-			)
-			{
-				static bevel = mixin(體!((BevelParams),q{param : .5})); 
-				bevel.rounding = bevel.width = border.width/2; 
-				if(bs<=2) bevel.width /= 2; 
-				bevel.inverted = !!bs.among(1, 3); 
-				static shape = mixin(體!((ShapeParams),q{})); 
-				
-				auto gfx = (cast(GfxBuilder)(dr.getGfxBuilder)); 
-				gfx.PC = border.color; 
-				gfx.drawShape(borderBounds_outer, shape, bevel); 
-				return; 
+			if(border) {
+				if(border.isLineBorder)	border.drawLineBorder   (dr, borderBounds     ); 
+				else	border.drawShadedBorder(dr, borderBounds_outer); 
 			}
-			
-			
-			auto bw = border.width, bb = borderBounds; 
-			dr.lineStyle = border.style.toLineStyle; 
-			dr.color = border.color; 
-			dr.lineWidth = bw * (border.style==BorderStyle.double_ ? 0.33f : 1); 
-			
-			bb = border.adjustBounds(bb); 
-			
-			void doit(float sh=0)
-			{
-				const m = bw*sh; 
-				auto r = bb.inflated(m, m); 
-				if(r.width<=0 || r.height<=0)
-				{
-					dr.line(r.topLeft, r.bottomRight); //Todo: just a line. Used for Spacer, but it's wrond, because it goes negative
-				}else
-				{ dr.drawRect(r); }
-			} 
-			
-			if(border.style==BorderStyle.double_)
-			{ doit(-0.333f); doit(0.333f); 	}
-			else { doit; 	}
 		} 
+		
+		
 		
 		void dump(int indent=0)
 		{
@@ -1866,20 +1883,58 @@ version(/+$DIDE_REGION+/all)
 		{
 			final switch(type)
 			{
-				case ShapeType.led: {
+				case ShapeType.led: 
+				{
 					auto r = min(innerWidth, innerHeight)*0.92f; 
-					
-					
 					auto p = innerCenter; 
 					
-					dr.pointSize = r; 	 dr.color = RGB(.3, .3, .3);  dr.point(p); 
-					dr.pointSize = r*.8f; 	 dr.color = color;   dr.point(p); 
-					dr.pointSize = r*0.4f; 	 dr.alpha = 0.4f; dr.color = clWhite; dr.point(p-vec2(1,1)*(r*0.15f)); 
-					dr.pointSize = r*0.2f; 	 dr.alpha = 0.4f; dr.color = clWhite; dr.point(p-vec2(1,1)*(r*0.18f)); 
-					dr.alpha = 1; 
-					
-					break; 
+					static if(0)
+					{
+						dr.pointSize = r; 	dr.color = RGB(.3, .3, .3); dr.point(p); 
+						dr.pointSize = r*.8f; 	dr.color = color; dr.point(p); 
+						dr.pointSize = r*0.4f; 	dr.alpha = 0.4f; dr.color = clWhite; dr.point(p-vec2(1,1)*(r*0.15f)); 
+						dr.pointSize = r*0.2f; 	dr.alpha = 0.4f; dr.color = clWhite; dr.point(p-vec2(1,1)*(r*0.18f)); 
+						dr.alpha = 1; 
+					}
+					else
+					{
+						/+dr.pointSize = r; 	dr.color = RGB(.3, .3, .3); dr.point(p); +/
+						
+						{
+							const bnd = bounds2(((p).名!q{center}), ((r).名!q{size})); 
+							static bevel = mixin(體!((BevelParams),q{
+								param 	: .5,
+								inverted	: true
+							})); 
+							bevel.rounding = r, bevel.width = 1.5; 
+							static shape = mixin(體!((ShapeParams),q{})); 
+							
+							auto gfx = (cast(GfxBuilder)(dr.getGfxBuilder)); 
+							gfx.PC = color.darken(.6); 
+							gfx.drawShape(bnd, shape, bevel); 
+						}
+						
+						r *= .8f; 
+						
+						{
+							const bnd = bounds2(((p).名!q{center}), ((r).名!q{size})); 
+							static bevel = mixin(體!((BevelParams),q{param 	: .5})); 
+							bevel.rounding = bevel.width = r; 
+							static shape = mixin(體!((ShapeParams),q{})); 
+							
+							auto gfx = (cast(GfxBuilder)(dr.getGfxBuilder)); 
+							gfx.PC = color; 
+							gfx.drawShape(bnd, shape, bevel); 
+						}
+						
+						if(color[].max>=128)
+						{
+							dr.pointSize = r/.8f; dr.alpha = .25; dr.color = color; dr.point(p); dr.alpha = 1; 
+							dr.pointSize = r; dr.alpha = .35; dr.color = color; dr.point(p); dr.alpha = 1; 
+						}
+					}
 				}
+				break; 
 			}
 		} 
 	} 
@@ -3274,7 +3329,7 @@ version(/+$DIDE_REGION+/all)
 	{ off, on, autoOff, autoOn, auto_ = autoOff} 
 	
 	bool getEffectiveScroll(ScrollState s) pure
-	{ return s.among(ScrollState.on, ScrollState.autoOn)>0; } 
+	=> s.among(ScrollState.on, ScrollState.autoOn)>0; 
 	
 	struct ContainerFlags
 	{
@@ -3343,36 +3398,30 @@ version(/+$DIDE_REGION+/all)
 			]))
 		) .GEN!q{GEN_bitfields}); 
 	} 
-	
-	
-	
-	
 	static assert(ContainerFlags.sizeof==8); 
 	
 	//Effective horizontal and vertical flow configuration of subCells
 	enum FlowConfig
-	{ autoSize, wrap, noScroll, scroll, autoScroll} 
+	{autoSize, wrap, noScroll, scroll, autoScroll} 
 	
 	auto getHFlowConfig(in bool autoWidth, in bool wordWrap, in ScrollState hScroll) pure
-	{
-		return autoWidth	? FlowConfig.autoSize :
-					 wordWrap	? FlowConfig.wrap :
-					 hScroll==ScrollState.off	? FlowConfig.noScroll :
-					 hScroll==ScrollState.on	? FlowConfig.scroll : FlowConfig.autoScroll; 
-	} 
+	=> autoWidth 	? FlowConfig.autoSize 	:
+		wordWrap	? FlowConfig.wrap 	:
+		hScroll==ScrollState.off 	? FlowConfig.noScroll 	:
+		hScroll==ScrollState.on 	? FlowConfig.scroll 
+			: FlowConfig.autoScroll; 
 	
 	bool getEffectiveHScroll(in bool autoWidth, in bool wordWrap, in ScrollState hScroll) pure
-	{ return !autoWidth && !wordWrap && hScroll.getEffectiveScroll; } 
+	=> !autoWidth && !wordWrap && hScroll.getEffectiveScroll; 
 	
 	auto getVFlowConfig(in bool autoHeight, in ScrollState vScroll) pure
-	{
-		return autoHeight ? FlowConfig.autoSize :
-					 vScroll==ScrollState.off	? FlowConfig.noScroll :
-					 vScroll==ScrollState.on	? FlowConfig.scroll : FlowConfig.autoScroll; 
-	} 
+	=> autoHeight 	? FlowConfig.autoSize 	:
+		vScroll==ScrollState.off	? FlowConfig.noScroll 	:
+		vScroll==ScrollState.on	? FlowConfig.scroll 
+			: FlowConfig.autoScroll; 
 	
 	bool getEffectiveVScroll(in bool autoHeight, in ScrollState vScroll) pure
-	{ return !autoHeight && vScroll.getEffectiveScroll; } 
+	=> !autoHeight && vScroll.getEffectiveScroll; 
 	
 }
 version(/+$DIDE_REGION+/all)
@@ -3640,152 +3689,160 @@ version(/+$DIDE_REGION+/all)
 				flags.autoHeight	= outerSize.y==0; 
 			}
 			
-			//detect scrollbars
-			const hFlow = getHFlowConfig, vFlow = getVFlowConfig, maxFlow = max(hFlow, vFlow); 
+			const 	hFlow 	= getHFlowConfig, 
+				vFlow 	= getVFlowConfig, 
+				maxFlow 	= max(hFlow, vFlow); 
 			
+			const 	scrollThickness 	= DefaultScrollThickness,
+				e 	= 1/+minimum area that must remain after the scrollbar.+/; 
+			
+			bool alloc(char o)()
+			{
+				const size = innerSize; 
+				static if(o=='H')
+				if(
+					size.x>=e && (
+						size.y>=scrollThickness+e || 
+						vFlow==FlowConfig.autoSize
+					) && !flags.hasHScrollBar
+				)
+				{
+					flags.hasHScrollBar = true; if(vFlow!=FlowConfig.autoSize)
+					outerSize.y -= scrollThickness; 
+					return true; 
+				}
+				static if(o=='V')
+				if(
+					size.y>=e && (
+						size.x>=scrollThickness+e || 
+						hFlow==FlowConfig.autoSize
+					) && !flags.hasVScrollBar
+				)
+				{
+					flags.hasVScrollBar = true; if(hFlow!=FlowConfig.autoSize)
+					outerSize.x -= scrollThickness; 
+					return true; 
+				}
+				return false; 
+			} 
+			
+			void handleNoScroll()
+			{
+				//very simple case with no scrolling, only autoSizing and wordWrapping
+				rearrange; 
+			} 
+			
+			void handlePersistents()
+			{
+				//there can be scrollbars, but no autoScrollbars
+				if(hFlow==FlowConfig.scroll)
+				alloc!'H'; if(vFlow==FlowConfig.scroll)
+				alloc!'V'; 
+				rearrange; 
+			} 
+			
+			void handleBothAuto()
+			{
+				//2 auto scrollbars
+				rearrange; 
+				const cs = calcContentSize; 
+				/+
+					Opt: rearrange should return contentSize 
+					because calcContentSize is slow
+				+/
+				if(cs.y>innerHeight)
+				{
+					if(cs.x>innerWidth)
+					{
+						//H&V overflow
+						alloc!'H'; alloc!'V'; 
+					}
+					else
+					{
+						//V overflow
+						if(alloc!'V' && cs.x > innerWidth)
+						{
+							//possivle H overflow because of VScrollBar
+							if((cast(Column)(this)))	rearrange; 
+							else	alloc!'H'; 
+							//Other things will need a scrollbar
+						}
+					}
+				}
+				else
+				{
+					if(cs.x>innerWidth)
+					{
+						//H overflow
+						if(alloc!'H' && cs.y > innerHeight)
+						{ alloc!'V'; }
+						//possivle V overflow because of HScrollBar
+					}
+				}
+			} 
+			void handleHAuto()
+			{
+				//only auto hscroll
+				if(vFlow==FlowConfig.scroll)
+				alloc!'V'; //alloc fixed if needed
+				rearrange; 
+				if(calcContentWidth > innerWidth)
+				alloc!'H'; 
+			} 
+			
+			void handleVAuto()
+			{
+				//only auto vscroll
+				if(hFlow==FlowConfig.scroll)
+				alloc!'H'; //alloc fixed if needed
+				rearrange; 
+				/+
+					Opt: This rearrange can exit early when the wordWrap 
+					and contentheight becomes too much.
+				+/
+				if(calcContentHeight > innerHeight)
+				{
+					if(
+						alloc!'V' && (
+							hFlow==FlowConfig.wrap || cast(Column)this
+							/*column also changes the width!*/
+						)
+					)
+					{
+						rearrange; 
+						//second rearrange
+						version(none)
+						{
+							/+I think this is overkill, not needed: +/
+							if(
+								!flags.hasHScrollBar && 
+								calcContentWidth > innerWidth
+							) alloc!'H'; 
+						}
+					}
+				}
+			} 
+			
+			//detect scrollbars
 			flags.hasHScrollBar = false; 
 			flags.hasVScrollBar = false; 
 			
 			if(maxFlow<=FlowConfig.noScroll)
-			{
-				 //very simple case with no scrolling, only autoSizing and wordWrapping
-				rearrange; 
-			}
+			{ handleNoScroll; }
 			else
 			{
-				 //scr9ollbars are a possibility from here
-				
-				//Opt: cache calcContentSize. It is called too much
-				//Opt: rearrange should optionally return contentSize
-				
-				const 	scrollThickness 	= DefaultScrollThickness,
-					e 	= 1/+minimum area that must remain after the scrollbar.+/; 
-				
-				
-				bool alloc(char o)()
-				{
-					const size = innerSize; 
-					static if(o=='H')
-					if(
-						size.x>=e && (
-							size.y>=scrollThickness+e || 
-							vFlow==FlowConfig.autoSize
-						) && !flags.hasHScrollBar
-					)
-					{
-						flags.hasHScrollBar = true; 
-						if(vFlow!=FlowConfig.autoSize)
-						outerSize.y -= scrollThickness; 
-						return true; 
-					}
-					
-					static if(o=='V')
-					if(
-						size.y>=e && (
-							size.x>=scrollThickness+e || 
-							hFlow==FlowConfig.autoSize
-						) && !flags.hasVScrollBar
-					)
-					{
-						flags.hasVScrollBar = true; 
-						if(hFlow!=FlowConfig.autoSize)
-						outerSize.x -= scrollThickness; 
-						return true; 
-					}
-					
-					return false; 
-				} 
-				
+				//scrollbars are a possibility from here
 				if(maxFlow<=FlowConfig.scroll)
-				{
-					 //there can be scrollbars, but no autoScrollbars
-					if(hFlow==FlowConfig.scroll)
-					alloc!'H'; 
-					if(vFlow==FlowConfig.scroll)
-					alloc!'V'; 
-					rearrange; 
-				}
+				{ handlePersistents; }
 				else
 				{
-					 //at least one axis is autoScroll, this is the most complicated case.
-					if(hFlow==FlowConfig.autoScroll && vFlow==FlowConfig.autoScroll)
-					{
-						 //2 auto scrollbars
-						rearrange; 
-						const cs = calcContentSize; 
-						if(cs.y>innerHeight)
-						{
-							if(cs.x>innerWidth)
-							{
-								 //H&V overflow
-								alloc!'H'; alloc!'V'; 
-							}
-							else
-							{
-								 //V overflow
-								if(alloc!'V' && cs.x > innerWidth)
-								{
-									//possivle H overflow because of VScrollBar
-									if(cast(Column)this)
-									rearrange; 
-									else
-									alloc!'H'; 
-									//Other things will need a scrollbar
-								}
-							}
-						}
-						else
-						{
-							if(cs.x>innerWidth)
-							{
-								//H overflow
-								if(alloc!'H' && cs.y > innerHeight)
-								{ alloc!'V'; }
-								//possivle V overflow because of HScrollBar
-							}
-						}
-					}
-					else if(hFlow==FlowConfig.autoScroll)
-					{
-						 //only auto hscroll
-						if(vFlow==FlowConfig.scroll)
-						alloc!'V'; //alloc fixed if needed
-						rearrange; 
-						if(calcContentWidth > innerWidth)
-						alloc!'H'; 
-					}
-					else
-					{
-						 //only auto vscroll
-						if(hFlow==FlowConfig.scroll)
-						alloc!'H'; //alloc fixed if needed
-						rearrange; 
-						/+
-							Opt: This rearrange can exit early when the wordWrap 
-							and contentheight becomes too much.
-						+/
-						if(calcContentHeight > innerHeight)
-						{
-							if(
-								alloc!'V' && (
-									hFlow==FlowConfig.wrap || cast(Column)this
-									/*column also changes the width!*/
-								)
-							)
-							{
-								rearrange; 
-								//second rearrange
-								version(none)
-								{
-									/+I think this is overkill, not needed: +/
-									if(
-										!flags.hasHScrollBar && 
-										calcContentWidth > innerWidth
-									) alloc!'H'; 
-								}
-							}
-						}
-					}
+					//at least one axis is autoScroll, this is the most complicated case.
+					if(
+						hFlow==FlowConfig.autoScroll && 
+						vFlow==FlowConfig.autoScroll
+					)	handleBothAuto; 
+					else if(hFlow==FlowConfig.autoScroll)	handleHAuto; 
+					else	handleVAuto; 
 				}
 				
 				//setup the scrollbars
@@ -3802,11 +3859,11 @@ version(/+$DIDE_REGION+/all)
 				outerSize.y += scrollThickness; 
 				if(flags.hasVScrollBar)
 				outerSize.x += scrollThickness; 
-				
 			}
 			
 			flags._measured = true; 
-		} 
+		} 
+		
 		
 		protected void measureSubCells()
 		{
@@ -5295,7 +5352,7 @@ version(/+$DIDE_REGION+/all)
 		} 
 		
 		this()
-		{} 
+		{} 
 		
 		void UI(
 			void delegate() setup/+must set outerSize in setup! Optionally can set fontHeight+/,
@@ -6433,14 +6490,19 @@ struct im
 		
 		enum PanelPosition
 		{
-			none, topLeft, topCenter, topRight, leftCenter, center, rightCenter, bottomLeft, bottomCenter, bottomRight,
-			topClient, leftClient, client, rightClient, bottomClient	
+			none, 
+			topLeft, 	topCenter, 	topRight, 	
+			leftCenter, 	center, 	rightCenter, 	
+			bottomLeft, 	bottomCenter, 	bottomRight, 	
+				topClient, 		
+			leftClient, 	client, 	rightClient, 	
+				bottomClient		
 		} 
 		
 		private bool isAlignPosition (PanelPosition pp)
 		{
 			with(PanelPosition)
-			return pp.inRange(topLeft  , bottomRight ); 
+			return pp.inRange(topLeft, bottomRight ); 
 		} //it will only position the container
 		private bool isClientPosition(PanelPosition pp)
 		{
@@ -6452,9 +6514,9 @@ struct im
 		{
 			with(PanelPosition)
 			{
-				//flags.targetSurface is unknown at this point, will check it later	in 'finalize'
+				//flags.targetSurface is unknown at this point, will check it later in 'finalize'
 				if(pp.among(client, topClient, bottomClient))
-				cntr.outerWidth	= area.width; 
+				cntr.outerWidth = area.width; 
 				else if(pp.among(client, leftClient, rightClient)) cntr.outerHeight	= area.height; 
 			}
 		} 
@@ -6472,26 +6534,27 @@ struct im
 				
 				if(isAlignPosition(pp))
 				{
-					ivec2 p; divMod(cast(int)pp-1, 3, p.y, p.x); 
+					ivec2 p; divMod((cast(int)(pp-1)), 3, p.y, p.x); 
 					if(p.x.inRange(0, 2) && p.y.inRange(0, 2))
 					{
-						auto t = p*.5f,
-								 u = vec2(1)-t; 
+						auto 	t = p*.5f,
+							u = vec2(1)-t; 
 						
-						cntr.outerPos = area.topLeft*u + area.bottomRight*t //Todo: bug: fucking vec2.lerp is broken again
-													- cntr.outerSize*t; 
+						cntr.outerPos = area.topLeft*u 	+ area.bottomRight*t //Todo: bug: fucking vec2.lerp is broken again
+							- cntr.outerSize*t; 
 					}
-				}else if(isClientPosition(pp))
+				}
+				else if(isClientPosition(pp))
 				{
 					//Todo: put checking for running out of area and scrolling here.
 					switch(pp)
 					{
-						case topClient: cntr.outerPos = area.topLeft; area.top	+= cntr.outerHeight; break; 
-						case bottomClient: area.bottom	-= cntr.outerHeight; cntr.outerPos	= area.bottomLeft	; break; 
-						case leftClient	: cntr.outerPos	= area.topLeft	; area.left    += cntr.outerWidth	; break; 
-						case rightClient	: area.right	-= cntr.outerWidth	; cntr.outerPos = area.topRight	; break; 
-						case client	: cntr.outerPos = area.topLeft	; cntr.outerSize = area.size; area = bounds2.init; break; 
-						default: ERR("invalid PanelPosition"); 
+						case topClient: 	cntr.outerPos = area.topLeft; 	area.top    += cntr.outerHeight; 	break; 
+						case bottomClient: 	area.bottom -= cntr.outerHeight; 	cntr.outerPos = area.bottomLeft; 	break; 
+						case leftClient: 	cntr.outerPos = area.topLeft; 	area.left    += cntr.outerWidth; 	break; 
+						case rightClient: 	area.right   -= cntr.outerWidth; 	cntr.outerPos = area.topRight; 	break; 
+						case client: 	cntr.outerPos = area.topLeft; 	cntr.outerSize = area.size; area = bounds2.init; 	break; 
+						default: 	ERR("invalid PanelPosition"); 
 					}
 				}
 			}
@@ -6499,7 +6562,7 @@ struct im
 		
 		void Panel(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
 		{
-			 //Todo: multiple Panels, but not call them frames...
+			//Todo: multiple Panels, but not call them frames...
 			enforce(actContainer is null, "Panel() must be on root level"); 
 			
 			//Todo: this should work for all containers, not just high level ones
@@ -6513,7 +6576,7 @@ struct im
 			Document!(srcModule, srcLine)
 			(
 				{
-					 //Todo: why document? It should be a template parameter!
+					//Todo: why document? It should be a template parameter!
 					cntr = actContainer; 
 					
 					//preparations
@@ -6521,8 +6584,16 @@ struct im
 					//Todo: outerSize should be stored, not innerSize, because the padding/border/margin settings after this can fuck up the alignment.
 					
 					//default panel frame
-					padding = "4"; 
-					border = "1 normal silver"; 
+					
+					
+					version(/+$DIDE_REGION+/none) { padding = "4"; border = "1 normal silver"; }
+					
+					
+					version(/+$DIDE_REGION+/all) {
+						padding = "3"; border = "6 normal silver"; 
+						with(border) inset = true, style = BorderStyle.fullFilletOut, borderFirst = true; 
+						flags.noBackground = true; 
+					}
 					
 					//call the delegates
 					static foreach(a; args) static if(__traits(compiles, a())) a(); //delegate/function
@@ -8705,7 +8776,7 @@ struct im
 			static foreach(a; args)
 			{
 				{
-					 alias t = Unqual!(typeof(a)); 
+					alias t = Unqual!(typeof(a)); 
 					static if(is(t==RGB))
 					shp.color = a; 
 					static if(is(t==vec2))
@@ -9141,41 +9212,53 @@ struct im
 						if(mousePos.x<drawn_p0.x)
 						pressed_thumbMouseOfs.x = drawn_p0.x-mousePos.x; 
 						if(mousePos.x>drawn_p1.x)
-						pressed_thumbMouseOfs.x = drawn_p1.x-mousePos.x - (isEndless ? 1 : 0); //otherwise endles range_ gets into an endless incrementing loop
-					}else if(drawn_orientation==SliderOrientation.vert)
+						pressed_thumbMouseOfs.x = drawn_p1.x-mousePos.x 
+							- ((isEndless)?(1):(0))/+prevent infinite incrementing+/; 
+					}
+					else if(drawn_orientation==SliderOrientation.vert)
 					{
 						pressed_thumbMouseOfs.y = 0; 
 						nPos = remap_clamp(mousePos.y, drawn_p0.y, drawn_p1.y, 0, 1); 
 						//Note: p1 and p0 are intentionally swapped!!!
 						if(mousePos.y<drawn_p1.y)
-						pressed_thumbMouseOfs.y = drawn_p1.y-mousePos.y; //Todo: test vertical circular slider jump to the very ends, and see if not jumps to opposite si
+						pressed_thumbMouseOfs.y = drawn_p1.y-mousePos.y; 
+						/+
+							Todo: test vertical circular slider jump to the very ends, 
+							and see if not jumps to opposite si
+						+/
 						if(mousePos.y>drawn_p0.y)
-						pressed_thumbMouseOfs.y = drawn_p0.y-mousePos.y - (isEndless ? 1 : 0); 
-					}else
-					{ NOTIMPL; }
+						pressed_thumbMouseOfs.y = drawn_p0.y-mousePos.y 
+							- ((isEndless)?(1):(0)); 
+					}
+					else { NOTIMPL; }
 				} 
 				
-				void mouseAdjust(ref float nPos, in vec2 mousePos, bool isClamped, bool isCircular, bool isEndless, ref int wrapCnt, float adjustSpeed)
+				void mouseAdjust(
+					ref float nPos, in vec2 mousePos, bool isClamped, bool isCircular, bool isEndless, 
+					ref int wrapCnt, float adjustSpeed
+				)
 				{
 					if(drawn_orientation==SliderOrientation.horz)
 					{
 						slowMouse(adjustSpeed!=1, adjustSpeed); 
 						auto p = mousePos.x+pressed_thumbMouseOfs.x; 
 						if(isCircular || isEndless)
-						mouseMoveRelX(wrapInRange(p, drawn_p0.x, drawn_p1.x, wrapCnt)); //circular wrap around
+						mouseMoveRelX(wrapInRange(p, drawn_p0.x, drawn_p1.x, wrapCnt)); 
 						nPos = remap(p, drawn_p0.x, drawn_p1.x, 0, 1); 
 						if(isClamped)
 						nPos = nPos.clamp(0, 1); 
-					}else if(drawn_orientation==SliderOrientation.vert)
+					}
+					else if(drawn_orientation==SliderOrientation.vert)
 					{
 						slowMouse(adjustSpeed!=1, adjustSpeed); 
 						auto p = mousePos.y+pressed_thumbMouseOfs.y; 
 						if(isCircular || isEndless)
-						mouseMoveRelY(wrapInRange(p, drawn_p0.y, drawn_p1.y, wrapCnt)); //circular wrap around
+						mouseMoveRelY(wrapInRange(p, drawn_p0.y, drawn_p1.y, wrapCnt)); 
 						nPos = remap(p, drawn_p0.y, drawn_p1.y, 0, 1); 
 						if(isClamped)
 						nPos = nPos.clamp(0, 1); 
-					}else if(drawn_orientation==SliderOrientation.round)
+					}
+					else if(drawn_orientation==SliderOrientation.round)
 					{
 						auto diff = rawMousePos-pressed_rawMousePos; 
 						auto act_dir = abs(diff.x)>abs(diff.y) ? 1 : 2; 
@@ -9183,17 +9266,24 @@ struct im
 						lockedDirection = act_dir; 
 						
 						const omniDirection = true; //right or up is the positive side
-						auto delta = omniDirection 	? inputs.MXraw.delta -inputs.MYraw.delta
-							: (lockedDirection ? lockedDirection : act_dir)==1 ? inputs.MXraw.delta : -inputs.MYraw.delta; 
+						const delta = 
+							((omniDirection)?(inputs.MXraw.delta -inputs.MYraw.delta) :(((((lockedDirection)?(lockedDirection) :(act_dir))==1) ?(inputs.MXraw.delta):(-inputs.MYraw.delta)))); 
 						
-						pressed_nPos += delta*(adjustSpeed*(1.0f/180)); //it adds small delta's, so it could be overdriven
+						pressed_nPos += delta*(adjustSpeed*(1.0f/180)); 
+						//it adds small delta's, so it could be overdriven
+						
 						pressed_nPos = pressed_nPos.clamp(0, 1); 
-						nPos = pressed_nPos; //Todo: it can't modify npos because npos can be an integer too. In this case, the pressed_nPos name is bad.
+						nPos = pressed_nPos; 
+						/+
+							Todo: it can't modify npos because npos can be an integer 
+							too. In this case, the pressed_nPos name is bad.
+						+/
+						
 						//Todo: endless????
 						//Todo: ha tulmegy, akkor vinnie kell magaval a base-t is!!!
 						//Todo: Ctrl precizitas megoldasa globalisan az inputs.d-ben.
-					}else
-					{ raise("Invalid orientation"); }
+					}
+					else { raise("Invalid orientation"); }
 				} 
 				
 				void mouseAdjust(ref float nPos, in vec2 mousePos, in range range_, ref int wrapCnt, float adjustSpeed)
@@ -9215,8 +9305,7 @@ struct im
 					void delta(float scale)
 					{
 						//modifiers
-						if(scale)
-						{
+						if(scale) {
 							if(inputs.Shift) scale*=10; 
 							if(inputs.Ctrl) scale/=10; 
 							if(inputs.Alt) scale/=100; 
@@ -9228,8 +9317,8 @@ struct im
 						set(nPos + nStep *scale); 
 					} 
 					
-					const horz = drawn_orientation != SliderOrientation.vert, //round knobs are working for both
-								vert = drawn_orientation != SliderOrientation.horz; 
+					const 	horz 	= drawn_orientation != SliderOrientation.vert, //round knobs are working for both
+						vert 	= drawn_orientation != SliderOrientation.horz; 
 					
 					if(horz && inputs.Left.repeated	|| vert && inputs.Down.repeated)
 					delta(-1); 
@@ -9277,8 +9366,11 @@ struct im
 						//round knob: lock the mouse and start measuring delta movement
 						if(isRound(drawn_orientation))
 						{
-							 //Todo: "round" knob never jumps
-							mouseLock;  //Bug: possible bug when the slider disappears, amd the mouse stays locked forever
+							//Todo: "round" knob never jumps
+							mouseLock; /+
+								Bug: possible bug when the slider disappears, 
+								and the mouse stays locked forever
+							+/
 						}
 					}
 					
@@ -9286,7 +9378,10 @@ struct im
 					if(id==pressed_id)
 					{
 						userModified = true; 
-						const adjustSpeed = inputs.Shift.active ? 10 : inputs.Ctrl.active ? 0.1f : inputs.Alt.active ? 0.01f : 1; //Note: this is a scaling factor...
+						const adjustSpeed = 	inputs.Shift.active 	? 10 : 
+							inputs.Ctrl.active 	? 0.1f : 
+							inputs.Alt.active 	? 0.01f 
+								: 1; //Note: this is a scaling factor...
 						mouseAdjust(nPos, mousePos, range_, wrapCnt, adjustSpeed); 
 					}
 					
@@ -9296,9 +9391,8 @@ struct im
 						pressed_id = Id.init; 
 						
 						//Todo: this isn't safe! what if the control disappears!!!
-						if(isLinear(drawn_orientation))
-						{ slowMouse(false); }else
-						{ mouseUnlock; }
+						if(isLinear(drawn_orientation))	{ slowMouse(false); }
+						else	{ mouseUnlock; }
 					}
 					
 					return userModified; 

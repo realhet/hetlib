@@ -5637,7 +5637,6 @@ $(V_size+G_size)".text
 							VB.upload; GB.upload; 
 							t4=QPS; 
 							{
-								const double globalScale2 = 1; 
 								const double fovY_deg = 60; 
 								const double fovY_rad = radians(fovY_deg); 
 								
