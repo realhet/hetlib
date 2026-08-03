@@ -1221,7 +1221,7 @@ version(/+$DIDE_REGION+/all)
 		BorderStyle.dash2	, LineStyle.dash2,
 		BorderStyle.dashDot2	, LineStyle.dashDot2,
 			LineStyle.normal
-	); 
+	); 
 	
 	struct _FlexValue
 	{ UpperFloat value=0; alias this = value; } //ganyolas
@@ -3381,10 +3381,8 @@ version(/+$DIDE_REGION+/all)
 				[],
 				[q{bool},q{1},q{"dontLocate"},q{},q{/+disables the locate() method for this container and its subcontainers+/}],
 				[q{bool},q{1},q{"oldSelected"},q{},q{/+SelectionManager2 needs this.+/}],
-				[],
 				[q{bool},q{1},q{"changedCreated"},q{},q{/+Dide2.CodeRow: changed by creationg a new cell+/}],
 				[q{bool},q{1},q{"changedRemoved"},q{},q{/+Dide2.CodeRow: changed by removing existing cells+/}],
-				[],
 				[q{bool},q{1},q{"dontStretchSubCells"},q{},q{/+Column: don't stretch the items to the innerWidth of the column.+/}],
 				[q{bool},q{1},q{"columnIsTable"},q{},q{/+At the moment it is only used by DIDE+/}],
 				[q{bool},q{1},q{"removed"},q{},q{/+At the moment it is only used by DIDE: SearchResults, BuildMessages can detect validity+/}],
@@ -3395,10 +3393,13 @@ version(/+$DIDE_REGION+/all)
 					//2: Console - no syntax, \33 coloring
 					//3: Arduino 
 				+/}],
+				[],
+				[],
 			]))
 		) .GEN!q{GEN_bitfields}); 
 	} 
 	static assert(ContainerFlags.sizeof==8); 
+	
 	
 	//Effective horizontal and vertical flow configuration of subCells
 	enum FlowConfig
@@ -3465,8 +3466,9 @@ version(/+$DIDE_REGION+/all)
 		Cell[] subCells; 
 		void clearSubCells()
 		{ subCells = []; } 
+		
 		final auto subContainers()
-		{ return subCells.map!(c => cast(Container)c).filter!"a"; } 
+		=> subCells.map!(c => cast(Container)c).filter!"a"; 
 		
 		void appendCell (Cell c)
 		{ if(c)	subCells ~= c; } 
@@ -6415,7 +6417,7 @@ struct im
 			
 			if(textEditorState.active)
 			{
-				 //an edit control is active.
+				//an edit control is active.
 				//Todo: mainWindow.canProcessUserInput check
 				auto err = textEditorState.processQueue; 
 			}
@@ -6433,12 +6435,21 @@ struct im
 		
 		version(/+$DIDE_REGION+/none) { DrawingOld drVisualizeHitStack; }
 		
-		void _drawFrame(string restrict="")(Drawing drWorld, Drawing drGUI, void delegate() funBefore=null, void delegate() funAfter=null)
+		void _drawFrame(string restrict="")(
+			Drawing drWorld, Drawing drGUI, 
+			void delegate() funBefore=null, void delegate() funAfter=null
+		)
 		{
 			static if(doTiming)
 			{
-				const T0 = QPS; scope(exit)
-				{ tDraw = QPS-T0; print(format!"im.timing: begin %5.1f   end %5.1f   draw %5.1f ms"(tBeginFrame*1000, tEndFrame*1000, tDraw*1000)); }
+				const T0 = QPS; 
+				scope(exit)
+				{
+					tDraw = QPS-T0; print(
+						format!"im.timing: begin %5.1f   end %5.1f   draw %5.1f ms"
+						(tBeginFrame*1000, tEndFrame*1000, tDraw*1000)
+					); 
+				}
 			}
 			
 			static assert(restrict=="system call only", "im.draw() is restricted to call by system only."); 
@@ -6450,11 +6461,12 @@ struct im
 			foreach(i, ref d; dr)
 			{
 				auto view = targetSurfaceViews[i].enforce; 
-				d.pushClipBounds(view.screenBounds_anim.bounds2.inflated(-view.screenBounds_anim.bounds2.size*0)); 
+				d.pushClipBounds(view.screenBounds_anim.bounds2); 
 			}
 			
 			foreach(i; 0..2)
 			surfaceBounds[i] = bounds2.init; 
+			
 			
 			if(funBefore) funBefore(); 
 			
@@ -6474,7 +6486,8 @@ struct im
 			version(/+$DIDE_REGION+/none) {
 				if(VisualizeHitStack && drVisualizeHitStack)
 				{
-					drVisualizeHitStack.glDraw(targetSurfaces[1].view); //Todo: problem with hitStack: it is assumed to be on GUI view
+					drVisualizeHitStack.glDraw(targetSurfaces[1].view); 
+					//Todo: problem with hitStack: it is assumed to be on GUI view
 				}
 				drVisualizeHitStack.destroy; 
 			}
@@ -6525,8 +6538,7 @@ struct im
 		{
 			with(PanelPosition)
 			{
-				if(pp == none)
-				return; 
+				if(pp == none) return; 
 				
 				enforce(cntr.flags.targetSurface == 1, "Unable to set PanelPosition on world_surface."); 
 				
@@ -6560,16 +6572,18 @@ struct im
 			}
 		} 
 		
+		static T ARG(T, Args...)(T def, Args args)
+		{ T res = def; static foreach(idx, a; args) static if(is(Unqual!(Args[idx])==T)) res = a; return res; } 
+		
 		void Panel(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
 		{
 			//Todo: multiple Panels, but not call them frames...
 			enforce(actContainer is null, "Panel() must be on root level"); 
 			
 			//Todo: this should work for all containers, not just high level ones
-			PanelPosition pp; 
-			static foreach(idx, a; args)
-			static if(is(Unqual!(T[idx]) == PanelPosition))
-			pp = a; 
+			auto pp = ARG(PanelPosition.init, args); 
+			
+			
 			
 			.Container cntr; 
 			
@@ -6606,8 +6620,8 @@ struct im
 		//Focus handling /////////////////////////////////
 		struct FocusedState
 		{
-			Id id;              //globally store the current hash
-			.Container container;  //this is sent to the Selection/Draw routines. If it is null, then the focus is lost.
+			Id id; 	//globally store the current hash
+			.Container container;  	//this is sent to the Selection/Draw routines. If it is null, then the focus is lost.
 			
 			void reset()
 			{ this = typeof(this).init; } 
@@ -6740,22 +6754,21 @@ struct im
 			static float mouseStopped_secs = 0; 
 			static float noHint_secs = 0; 
 			
-			const userBlocking = "Esc,Enter,LMB,RMB,MMB,Space".split(",").map!(k => inputs[k].active).any; 
+			const userBlocking = 	["Esc", "Enter", "LMB", "RMB", "MMB", "Space"]
+				.map!((k)=>(inputs[k].active)).any; 
 			
-			if(inputs.MX.delta==0 && inputs.MY.delta==0)
-			mouseStopped_secs += deltaTime; 
-			else mouseStopped_secs = 0; 
+			if(inputs.MX.delta==0 && inputs.MY.delta==0)	mouseStopped_secs += deltaTime; 
+			else	mouseStopped_secs = 0; 
 			
-			if(hints.empty)
-			noHint_secs += deltaTime; 
-			else noHint_secs = 0; 
+			if(hints.empty)	noHint_secs += deltaTime; 
+			else	noHint_secs = 0; 
 			
 			//enter hint mode
 			if(!hints.empty && !userBlocking)
 			{
-				if(hintState == HintState.idle	&& mouseStopped_secs>HintActivate_sec)
+				if(hintState==HintState.idle && mouseStopped_secs>HintActivate_sec)
 				hintState = HintState.active; 
-				if(hintState == HintState.active	&& mouseStopped_secs>HintDetails_sec)
+				if(hintState==HintState.active && mouseStopped_secs>HintDetails_sec)
 				hintState = HintState.details; 
 			}
 			
@@ -6790,7 +6803,7 @@ struct im
 						if(lastHint.markup!="")
 						Row(
 							{
-								 //Todo: row kell?
+								//Todo: row kell?
 								padding = "4"; 
 								style.fontColor = clHintText; 
 								style.bkColor = bkColor = clHintBk; 
@@ -6800,7 +6813,10 @@ struct im
 							}
 						); 
 						
-						if(hintState == HintState.details && lastHint.markupDetails!="")
+						if(
+							hintState == HintState.details 
+							&& lastHint.markupDetails!=""
+						)
 						Row(
 							{
 								padding = "4"; 
@@ -6820,11 +6836,15 @@ struct im
 				hintContainer.measure; 
 				
 				//align the hint
-				hintContainer.outerPos 	= lastHint.bounds.bottomCenter //Bounds.bottomCenter
+				hintContainer.outerPos = 	lastHint.bounds.bottomCenter //Bounds.bottomCenter
 					+ vec2(-hintContainer.outerWidth*.5, 5); 
 				
 				//clamp horizontaly
-				hintContainer.outerPos.x = clamp(hintContainer.outerPos.x, 0, max(0, screenBounds.width-hintContainer.outerWidth)); 
+				const remainingWidth = max(0, screenBounds.width-hintContainer.outerWidth); 
+				hintContainer.outerPos.x = clamp(
+					hintContainer.outerPos.x, 0, 
+					remainingWidth
+				); 
 				
 				//Todo: HintSettings: on/off, hintLocation:nextTo/statusBar/bottomRight, save to ini
 			}
@@ -6834,13 +6854,13 @@ struct im
 		
 		//! im internal state ////////////////////////////////////////////////////////////////
 		
-		Cell[] root; //when containerStack is empty, this is the container
+		Cell[] rootCells; //when containerStack is empty, this is the container
 		
 		auto rootContainers(bool forceAll)
 		{
-			auto res = root.map!((c)=>((cast(.Container)(c)))).filter!"a".array; 
+			auto res = rootCells.map!((c)=>((cast(.Container)(c)))).filter!"a".array; 
 			if(forceAll)
-			enforce(root.length == res.length, "FATAL ERROR: All of root[] must be non null and a descendant of Container."); 
+			enforce(rootCells.length == res.length, "FATAL ERROR: All of rootCells[] must be non null and a descendant of Container."); 
 			return res; 
 		} 
 		
@@ -6896,7 +6916,7 @@ struct im
 			textStyle = tsNormal; 
 			theme = ""; 
 			
-			root = []; 
+			rootCells = []; 
 			stack = [StackEntry(null, enabled, textStyle, theme)]; 
 			actContainer = null; 
 			
@@ -6940,8 +6960,7 @@ struct im
 		void dump()
 		{
 			writeln("---- IM dump --------------------------------"); 
-			foreach(cell; root)
-			cell.dump; 
+			foreach(cell; rootCells) cell.dump; 
 			writeln("---- End of IM dump -------------------------"); 
 		} 
 		
@@ -6955,9 +6974,8 @@ struct im
 		
 		private void append(Cell c)
 		{
-			if(actContainer !is null)
-			actContainer.appendCell(c); 
-			else root ~= c; 
+			if(actContainer !is null)	actContainer.appendCell(c); 
+			else	rootCells ~= c; 
 		} 
 		
 		public void imAppend(Cell c) { append(c); } 
@@ -6966,29 +6984,8 @@ struct im
 		{
 			//needed for temporary composable building
 			return actContainer 	? actContainer.removeLastContainer
-				: cast(.Container)root.fetchBack; 
+				: (cast(.Container)(rootCells.fetchBack)); 
 		} 
-		
-		version(/+$DIDE_REGION+/none) {
-				//overlay drawing //////////////////////////
-				private Drawing[.Container] overlayDrawings; 
-			
-				void addOverlayDrawing(Drawing dr)
-			{
-				enforce(actContainer !is null); 
-				enforce(!actContainer.flags._hasOverlayDrawing, "Container already has an OverlayDrawing."); 
-				
-				actContainer.flags._hasOverlayDrawing = true; 
-				overlayDrawings[actContainer] = dr; 
-			} 
-			
-				private Drawing getOverlayDrawing(.Container cntr)
-			{
-				if(auto drOverlay = cntr in overlayDrawings)
-				return *drOverlay; 
-				else return null; 
-			} 
-		}
 		
 		//DrawCallback ////////////////////////
 		alias DrawCallback = void delegate(Drawing, .Container); 
@@ -7031,36 +7028,36 @@ struct im
 		//container delegates
 		//void opDispatch(string name, T...)(T args) { mixin("containerStack[$-1]." ~ name)(args); }
 		
-		auto ContainerProp(string name)
-		{
-			 //Todo: assignment operation sucks with this: width = height = fh
-			return q{
-				@property auto #()
-				{ return actContainer.#; } 
-				@property void #(typeof(actContainer.#) val)
-				{ actContainer.# = val; } 
-			}.replace("#", name); 
-		} 
+		private auto ContainerProp(string name)
+		=> q{
+			@property auto #()
+			{ return actContainer.#; } 
+			@property auto #(typeof(actContainer.#) val)
+			{ actContainer.# = val; return val; } 
+		}
+		.replace("#", name); 
 		
-		auto ContainerRef(string name)
-		{
-			return q{
-				ref auto #()
-				{ return actContainer.#; } 
-			}.replace("#", name); 
-		} 
-		
+		private auto ContainerRef(string name)
+		=> q{
+			ref auto #()
+			{ return actContainer.#; }; 
+		}.replace("#", name); 
+		
 		mixin(
-			["innerWidth", "outerWidth", "innerHeight", "outerHeight", "innerSize", "outerSize", "innerPos", "outerPos", "pos", "width", "height"].map!ContainerProp.join ~
+			[
+				"innerWidth", "outerWidth", "innerHeight", "outerHeight", 
+				"innerSize", "outerSize", "innerPos", "outerPos", "pos", 
+				"width", "height"
+			].map!ContainerProp.join ~
 			["flags", "flex", "margin", "border", "padding", "bkColor"].map!ContainerRef.join
 		); 
-		
+		
 		//Parameter structs ///////////////////////////////////
 		//deprecated struct id      { uint val;  /*private*/ enum M = q{ auto id_ = file.xxh(line)^baseId;                          static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
 		immutable prepareId = q{auto id_ = combine(actId, srcId!(srcModule, srcLine)(args)); }; 
 		
 		struct enable 
-		{ bool val; 	 enum M = q{auto oldEnabled = enabled; scope(exit) enabled = oldEnabled; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled	= enabled && a.val; 	}; } 
+		{ bool val; 	 enum M = q{auto oldEnabled = enabled; scope(exit) enabled = oldEnabled; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled = enabled && a.val; 	}; } 
 		struct selected
 		{ bool val; 	 enum M = q{auto _selected = false; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == selected)) _selected	= a.val; 	}; } 
 		
@@ -7090,28 +7087,23 @@ struct im
 			
 			float normalize(float x) const
 			{
-				auto n = isLog ? x.log2.remap(min.log2, max.log2, 0, 1)  //Todo: handle log(0)
-											 : x     .remap(min     , max     , 0, 1); 
-				if(isCircular)
-				if(n<0 || n>1)
-				n = n-n.floor; 
-				if(isClamped)
-				n = n.clamp(0, 1); 
+				auto n = isLog 	? x.log2.remap(min.log2, max.log2, 0, 1)
+					: x     .remap(min    , max    , 0, 1); 
+				//Todo: handle log(0)
+				if(isCircular) if(n<0 || n>1) n = n-n.floor; 
+				if(isClamped) n = n.clamp(0, 1); 
 				return n; 
 			} 
 			
 			float denormalize(float n) const
 			{
-				if(isCircular)
-				if(n<0 || n>1)
-				n = n-n.floor; 
-				if(isClamped)
-				n = n.clamp(0, 1); 
-				
+				if(isCircular) if(n<0 || n>1) n = n-n.floor; 
+				if(isClamped) n = n.clamp(0, 1); 
 				return clamp(
 					isLog 	? 2 ^^ n.remap(0, 1, min.log2, max.log2)
-						: n.remap(0, 1, min     , max     )
-				); //clamp is needed because of rounding errors
+						:       n.remap(0, 1, min    , max    )
+				)
+				/+clamp is needed because of rounding errors+/; 
 			} 
 			
 			Unqual!T clamp(T)(T f) const
@@ -7131,7 +7123,7 @@ struct im
 					}
 				}else
 				{
-					 //incomplete range: eiter min or max is nan
+					//incomplete range: eiter min or max is nan
 					static if(isIntegral!T)
 					{
 						if(!isnan(min) && f<min.iceil)
@@ -7195,7 +7187,6 @@ struct im
 		
 		struct ScrollInfo
 		{
-			 //------------------------------- ScrollInfo //////////////////////////////
 			char orientation; 
 			
 			struct ScrollInfoRec
@@ -7235,13 +7226,13 @@ struct im
 			in(container.id!=Id.init)
 			{
 				infos.findAdd(
-					container.id, (ref ScrollInfoRec info){
-						info.container	= container; 
-						info.id	= container.id; 
-						info.contentSize	= contentSize; 
-						info.pageSize	= pageSize; 
+					container.id, ((ref ScrollInfoRec info){
+						info.container	= container,
+						info.id	= container.id,
+						info.contentSize	= contentSize,
+						info.pageSize	= pageSize,
 						info.lastAccess	= application.tick; 
-					}
+					})
 				); 
 			} 
 			
@@ -7255,9 +7246,15 @@ struct im
 						}
 			*/
 			
-			//Todo: IDE: nicer error display, and autoSolve: "undefined identifier `global_updateTick`, did you mean variable `global_UpdateTick`?"
+			/+
+				Todo: IDE: nicer error display, and autoSolve: "undefined identifier `global_updateTick`, 
+					did you mean variable `global_UpdateTick`?"
+			+/
 			
-			//2. called after measure when the final local positions are known. It creates the bars if needed and registers them with hitTestManager
+			/+
+				2. called after measure when the final local positions are known. 
+					It creates the bars if needed and registers them with hitTestManager
+			+/
 			void createBars(bool doPurge)
 			{
 				assert(orientation.among('H', 'V')); 
@@ -7271,8 +7268,8 @@ struct im
 						toRemove ~= id; 
 						continue; 
 					}
-					const exists = (orientation=='H' && info.container.flags.hasHScrollBar)
-											|| (orientation=='V' && info.container.flags.hasVScrollBar); 
+					const exists 	= (orientation=='H' && info.container.flags.hasHScrollBar)
+						|| (orientation=='V' && info.container.flags.hasVScrollBar); 
 					if(!exists)
 					continue; 
 					
@@ -7306,10 +7303,16 @@ struct im
 					
 					bool userModified; 
 					HitInfo hit; 
-					//Todo: scrollbars only work on GUI surface. This flag shlould be inherited automatically, just like the upcoming enabled flag.
-					auto sl = new SliderClass(
-						combine(info.container.id, orientation), enabled, normValue, range(0, 1), userModified, view_gui.mousePos.vec2, tsNormal, hit,
-						orientation=='H' ? SliderOrientation.horz : SliderOrientation.vert, SliderStyle.scrollBar, 1, normThumbSize
+					/+
+						Todo: scrollbars only work on GUI surface. This flag shlould be inherited automatically, 
+								just like the upcoming enabled flag.
+					+/
+					auto sl = new SliderClass
+						(
+						combine(info.container.id, orientation), enabled, normValue, 
+						range(0, 1), userModified, view_gui.mousePos.vec2, tsNormal, hit,
+						orientation=='H' ? SliderOrientation.horz : SliderOrientation.vert, 
+						SliderStyle.scrollBar, 1, normThumbSize
 					); 
 					
 					info.slider = sl; 
@@ -7321,11 +7324,11 @@ struct im
 					if(orientation=='H')
 					{
 						sl.outerPos = vec2(0, innerHeight-scrollThickness); 
-						sl.outerSize = vec2(innerWidth-(flags.hasVScrollBar ? scrollThickness : 0), scrollThickness); 
+						sl.outerSize = vec2(innerWidth-((flags.hasVScrollBar) ?(scrollThickness):(0)), scrollThickness); 
 					}else
 					{
 						sl.outerPos = vec2(innerWidth-scrollThickness, 0); 
-						sl.outerSize = vec2(scrollThickness, innerHeight-(flags.hasHScrollBar ? scrollThickness : 0)); 
+						sl.outerSize = vec2(scrollThickness, innerHeight-((flags.hasHScrollBar) ?(scrollThickness):(0))); 
 					}
 					
 					
@@ -7370,10 +7373,16 @@ struct im
 					else static if(is(T == Padding))	padding = a; 
 					else static if(is(T == Border))	border = a; 
 					else static if(is(T == Margin))	margin = a; 
-					else static if(is(T == SyntaxKind))	{ textStyle.applySyntax(a); bkColor = textStyle.bkColor; }
-					else static if(isGenericArg!(T, "id"))	{/+ Already processed by prepareId.srcId +/}
+					else static if(is(T == SyntaxKind))	{
+						textStyle.applySyntax(a); 
+						bkColor = textStyle.bkColor; 
+					}
+					else static if(isGenericArg!(T, "id"))	{/+Already processed by prepareId.srcId+/}
 					else static if(isGenericArg!(T, "theme"))	theme = a; 
-					else static if(isGenericArg!(T, "syntax"))	{ textStyle.applySyntax(a.to!SyntaxKind); bkColor = textStyle.bkColor; }
+					else static if(isGenericArg!(T, "syntax"))	{
+						textStyle.applySyntax(a.to!SyntaxKind); 
+						bkColor = textStyle.bkColor; 
+					}
 					else static if(isGenericArg!(T, "fontColor"))	style.fontColor = a; 
 					else static if(isGenericArg!(T, "bold"))	style.bolt = a; 
 					else static if(isGenericArg!(T, "italic"))	style.italic = a; 
@@ -7381,21 +7390,31 @@ struct im
 					else static if(isGenericArg!(T, "padding"))	padding = a; 
 					else static if(isGenericArg!(T, "border"))	border = a; 
 					else static if(isGenericArg!(T, "margin"))	margin = a; 
-					else	static assert(false, "Unsupported type: "~T.stringof); 
+					else
+					static assert(false, "Unsupported type: "~T.stringof); 
 				}
 			}
 		} 
 		
 		void Container(CType = .Container, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
 		{
-			  //Container //////////////////////////////
 			mixin(prepareId, enable.M); 
+			
+			/+
+				const pp = ARG(PanelPosition.init, args); 
+				if(pp) { initializePanelPosition; }
+				scope(exit) if(pp) finalizePanelPosition; 
+			+/
 			
 			static if(__traits(compiles, new CType))
 			{ auto cntr = new CType; }else
 			{
 				alias FirstCtorParam = ParameterTypeTuple!(__traits(getOverloads, CType, "__ctor")[0])[0]; 
-				static assert(is(FirstCtorParam : .Container), "If there is no () constructor, the first parameter must be a Container. actContainer will be sent to it as the parent."); 
+				static assert(
+					is(FirstCtorParam : .Container), 
+					"If there is no () constructor, the first parameter must be a Container."
+					~"actContainer will be sent to it as the parent."
+				); 
 				auto cntr = new CType(cast(FirstCtorParam)actContainer); //try to give parent for the new control
 			}
 			
@@ -7485,7 +7504,7 @@ struct im
 			raise("Popup must contain only one Cell"); 
 			
 			auto popup = actContainer.removeLast; 
-			root ~= popup; 
+			imAppend(popup); 
 			
 			popupState.cell = popup; 
 			popupState.parent = parent; 
@@ -7521,19 +7540,16 @@ struct im
 		} 
 		
 		void Flex(float value = 1)
-		{
-			 //Flex //////////////////////////////////
-			Row({ flex = value; }); 
-		} 
+		{ Row({ flex = value; }); } 
 		
 		string bold	  (string s)	
-		{ return tag("style bold=1"	  )~s~tag("style bold=0"	  ); } 
+		=> tag("style bold=1"	  )~s~tag("style bold=0"	  ); 
 		string italic		(string s)
-		{ return tag("style italic=1"	  )~s~tag("style italic=0"	  ); } 
+		=> tag("style italic=1"	  )~s~tag("style italic=0"	  ); 
 		string underline(string s)
-		{ return tag("style underline=1")~s~tag("style underline=0"); } 
+		=> tag("style underline=1")~s~tag("style underline=0"); 
 		string strikeout(string s)
-		{ return tag("style strikeout=1")~s~tag("style strikeout=0"); } 
+		=> tag("style strikeout=1")~s~tag("style strikeout=0"); 
 		
 		string progressSpinner(int style=1)
 		{
@@ -7577,9 +7593,9 @@ struct im
 			//actContainer is null: root level gets a lot of rows
 			
 			//Text is always making one line, even in a container. Use \n for multiple rows
-			if(args.length>1 &&(actContainer is null || cast(.Column)actContainer !is null))
+			if(args.length>1 &&(actContainer is null || (cast(.Column)(actContainer)) !is null))
 			{
-				 //implicit row
+				//implicit row
 				Row({ Text/*!(file, line)*/(args); }); 
 				return; 
 			}
@@ -7593,49 +7609,32 @@ struct im
 					
 					static if(is(t == _FlexValue))
 					{
-						 //nasty workaround for flex() and flex property
+						//nasty workaround for flex() and flex property
 						append(new FlexRow("", style)); 
-					}else static if(is(t == TextStyle))
+					}
+					else static if(is(t == TextStyle))
 					{
 						if(chkSet(restoreTextStyle))
 						oldTextStyle = textStyle; 
 						textStyle = a; 
-					}else static if(is(t == RGB))
-					{ textStyle.fontColor = a; }else static if(is(t == SyntaxKind))
-					{ textStyle.applySyntax(a); }else static if(__traits(compiles, a()))
-					{ a(); }else
+					}
+					else static if(is(t == RGB))
+					{ textStyle.fontColor = a; }
+					else static if(is(t == SyntaxKind))
+					{ textStyle.applySyntax(a); }
+					else static if(__traits(compiles, a()))
+					{ a(); }
+					else
 					{
-						   //general case, handles as string
-						
-						/*
-							 mar nem ez tordel, hanem a Row.
-											auto lines = a.split('\n').map!(a => a.withoutTrailing('\r')).array;
-											if(!lines.empty){
-												.Row row = cast(.Row)actContainer;
-												if(row){
-													row.appendMarkupLine(lines[0], textStyle);
-													auto id = file.xxh(line);
-													foreach(int idx, line; lines[1..$]){
-														pop;
-														row = new .Row(line, textStyle);
-														append(row);
-														push(row, [idx].xxh(id));
-													}
-												}else{
-													foreach(int idx, line; lines){
-														append(new .Row(line, textStyle)); //todo: not clear how it works with multiple parameters. All arg strings should be packed in one string and then processed by lines.
-													}
-												}
-											}
-						*/
-						
-						//this variant gives \n to the row
+						//general case, handles as string
 						auto s = a.text; 
-						if(.Column col = cast(.Column)actContainer)
+						if(.Column col = (cast(.Column)(actContainer)))
 						{
-							Row({ Text(s); });  //implicit Rows for Column
-						}else if(.Row row = cast(.Row)actContainer)
-						{ row.appendMarkupLine(s, textStyle); }else
+							Row({ Text(s); }); //implicit Rows for Column
+						}
+						else if(.Row row = (cast(.Row)(actContainer)))
+						{ row.appendMarkupLine(s, textStyle); }
+						else
 						{ actContainer.appendMarkupLine(s, textStyle); }
 					}
 				}
@@ -7664,7 +7663,11 @@ struct im
 		//Bullet ///////////////////////////////////
 		void Bullet()
 		{
-			Row({ outerWidth = fh*2; Flex; Text(tag("char 0x2022")); Flex; }); //Todo: no flex needed, -> center aligned. Constant width is needed however, for different bullet styles.
+			Row({ outerWidth = fh*2; Flex; Text(tag("char 0x2022")); Flex; }); 
+			/+
+				Todo: no flex needed, -> center aligned. 
+				Constant width is needed however, for different bullet styles.
+			+/
 		} 
 		
 		void Bullet(void delegate() contents)
@@ -7682,12 +7685,14 @@ struct im
 		//Spacer //////////////////////////
 		private void SpacerRow(Args...)(float size, in Args args)
 		{
-			const vert = cast(.Row)actContainer !is null; 
+			const vert = (cast(.Row)(actContainer)) !is null; 
 			Row(
 				args, {
-					if(vert)
-					{ innerWidth	= size; flags.yAlign = YAlign.stretch; }
-					else { innerHeight	= size; /+width is auto by default. A Column will stretch it properly.+/}
+					if(vert) { innerWidth = size; flags.yAlign = YAlign.stretch; }
+					else {
+						innerHeight = size; 
+						/+width is auto by default. A Column will stretch it properly.+/
+					}
 				}
 			); 
 		} 
@@ -7695,14 +7700,12 @@ struct im
 		void Spacer(Args...)(in Args args)
 		{
 			float size; 
-			static if(args.length && isNumeric!(Args[0]))
-			{
+			static if(args.length && isNumeric!(Args[0]))	{
 				size = args[0]; 
 				enum argStart = 1; 
-			}else
-			{ enum argStart = 0; }
-			if(isnan(size))
-			size = fh*.5f; 
+			}
+			else	{ enum argStart = 0; }
+			if(isnan(size)) size = fh*.5f; 
 			
 			SpacerRow(size, args[argStart..$]); 
 		} 
@@ -7720,9 +7723,9 @@ struct im
 		void HLine()
 		{ Row({ innerHeight = 1; bkColor = mix(clWinBackground, clWinText, .25f); }); } 
 		
-		void Grp(alias Cntr=Column, string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(void delegate() fun, A args)
+		void Grp(alias Cntr=Column, string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)
+			(void delegate() fun, A args)
 		{
-			 //Grp /////////////////////////////
 			Cntr(
 				{
 					border = "2 normal silver"; padding = "2 4"; margin = "2 4"; 
@@ -7731,7 +7734,8 @@ struct im
 			); 
 		} 
 		
-		void Grp(alias Cntr=Column, string srcModule=__MODULE__, size_t srcLine=__LINE__, T, A...)(T title, void delegate() fun, A args)
+		void Grp(alias Cntr=Column, string srcModule=__MODULE__, size_t srcLine=__LINE__, T, A...)
+			(T title, void delegate() fun, A args)
 		{
 			Container(
 				{
@@ -7740,7 +7744,8 @@ struct im
 					lastContainer.measure; 
 					const hh = lastContainer.outerHeight; 
 					
-					Grp!(Cntr, srcModule, srcLine)(
+					Grp!(Cntr, srcModule, srcLine)
+					(
 						{
 							margin.top += (hh*(3/8.0f)).iround; 
 							padding.top = max(padding.top, hh-margin.top-border.width); 
@@ -7757,7 +7762,7 @@ struct im
 		
 		void applyBtnBorder(in RGB bColor = clWinBtn)
 		{
-			 //Todo: use it for edit as well
+			//Todo: use it for edit as well
 			margin	= Margin(2, 2, 2, 2); 
 			border	= Border(2, BorderStyle.normal, bColor); 
 			padding	= Padding(2, 2, 2, 2); 
@@ -7787,7 +7792,10 @@ struct im
 			//Todo: handle focused
 		} 
 		
-		void applyBtnStyle(bool isWhite, bool enabled, bool focused, bool selected, bool captured, float hover)
+		void applyBtnStyle(
+			bool isWhite, bool enabled, bool focused, 
+			bool selected, bool captured, float hover
+		)
 		{
 			const oldFh = style.fontHeight; 
 			style = tsBtn; 
@@ -7798,14 +7806,19 @@ struct im
 			applyBtnBorder(bColor); 
 			
 			flags.selected = selected; 
-			//Todo: nem itt van a helye. minden containernek kezelnie kell a selected generic parametert, a focused mar kozpontositva van. Az enabledet is meg kell igy csinalni.
+			/+
+				Todo: nem itt van a helye. minden containernek kezelnie kell a selected 
+				generic parametert, 	a focused mar kozpontositva van. 
+				Az enabledet is meg kell igy csinalni.
+			+/
 			
 			if(!enabled)
 			{
 				style.fontColor	= clWinBtnDisabledText; 
 				style.bkColor 	= mix(style.bkColor, clWinBackground, .66f); 
 				border.color	= style.bkColor; 
-			}else if(captured)
+			}
+			else if(captured)
 			{
 				border.style	  = BorderStyle.none; 
 				style.bkColor	  = clWinBtnPressed; 
@@ -7815,12 +7828,12 @@ struct im
 			{
 				if(captured)
 				style.bkColor = mix(clWinBackground, clWinBtnPressed, .5f); 
-				else style.bkColor = clWinBackground; //Todo: ez felulirja a
+				else style.bkColor = clWinBackground; 
 			}
 			
 			if(theme == "tool")
 			{
-				 //every appearance is lighter on a toolBtn
+				//every appearance is lighter on a toolBtn
 				style.bkColor   = mix(style.bkColor, tsNormal.bkColor, .5f); 
 				if(captured && enabled)
 				border.width = 0; //this if() makes the edge squareish
@@ -7832,25 +7845,25 @@ struct im
 				border.color	= mix(border.color , clAccent, .5f); 
 			}
 			
-			bkColor = style.bkColor; //Todo: update the backgroundColor of the container. Should be automatic, but how?...
-			
+			bkColor = style.bkColor; 
+			//Todo: update the backgroundColor of the container. Should be automatic, but how?...
 			//Todo: handle focused
 		} 
 		
 		void applyEditStyle(bool enabled, bool focused, float hover)
 		{
-				style   = tsNormal; 
+			style   = tsNormal; 
 			
-				auto bColor = focused	? clAccent :
-											!enabled	? mix(clWinBtn       , style.bkColor, 0.5f)
-			: mix(clWinBtn, clWinBtnHoverBorder, hover); 
+			auto bColor = focused	? clAccent : !enabled
+				? mix(clWinBtn, style.bkColor, 0.5f)
+				: mix(clWinBtn, clWinBtnHoverBorder, hover); 
 			
-				applyBtnBorder(bColor); 
+			applyBtnBorder(bColor); 
 			
-				if(!enabled)
+			if(!enabled)
 			{ style.fontColor = mix(style.fontColor, style.bkColor, 0.5f); }
 			
-				bkColor = style.bkColor; 
+			bkColor = style.bkColor; 
 		} 
 	}
 	version(/+$DIDE_REGION+/all)
@@ -8059,9 +8072,9 @@ struct im
 		} 
 		
 		static EditPath_hasRefreshBtn = true; 
+		
 		auto EditPath(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(ref Path actPath, in Args args)
 		{
-			 //EditPath ///////////////////////////////////////
 			static struct Res
 			{
 				bool mustRefresh; alias mustRefresh this; 
@@ -8218,7 +8231,6 @@ struct im
 		
 		auto Static(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(in T0 value, T args)
 		{
-			 //Static /////////////////////////////////
 			static if(is(T0 : Property))
 			{
 				auto p = cast(Property)value; 
@@ -8257,15 +8269,18 @@ struct im
 			}
 		} 
 		
-		auto IncBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, int sign=1, T0, T...)(ref T0 value, T args) if(sign!=0 && isNumeric!T0)
+		auto IncBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, int sign=1, T0, T...)
+			(ref T0 value, T args)
+			if(sign!=0 && isNumeric!T0)
 		{
-			 //IncBtn /////////////////////////////////
 			mixin(enable.M, range.M); 
 			
-			auto capt = symbol(`Calculator` ~ (sign>0 ? `Addition` : `Subtract`)); 
+			auto capt = symbol(`Calculator` ~ ((sign>0)?(`Addition`):(`Subtract`))); 
 			enum isInt = isIntegral!T0; 
 			
-			auto hit = Btn!(srcModule, srcLine)(capt, args, genericId(sign), ((true).genericArg!q{focusOnPress})); //2 id's can pass because of the static foreach
+			auto hit = Btn!(srcModule, srcLine)(capt, args, ((sign).名!q{id}), ((true).名!q{focusOnPress})); 
+			//2 id's can pass because of the static foreach
+			
 			bool chg; 
 			if(hit.repeated)
 			{
@@ -8305,7 +8320,10 @@ struct im
 		auto IncDec(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(ref T0 value, T args)
 		{
 			auto oldValue = value; 
-			Edit!(srcModule, srcLine)(value, { width = 2*fh; }, args); //Todo: na itt total nem vilagos, hogy az args hova megy, meg mi a result
+			
+			Edit!(srcModule, srcLine)(value, { width = 2*fh; }, args); 
+			//Todo: na itt total nem vilagos, hogy az args hova megy, meg mi a result
+			
 			IncDecBtn(value, args); 
 			return oldValue != value; 
 		} 
@@ -8425,7 +8443,8 @@ struct im
 		} 
 		
 		//Todo: (enum, enum[]) is ambiguous!!! only (enum) works on its the full members.
-		auto BtnRow(Cntr = .Row, string srcModule=__MODULE__, size_t srcLine=__LINE__, E, Args...)(ref E e, in Args args) if(is(E==enum))
+		auto BtnRow(Cntr = .Row, string srcModule=__MODULE__, size_t srcLine=__LINE__, E, Args...)(ref E e, in Args args)
+		if(is(E==enum))
 		{
 			string s = e.text; 
 			auto res = BtnRow!(Cntr, srcModule, srcLine)(s, EnumMemberNames!E, args); 
@@ -8435,7 +8454,7 @@ struct im
 		} 
 		
 		
-		bool TabsHeader(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, I, A...)(T[] items, ref I idx, A args) //TabsHeader /////////////////////////////
+		bool TabsHeader(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, I, A...)(T[] items, ref I idx, A args)
 			if(isIntegral!I)
 		{
 			static customDraw(Drawing dr, .Container cntr)
@@ -8493,13 +8512,20 @@ struct im
 					foreach(i; 0..items.length)
 					{
 						if(
-							WhiteBtn(
+							WhiteBtn
+							(
 								items[i], genericId(i), /*selected(i==idx)*/
 								{
-									//if(border.color==clWinBtn) border.color = bkColor; //todo: this is a nasty workaround. Need a completely white Btn (link) for this.
+									//if(border.color==clWinBtn) border.color = bkColor; 
+									/+
+										Todo: this is a nasty workaround. 
+										Need a completely white Btn (link) for this.
+									+/
+									
 									bkColor = clWinBackground; 
 									border.color = clWinBackground; 
-									flags.selected = i==idx;  //Todo: Ez kurvaga'ny! Ez adja at a selectiont a draw callbacknak
+									flags.selected = i==idx; 
+									//Todo: Ez kurvaga'ny! Ez adja at a selectiont a draw callbacknak
 									
 									padding = "4"; 
 								}
@@ -8507,10 +8533,7 @@ struct im
 						)
 						{ idx = i.to!I; clicked = true; }
 					}
-					
 					addDrawCallback(toDelegate(&customDraw)); 
-					
-					
 				}, args
 			); 
 			
@@ -8519,8 +8542,8 @@ struct im
 		
 		void TabsPage(string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(A args)
 		{
-			 //TabsPage ////////////////////////////////
-			Column!(srcModule, srcLine)(
+			Column!(srcModule, srcLine)
+			(
 				{
 					bool materialStyle = true; 
 					if(materialStyle)
@@ -8534,9 +8557,11 @@ struct im
 			); 
 		} 
 		
-		void Tabs(alias mapTitle = "a.title", alias mapUI = "a.UI()", R, I, string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(R r, ref I idx, A args)
+		void Tabs(
+			alias mapTitle = "a.title", alias mapUI = "a.UI()", R, I, 
+			string srcModule=__MODULE__, size_t srcLine=__LINE__, A...
+		)(R r, ref I idx, A args)
 		{
-			 //Tabs/////////////////////////////
 			mixin(prepareId); 
 			
 			bool includeAll = false; 
@@ -8564,7 +8589,8 @@ struct im
 			
 			
 			TabsHeader!(srcModule, srcLine)(titles, idx); 
-			TabsPage!(srcModule, srcLine)(
+			TabsPage!(srcModule, srcLine)
+			(
 				{
 					if(idx>=0 && idx<len)
 					{
@@ -8825,15 +8851,22 @@ struct im
 		} 
 		
 		
-		auto ListBoxItem(string srcModule=__MODULE__, size_t srcLine=__LINE__, C, Args...)(ref bool isSelected, C s, in Args args)
+		auto ListBoxItem(string srcModule=__MODULE__, size_t srcLine=__LINE__, C, Args...)
+			(ref bool isSelected, C s, in Args args)
 		{
 			HitInfo hit; 
-			Row!(srcModule, srcLine)(
+			Row!(srcModule, srcLine)
+			(
 				{
 					hit = hitTest(enabled); 
 					
-					if(!isSelected && hit.hover && (inputs.LMB.down || inputs.RMB.down))
-					isSelected = true; //mosue down left or right
+					if(
+						!isSelected && hit.hover && (
+							inputs.LMB.down || inputs.RMB.down
+							/+mosue down left or right+/
+						)
+					)
+					isSelected = true; 
 					
 					padding = "2 2"; 
 					bkColor = mix(bkColor, clAccent, max(isSelected ? 0.66f:0, hit.hover_smooth*0.33f)); 
@@ -8856,13 +8889,15 @@ struct im
 			alias changed this; 
 		} 
 		
-		auto ListBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)(ref int idx, in A[] items, in Args args)
+		auto ListBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)
+			(ref int idx, in A[] items, in Args args)
 		{
-			 //LixtBox ///////////////////////////////
 			mixin(prepareId); //Todo: enabled, tool theme
 			
 			//find translator function . This translates data to gui.
-			enum isTranslator(T) = __traits(compiles, T.init(A.init)); //is(T==void delegate(in A)) || is(T==void delegate(A)) || is(T==void function(in A)) || is(T==void function(A));
+			enum isTranslator(T) = __traits(compiles, T.init(A.init)); 
+			//is(T==void delegate(in A)) || is(T==void delegate(A)) || is(T==void function(in A)) || is(T==void function(A));
+			
 			enum translated = anySatisfy!(isTranslator, Args); 
 			
 			HitInfo hit; 
@@ -8896,20 +8931,27 @@ struct im
 					static if(__traits(compiles, a()))
 					a(); 
 				}/*, args*/
-			); //Todo: passing that fucking genericId
+			); 
+			//Todo: passing that fucking genericId
+			
 			return ListBoxResult(hit, changed); 
 		} 
 		
-		auto ListBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)(ref A value, A[] items, Args args)
+		auto ListBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)
+			(ref A value, A[] items, Args args)
 		{
-			auto idx = cast(int) items.countUntil(value); //Opt: slow search. iterates items twice: 1. in this, 2. in the main ListBox funct
+			auto idx = cast(int) items.countUntil(value); 
+			//Opt: slow search. iterates items twice: 1. in this, 2. in the main ListBox funct
+			
 			auto res = ListBox!(srcModule, srcLine)(idx, items, args); 
 			if(res)
 			value = items[idx]; 
 			return res; 
 		} 
 		
-		auto ListBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, E, Args...)(ref E e, Args args) if(is(E==enum))
+		auto ListBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, E, Args...)
+			(ref E e, Args args)
+			if(is(E==enum))
 		{
 			auto s = e.text; 
 			auto res = ListBox!(srcModule, srcLine)(s, getEnumMembers!E, args); 
@@ -8918,8 +8960,12 @@ struct im
 			return res; 
 		} 
 		
-		//Todo: the parameters of all the ListBox-es, ComboBoxes must be refactored. It's a lot of copy paste and yet it's far from full accessible functionality.
-		static void ScrollListBox(T, U, string srcModule=__MODULE__ , size_t srcLine=__LINE__)(ref T focusedItem, U items, void delegate(in T) cellFun, int pageSize, ref int topIndex)
+		/+
+			Todo: the parameters of all the ListBox-es, ComboBoxes must be refactored. 
+			It's a lot of copy paste and yet it's far from full accessible functionality.
+		+/
+		static void ScrollListBox(T, U, string srcModule=__MODULE__ , size_t srcLine=__LINE__)
+			(ref T focusedItem, U items, void delegate(in T) cellFun, int pageSize, ref int topIndex)
 			if(isInputRange!U && is(ElementType!U == T))
 		{
 			auto scrollMax = max(0, items.walkLength.to!int-pageSize); 
@@ -10397,9 +10443,7 @@ struct im
 			{
 				with(im)
 				{
-					  //Todo: this could go inside het.ui.im
-					if(ext.empty)
-					return; 
+					if(ext.empty) return; 
 					
 					static Cell[][string] cache;  //Todo: when megatexture is reallocated, the texture id's of icons become invalid.
 					
