@@ -8852,8 +8852,14 @@ $(V_size+G_size)".text
 							shape, aspect*p, 	aspect*(topLeft-sharpBorder-correction), 
 								aspect*(size+sharpBorder*2.+correction*2.), p0, p1, p2
 						)+sharpBorder; 
-						float nsd = 1.0 - (sd - (roundingRadius-border)) / border; //0..1 range is in the border area
 						
+						float nsd = 1.0001 - ((sd - (roundingRadius-border))/(border))
+						/*
+							To make sure, that it fully fills the shapeRect, 
+							it's not exactly 1.0, but a bit higher.
+						*/; 
+						
+						//from here 0..1 range is in the border area, 0=outside, 1=inside
 						bool isOutside = nsd < 0.0; if(isOutside) return border*-2.; //Todo: if border = 0, it will not return anything
 						bool isInside = nsd >= 1.0; if(isInside) return superEllipticRampTarget(bevelType) * border; 
 						return superEllipticRamp(nsd, bevelParam, bevelType) * border; 

@@ -1310,13 +1310,16 @@ version(/+$DIDE_REGION+/all)
 		vec2 outerPos, outerSize; 
 		
 		ref _FlexValue flex()
-		{ static _FlexValue nullFlex; return nullFlex	; } //Todo: this is bad, but fast. maybe do it with a setter and const ref.
-		ref Margin	margin ()
-		{ static Margin	nullMargin; return nullMargin	; } 
-		ref Border	border ()
-		{ static Border	nullBorder; return nullBorder	; } 
-		ref Padding	padding()
-		{ static Padding	nullPadding; return nullPadding; }  //Todo: inout ref
+		{
+			static _FlexValue nullFlex; return nullFlex; 
+			//Todo: this is bad, but fast. maybe do it with a setter and const ref.
+		} 
+		ref Margin	margin()
+		{ static Margin nullMargin; return nullMargin	; } 
+		ref Border border ()
+		{ static Border nullBorder; return nullBorder	; } 
+		ref Padding padding()
+		{ static Padding nullPadding; return nullPadding; }  //Todo: inout ref
 		
 		version(/+$DIDE_REGION SelectionManager  virtual functs+/all)
 		{
@@ -3226,7 +3229,7 @@ version(/+$DIDE_REGION+/all)
 					
 					if(flexRatioSum>0)
 					{
-						//WARN("flex and tab processing not implemented yet");
+						WARN("flex and tab processing not implemented yet"); 
 						//Todo: flex and tab processing
 					}
 				}
@@ -6972,13 +6975,11 @@ struct im
 			return null; 
 		} 
 		
-		private void append(Cell c)
+		public void append(T)(T c)
 		{
-			if(actContainer !is null)	actContainer.appendCell(c); 
+			if(actContainer !is null)	actContainer.append(c); 
 			else	rootCells ~= c; 
 		} 
-		
-		public void imAppend(Cell c) { append(c); } 
 		
 		.Container removeLastContainer()
 		{
@@ -7362,34 +7363,41 @@ struct im
 			{
 				{
 					alias T = typeof(cast()a); 
+					enum isT(Type) 	= is(T == Type),
+					isG(string Name) 	= isGenericArg!(T, Name); 
+					
+					static GEN_static_if(T)(T table)
+					{ return table.rows.map!((r){ return iq{if($(r[0])) {$(r[1])}}.text; }).join("\nelse "); } 
+					
 					static if(isFunctionPointer!a)	a(); 
 					else static if(isDelegate!a)	a(); 
 					else static if(isSomeString!T)	Text(a); 
-					else static if(is(T == YAlign))	flags.yAlign = a; 
-					else static if(is(T == HAlign))	flags.hAlign = a; 
-					else static if(is(T == VAlign))	flags.vAlign = a; 
-					else static if(is(T == TextStyle))	textStyle = a; 
-					else static if(is(T == RGB))	style.bkColor = bkColor = a; 
-					else static if(is(T == Padding))	padding = a; 
-					else static if(is(T == Border))	border = a; 
-					else static if(is(T == Margin))	margin = a; 
-					else static if(is(T == SyntaxKind))	{
+					else static if(isT! YAlign)	flags.yAlign = a; 
+					else static if(isT! HAlign)	flags.hAlign = a; 
+					else static if(isT! VAlign)	flags.vAlign = a; 
+					else static if(isT! TextStyle)	textStyle = a; 
+					else static if(isT! RGB)	style.bkColor = bkColor = a; 
+					else static if(isT! Padding)	padding = a; 
+					else static if(isT! Border)	border = a; 
+					else static if(isT! Margin)	margin = a; 
+					else static if(isT! SyntaxKind)	{
 						textStyle.applySyntax(a); 
 						bkColor = textStyle.bkColor; 
 					}
-					else static if(isGenericArg!(T, "id"))	{/+Already processed by prepareId.srcId+/}
-					else static if(isGenericArg!(T, "theme"))	theme = a; 
-					else static if(isGenericArg!(T, "syntax"))	{
+					else static if(isG!"id")	{/+Already processed by prepareId.srcId+/}
+					else static if(isG!"theme")	theme = a; 
+					else static if(isG!"syntax")	{
 						textStyle.applySyntax(a.to!SyntaxKind); 
 						bkColor = textStyle.bkColor; 
 					}
-					else static if(isGenericArg!(T, "fontColor"))	style.fontColor = a; 
-					else static if(isGenericArg!(T, "bold"))	style.bolt = a; 
-					else static if(isGenericArg!(T, "italic"))	style.italic = a; 
-					else static if(isGenericArg!(T, "bkColor"))	style.bkColor = bkColor = a; 
-					else static if(isGenericArg!(T, "padding"))	padding = a; 
-					else static if(isGenericArg!(T, "border"))	border = a; 
-					else static if(isGenericArg!(T, "margin"))	margin = a; 
+					else static if(isG!"fontColor")	style.fontColor = a; 
+					else static if(isG!"bold")	style.bolt = a; 
+					else static if(isG!"italic")	style.italic = a; 
+					else static if(isG!"bkColor")	style.bkColor = bkColor = a; 
+					else static if(isG!"padding")	padding = a; 
+					else static if(isG!"border")	border = a; 
+					else static if(isG!"margin")	margin = a; 
+					else static if(isG!"flex")	flex = a; 
 					else
 					static assert(false, "Unsupported type: "~T.stringof); 
 				}
@@ -7504,7 +7512,7 @@ struct im
 			raise("Popup must contain only one Cell"); 
 			
 			auto popup = actContainer.removeLast; 
-			imAppend(popup); 
+			append(popup); 
 			
 			popupState.cell = popup; 
 			popupState.parent = parent; 
@@ -8070,37 +8078,41 @@ struct im
 			
 			return res; //a hit testet vissza kene adni im.valtozoban
 		} 
-		
-		static EditPath_hasRefreshBtn = true; 
-		
-		auto EditPath(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(ref Path actPath, in Args args)
+		alias EditFile = EditFileOrPath, EditPath = EditFileOrPath; 
+		auto EditFileOrPath(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, Args...)
+			(ref T act, in Args args)
+			if (is(T == Path) || is(T == File))
 		{
 			static struct Res
 			{
 				bool mustRefresh; alias mustRefresh this; 
 				bool valid, editing, changed; 
-			} 
-			Res res; 
+			} Res res; 
 			
-			EditPath_hasRefreshBtn = true; 
 			
-			Row!(srcModule, srcLine)(
-				args, {
-					auto editedPath = &ImStorage!Path.access(actContainer.id); 
+			Row!(srcModule, srcLine)
+			(
+				args,
+				{
+					auto edited = &ImStorage!T.access(actContainer.id); /+doto: use ref!+/
 					
-					auto normalize = (in Path p) => p.normalized; 
-					auto validate = (in Path p) => p.exists; 
+					auto normalize(in T p) => p.normalized; 
+					auto validate(in T p) => p.exists; 
+					
+					static if(is(T == Path))	ref editField() => edited.fullPath; 
+					else	ref editField() => edited.fullName; 
 					
 					Edit(
-						editedPath.fullPath, {
+						editField,
+						{
 							flex = 1; 
 							if(flags.focused)
 							{
 								res.editing = true; 
 								
-								auto normalizedValue = normalize(*editedPath); 
+								auto normalizedValue = normalize(*edited); 
 								res.valid = validate(normalizedValue); 
-								res.changed = actPath != *editedPath; 
+								res.changed = act != *edited; 
 								
 								void colorize(RGB cl)
 								{
@@ -8108,24 +8120,25 @@ struct im
 									border.color = cl; 
 								} 
 								
-								if(!res.valid)
-								colorize(clRed); else if(res.changed)
-								colorize(clGreen); 
-								
-								if(inputs.Esc.pressed)
-								{ *editedPath = actPath; }
-								if(inputs.Enter.pressed && res.valid)
-								{
-									actPath = normalizedValue; 
-									focusedState.reset; 
-									res.mustRefresh = true; 
+								if(!res.valid)	colorize(clRed); 
+								else if(res.changed)	colorize(clGreen); 
+								if(inputs.Esc.pressed) *edited = act; 
+								if(
+									inputs.Enter.pressed 
+									&& res.valid
+								) {
+									{
+										act = normalizedValue; 
+										focusedState.reset; 
+										res.mustRefresh = true; 
+									}
 								}
-							}else
+							}
+							else
 							{
-								*editedPath = actPath; 
-								res.valid =  validate(actPath); 
-								if(!res.valid)
-								style.fontColor = clRed; 
+								*edited = act; 
+								res.valid = validate(act); 
+								if(!res.valid) { style.fontColor = clRed; }
 							}
 						}
 					); 
@@ -8136,97 +8149,36 @@ struct im
 						{
 							//Todo: These buttons ain't work with mouse. Only Enter/Esc works.
 							if(Btn(symbol("Accept"), enable(res.valid)))
-							{ actPath = *editedPath; res.editing = false; res.valid = validate(actPath); res.mustRefresh = true; focusedState.reset; }
+							{
+								act = *edited; 
+								res.editing = false; 
+								res.valid = validate(act); 
+								res.mustRefresh = true; 
+								focusedState.reset; 
+							}
 							if(Btn(symbol("Cancel")))
-							{ *editedPath = actPath; res.editing = false; res.valid = validate(actPath); focusedState.reset; }
-						}
-					}else
-					{
-						if(EditPath_hasRefreshBtn && res.valid && Btn(symbol("Refresh")))
-						{ res.mustRefresh = true; }
-					}
-				}
-			); 
-			
-			return res; 
-		} 
-		
-		auto EditFile(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(ref File actFile, in Args args)
-		{
-			 //EditFile ///////////////////////////////////////
-			//Todo: CopyPasta
-			static struct Res
-			{
-				bool mustRefresh; alias mustRefresh this; 
-				bool valid, editing, changed; 
-			} 
-			Res res; 
-			
-			Row!(srcModule, srcLine)(
-				args, {
-					auto editedFile = &ImStorage!File.access(actContainer.id); 
-					
-					auto normalize = (in File p) => p.normalized; 
-					auto validate = (in File p) => p.exists; 
-					
-					Edit(
-						editedFile.fullName, {
-							flex = 1; 
-							if(flags.focused)
 							{
-								res.editing = true; 
-								
-								auto normalizedValue = normalize(*editedFile); 
-								res.valid = validate(normalizedValue); 
-								res.changed = actFile != *editedFile; 
-								
-								void colorize(RGB cl)
-								{
-									style.bkColor = bkColor = mix(bkColor, cl, 0.25f); 
-									border.color = cl; 
-								} 
-								
-								if(!res.valid)
-								colorize(clRed); else if(res.changed)
-								colorize(clGreen); 
-								
-								if(inputs.Esc.pressed)
-								{ *editedFile = actFile; }
-								if(inputs.Enter.pressed && res.valid)
-								{
-									actFile = normalizedValue; 
-									focusedState.reset; 
-									res.mustRefresh = true; 
-								}
-							}else
-							{
-								*editedFile = actFile; 
-								res.valid =  validate(actFile); 
-								if(!res.valid)
-								style.fontColor = clRed; 
+								*edited = act; 
+								res.editing = false; 
+								res.valid = validate(act); 
+								focusedState.reset; 
 							}
 						}
-					); 
-					
-					if(res.editing)
+					}
+					else
 					{
-						if(res.changed)
+						static if(is(T == Path))
 						{
-							if(Btn(symbol("Accept"), enable(res.valid)))
-							{ actFile = *editedFile; res.editing = false; res.valid = validate(actFile); res.mustRefresh = true; focusedState.reset; }
-							if(Btn(symbol("Cancel")))
-							{ *editedFile = actFile; res.editing = false; res.valid = validate(actFile); focusedState.reset; }
+							if(res.valid && Btn(symbol("Refresh")))
+							{ res.mustRefresh = true; }
 						}
-					}else
-					{
-						//Todo: optional refresh button. Disabled for file
-						//if(res.valid && Btn(symbol("Refresh"))){ res.mustRefresh = true; }
 					}
 				}
 			); 
 			
 			return res; 
 		} 
+		
 		
 		
 		auto Static(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(in T0 value, T args)
