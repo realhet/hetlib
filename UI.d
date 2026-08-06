@@ -3151,8 +3151,6 @@ version(/+$DIDE_REGION+/all)
 	
 	void processElasticTabs(R)(R[] rows, in float flexMaxWidth = float.nan, in int level=0)  if(is(R==Cell) || is(R==WrappedLine))
 	{
-		if(inputs.Shift.down) return; 
-		
 		/+
 			Copyright: Nick Gravgaard
 			licensed under a Creative Commons Attribution 3.0 Licence
@@ -3326,6 +3324,42 @@ version(/+$DIDE_REGION+/all)
 				{ (cast(Glyph)(tab)).bkColor = mix(clGray, clRainbow[level%$], .25f); }
 			}
 			processElasticTabs(range, flexMaxWidth, level+1); //recursive
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
 			
 			if(doFlex && (false || anyFlexToTheRight))
 			{
@@ -3333,6 +3367,10 @@ version(/+$DIDE_REGION+/all)
 				{
 					auto 	subCells 	= getSubCells(row),
 						Δ 	= subCells.back.outerRight - flexMaxWidth; 
+					
+					
+					
+					
 					if(Δ>ε /+avoid float sum precision loss+/)
 					{
 						version(/+$DIDE_REGION Find flex cells+/all)
@@ -3685,24 +3723,19 @@ version(/+$DIDE_REGION+/all)
 		vec2 calcContentSize  ()
 		{ return vec2(calcContentWidth, calcContentHeight); } 
 		
-		final void setSubContainerWidths(bool setAll=true)(float targetWidth, bool DEBUGGG)
+		final void setSubContainerWidths(bool setAll=true)(float targetWidth)
 		{
 			foreach(c; subContainers)
 			if(setAll || (magnitude(c.outerWidth-targetWidth)) > AlignEpsilon)
 			{
-				if(DEBUGGG) print(i"$(c.outerWidth) ->"); 
-				
 				c.outerWidth = targetWidth; 
-				
-				if(DEBUGGG) print(i"->$(c.outerWidth)"); 
 				c.flags.autoWidth = false; 
 				c.measure; 
-				if(DEBUGGG) print(i"after measure->$(c.outerWidth)"); 
 			}
 		} 
 		
-		final void setSubContainerWidths_differentOnly(float targetWidth, bool DEBUGGG)
-		{ setSubContainerWidths!false(targetWidth, DEBUGGG); } 
+		final void setSubContainerWidths_differentOnly(float targetWidth)
+		{ setSubContainerWidths!false(targetWidth); } 
 		
 		/// this must overrided by every descendant. Its task is to measure and then place all the subcells.
 		/// must update innerSize if autoWidth or autoHeight is specified.
@@ -4867,10 +4900,6 @@ version(/+$DIDE_REGION+/all)
 		
 		override void rearrange()
 		{
-			
-			if(DEBUGGG)
-			{ print(i"DEBUGGG  dontStretchSubCells = $(flags.dontStretchSubCells), autoWidth = $(flags.autoWidth)"); }
-			
 			//measure the subCells and stretch them to a maximum width
 			if(flags.dontStretchSubCells)
 			{
@@ -4883,8 +4912,8 @@ version(/+$DIDE_REGION+/all)
 				innerWidth = calcContentWidth; 
 				//at this point all the subCells are measured
 				//now set the width of every subcell in this column if it differs, and remeasure only when necessary
-				if(DEBUGGG) print(i"setSubContainerWidths_differentOnly $(innerWidth)"); 
-				setSubContainerWidths_differentOnly(innerWidth, DEBUGGG); 
+				
+				setSubContainerWidths_differentOnly(innerWidth); 
 				/+
 					Note: this is not perfectly optimal when autoWidth and fixedWidth Rows are mixed. 
 						But that's not an usual case: ListBox: all textCells are fixedWidth, 
@@ -4893,16 +4922,11 @@ version(/+$DIDE_REGION+/all)
 			}
 			else {
 				//first set the width of every subcell in this column, and measure all (for the first time).
-				setSubContainerWidths(innerWidth, DEBUGGG); 
+				setSubContainerWidths(innerWidth); 
 			}
-			
-			if(DEBUGGG) print("AAAAA", subCells.map!"a.outerWidth"); 
 			
 			if(flags.columnElasticTabs)
 			processElasticTabs(subCells, ((flags.autoWidth)?(float.nan):(innerWidth))); //Todo: ez a flex=1 -el egyutt bugzik.
-			
-			if(DEBUGGG) print("BBBBB", subCells.map!"a.outerWidth"); 
-			
 			
 			//process vertically flexible items
 			if(!flags.autoHeight)
@@ -4935,8 +4959,6 @@ version(/+$DIDE_REGION+/all)
 			
 			if(flags.autoHeight)
 			innerHeight = calcContentHeight; 
-			
-			if(DEBUGGG) print("CCCCC", subCells.map!"a.outerWidth"); 
 		} 
 		
 		override void visitSubCells_cull(bounds2 clipBounds, void delegate(Cell) fun)
@@ -5145,13 +5167,13 @@ version(/+$DIDE_REGION+/all)
 			super.parse(s, ts); 
 		} 
 		
-	} class GrpContainer : Container
+	} class GrpContainer : Container /+more info-> im.Grp()+/
 	{
 		override void rearrange()
 		{
 			super.rearrange; 
 			
-			auto 	content 	= (cast(.Container)(subCells.get(0))),
+			auto 	content 	= (cast(.Container)(subCells.get(0))), //<- automatically resized when resizing this
 				title 	= (cast(.Container)(subCells.get(1))); 
 			if(content && title)
 			{
@@ -7875,7 +7897,8 @@ struct im
 		void Grp(alias Cntr=Column, string srcModule=__MODULE__, size_t srcLine=__LINE__, T, A...)
 			(T title, void delegate() fun, A args)
 		{
-			Container(
+			Container!GrpContainer
+			(
 				{
 					Row({ padding.left+=fh/4; padding.right+=fh/4; }, title); 
 					lastContainer.outerPos.x = fh/2; 
@@ -7890,34 +7913,10 @@ struct im
 							fun(); 
 						}, args
 					); 
+					
+					with(actContainer) swap(subCells[0], subCells[1]); /+Correct Z-Order+/
 				}
 			); 
-			
-			swap(lastContainer.subCells[0], lastContainer.subCells[1]); /+nasty trick to measure the caption first}+/
-			
-			
-			version(/+$DIDE_REGION+/none) {
-				Container!GrpContainer
-				(
-					{
-						Row({ padding.left+=fh/4; padding.right+=fh/4; }, title); 
-						lastContainer.outerPos.x = fh/2; 
-						lastContainer.measure; 
-						const hh = lastContainer.outerHeight; 
-						
-						Grp!(Cntr, srcModule, srcLine)
-						(
-							{
-								margin.top += (hh*(3/8.0f)).iround; 
-								padding.top = max(padding.top, hh-margin.top-border.width); 
-								fun(); 
-							}, args
-						); 
-						
-						with(actContainer) swap(subCells[0], subCells[1]); /+Correct Z-Order+/
-					}
-				); 
-			}
 		} 
 		
 		
@@ -9902,6 +9901,8 @@ struct im
 				static foreach(a; args)
 				static if(__traits(compiles, a()))
 				a(); 
+				
+				//Todo: args hanfling is bad here! only handles delegates. Ignored named parameters!
 				
 				if(userModified && enabled)
 				{

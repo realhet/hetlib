@@ -184,7 +184,14 @@ class AiChat
 				const 	st 	= now.localSystemTime, 
 					hour	= st.wHour + st.wMinute/60.0,
 					scale 	= /+((mixin(界3(q{1.5},q{hour},q{17.5})))?(1.0/+Note: normal+/):(0.5/+Note: discount+/)) before 260402+/
-						  1.0; 
+					((
+					mixin(界3(q{2},q{hour},q{5}))||mixin(界3(q{7},q{hour},q{11}))
+					/+
+						DeepSeek defines its API peak hours 
+						as 09:00–12:00 and 14:00–18:00 
+						Beijing Time (UTC+8)
+					+/
+				)?(2.0/+Note: peak+/):(1.0/+Note: normal+/))/+from 260806+/; 
 				//Todo: model dependent prices.  this is chat only
 				return i"Usage(prompt_hit: $(cached_prompt_tokens), ".text~
 				i"prompt_miss: $(prompt_tokens), ".text~
@@ -211,12 +218,14 @@ class AiChat
 					)~ before 260725
 				+/
 				(
+					/+deepseek-v4-flash+/
 					(
 						cached_prompt_tokens	*0.0028*scale+
 						(prompt_tokens-cached_prompt_tokens)	*0.14*scale+
 						completion_tokens	*0.28*scale
 					)
-					/ 1e6 * 318/+1 usd to huf+/ /+Todo: more accurate usd to huf+/
+					/ 1e6/+1M tokens+/ * 316/+1 USD to HUF+/ 
+					/+Todo: more accurate usd to huf+/
 				)~
 				format!"price: %3d%%)"((scale*100).iround); 
 			} 
