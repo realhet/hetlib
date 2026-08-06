@@ -908,6 +908,24 @@ version(/+$DIDE_REGION+/all)
 		}
 	} 
 	
+	void spreadH(Cell[] cells, float x)
+	{
+		foreach(c; cells)
+		{
+			c.outerPos.x = x; 
+			x += c.outerWidth; 
+		}
+	} 
+	
+	void spreadV(Cell[] cells, float y)
+	{
+		foreach(c; cells)
+		{
+			c.outerPos.y = y; 
+			y += c.outerHeight; 
+		}
+	} 
+	
 	float maxOuterWidth (Cell[] cells, float def = EmptyCellWidth )
 	{ return cells.empty ? def : cells.map!"a.outerWidth" .maxElement; } 
 	float maxOuterHeight(Cell[] cells, float def = EmptyCellHeight)
@@ -1685,6 +1703,12 @@ version(/+$DIDE_REGION+/all)
 	} 
 	
 	bool cellIsNewLine(Cell c) { return cast(Glyph)c && (cast(Glyph)c).isNewLine; } 
+	
+	private bool isTab(in Cell c)
+	{
+		if(const g = (cast(Glyph)(c)))	return g.isTab; 
+		else	return false; 
+	} 
 	
 	
 	class Glyph : Cell
@@ -2856,25 +2880,24 @@ version(/+$DIDE_REGION+/all)
 	
 	private struct WrappedLine
 	{
-		 //WrappedLine /////////////////////////////////////////////////////////
 		Cell[] cells; 
 		float y0, height; 
 		
-		//const{ //todo: outerRight is not const
-			auto top()
+		auto top()
 		{ return y0; } 
-			auto bottom()
+		auto bottom()
 		{ return top+height; } 
-			auto right()
+		auto right()
 		{ return cells.length ? cells.back.outerRight : 0; } 
-			auto left()
+		auto left()
 		{ return cells.length ? cells[0].outerPos.x : 0; } 
-			auto calcWidth()
+		auto calcWidth()
 		{
 			assert(left==0, "Trying to rearrange subCells of a Row that were already realigned."); 
 			return right; 
-		} //Todo: assume left is 0
-		//}
+		} 
+		//Todo: assume left is 0
+		
 		
 		int cellCount() const
 		{ return cast(int)cells.length; } 
@@ -3125,208 +3148,243 @@ version(/+$DIDE_REGION+/all)
 	
 	//Elastic Tabs //////////////////////////////////////////
 	
-	/+
-			Elastic Tabstops License
-		https://nickgravgaard.com/elastic-tabstops/
-		https://github.com/nickgravgaard/AlwaysAlignedVS/blob/master/LICENSE.md
+	
+	void processElasticTabs(R)(R[] rows, in float flexMaxWidth = float.nan, in int level=0)  if(is(R==Cell) || is(R==WrappedLine))
+	{
+		if(inputs.Shift.down) return; 
 		
-		Copyright 2010-2017 Nick Gravgaard
-		
-		Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
-		associated documentation files (the "Software"), to deal in the Software without restriction,
-		including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
-		and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
-		subject to the following conditions:
-		
-		The above copyright notice and this permission notice shall be included in all copies or substantial
-		portions of the Software.
-		
-		THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
-		LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-		IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-		WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-		SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-	+/
-	
-	//elastic tabs
-	int[] tabIdx(Cell c)
-	{
-		if(auto r = cast(Row)c)
-		return r.tabIdxInternal; 
-		else return []; 
-	} 
-	
-	int tabCnt(Cell c)
-	{
-		return cast(int)c.tabIdx.length; //Todo: int -> size_t
-	} 
-	
-	float tabPos(Cell c, int i)
-	{
-		if(auto r = cast(Row)c)
-		return r.subCells[r.tabIdxInternal[i]].outerRight; 
-		else return 0; 
-	} 
-	
-	Glyph[] subGlyphs(Cell c)
-	{
-		if(auto r = cast(Container)c)
-		return cast(Glyph[])r.subCells; 
-		else return []; 
-	} 
-	
-	
-	Glyph subGlyph(Cell c, int i)
-	{
-		if(auto r = cast(Container)c)
-		return cast(Glyph)r.subCells.get(i); 
-		else return null; 
-	} 
-	
-	void processElasticTabs(Cell[] rows, int level=0)
-	{
 		/+
 			Copyright: Nick Gravgaard
 			licensed under a Creative Commons Attribution 3.0 Licence
 			/+Link: https://nickgravgaard.com/elastic-tabstops+/
+			/+Link: https://github.com/nickgravgaard/AlwaysAlignedVS/blob/master/LICENSE.md+/
+			
+			Copyright 2010-2017 Nick Gravgaard
+			
+			Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
+			associated documentation files (the "Software"), to deal in the Software without restriction,
+			including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,
+			and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so,
+			subject to the following conditions:
+			
+			The above copyright notice and this permission notice shall be included in all copies or substantial
+			portions of the Software.
+			
+			THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+			LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+			IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+			WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+			SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		+/
 		
-		bool tabCntGood(Cell row)
-		{ return row.tabCnt > level; } 
-		
+		static if(is(R==Cell))
+		{
+			static int getTabCnt(in Cell c)
+			{
+				if(auto r = (cast(Row)(c)))
+				return (cast(int)(r.tabIdxInternal.length)); 
+				else return 0; 
+			} 
+			
+			static int getTabIdx(in Cell c, int i)
+			{
+				if(auto r = (cast(Row)(c)))
+				return r.tabIdxInternal[i]; 
+				else return -1; 
+			} 
+			
+			static float getTabPos(in Cell c, int i)
+			{
+				if(auto r = (cast(Row)(c)))
+				return r.subCells[r.tabIdxInternal[i]].outerRight; 
+				else return 0; 
+			} 
+			
+			static Cell[] getSubCells(Cell c)
+			{
+				if(auto r = (cast(Row)(c)))
+				return r.subCells; 
+				else return []; 
+			} 
+		}static if(is(R==WrappedLine))
+		{
+			static int getTabCnt(in WrappedLine wl)
+			=> (cast(int)(wl.cells.count!((c)=>(c.isTab))/+Opt: SLOW+/)); 
+			
+			static int getTabIdx(in WrappedLine wl, int i)
+			{
+				int j; //Opt: SLOW
+				foreach(idx, const cell; wl.cells)
+				{
+					if(cell.isTab)
+					{
+						if(j==i)
+						return cast(int) idx; 
+						j++; 
+					}
+				}
+				return -1; 
+			} 
+			//Opt: WrappedLine tab processing is terribly unoptimal
+			
+			static float getTabPos(in WrappedLine wl, int i)
+			=> wl.cells[getTabIdx(wl, i)].outerRight; 
+			
+			static Cell[] getSubCells(WrappedLine wl)
+			=> wl.cells; 
+			
+			
+			
+			
+			
+			
+			
+			
+			
+		}
+		
+		enum ε = AlignEpsilon; 
+		const doFlex = !flexMaxWidth.isnan && level==0; 
 		while(1)
 		{
 			//search the islands
+			bool tabCntGood(T)(in T row)
+			=> getTabCnt(row) > level; 
 			while(rows.length && !tabCntGood(rows[0]))
 			rows = rows[1..$]; 
-			int n; while(n<rows.length && tabCntGood(rows[n]))
-			n++; 
-			if(!n)
+			int n; while(
+				n<rows.length && 
+				tabCntGood(rows[n])
+			) n++; if(!n)
 			break; 
 			auto range = rows[0..n]; 
 			
-			auto rightMostTabPos = range.map!(r => r.tabPos(level)).maxElement; 
+			const rightMostTabPos = range.map!((r)=>(getTabPos(r, level))).maxElement; 
 			
+			bool anyFlexToTheRight /+true if any row has a flex cell after the first tab+/; 
 			foreach(row; range)
 			{
-				auto 	tIdx 	= row.tabIdx[level],
-					tab 	= row.subGlyph(tIdx),
-					delta 	= rightMostTabPos-(tab.outerRight); 
+				auto 	subCells 	= getSubCells(row),
+					tIdx 	= getTabIdx(row, level),
+					tab 	= subCells[tIdx],
+					Δ 	= rightMostTabPos - (tab.outerRight); 
 				
-				if(delta)
+				if(Δ>ε /+can't be negative+/)
 				{
-					tab.innerWidth = tab.innerWidth + delta; 
-					//Todo: after this, the flex width are fucked up.
-					
-					//Todo: itt ha tordeles van, akkor ez szar.
-					float flexRatioSum = 0; 
-					foreach(g; (cast(Container)row).subCells[tIdx+1..$])
+					version(/+$DIDE_REGION Look to the left and find flex cells+/all)
 					{
-						g.outerPos.x += delta; //shift the cells
-						if(g.flex)
-						flexRatioSum += g.flex; 
+						int flexCnt; float totalFlexWidth=0, totalFlexRatio=0; 
+						foreach_reverse(c; subCells[0 .. tIdx])
+						{
+							if(c.isTab) break; 
+							if(c.flex) {
+								flexCnt 	+= 1,
+								totalFlexWidth 	+= c.outerWidth,
+								totalFlexRatio	+= c.flex; 
+							}
+						}
 					}
 					
-					if(flexRatioSum>0)
+					if(flexCnt)
 					{
-						WARN("flex and tab processing not implemented yet"); 
-						//Todo: flex and tab processing
+						//move the Tab to the right
+						tab.outerPos.x += Δ; 
+						//spread Δ across flex cells, align other cells to the right
+						const invRatio = 1.0f / totalFlexRatio; 
+						foreach_reverse(i; 0 .. tIdx)
+						{
+							auto c = subCells[i], cNext = subCells[i+1]; 
+							if(c.isTab) break; 
+							if(c.flex)
+							{
+								c.outerWidth += Δ * (c.flex * invRatio); 
+								if(auto cntr = (cast(Container)(c)))
+								{
+									cntr.flags.autoHeight = false; cntr.measure; 
+									//Todo: height can change if wordwrapped!!!
+								}
+							}
+							
+							//align all cells while going to the left
+							c.outerPos.x = cNext.outerPos.x - c.outerWidth; 
+						}
 					}
+					else
+					{
+						//extend the Tab to the right
+						tab.innerWidth = tab.innerWidth + Δ; 
+					}
+					
+					version(/+$DIDE_REGION Shift all cells on the right side of the tab to the right+/all)
+					{ subCells[tIdx+1..$].spreadH(tab.outerRight); }
 				}
+				
+				if(doFlex && !anyFlexToTheRight)
+				{ anyFlexToTheRight = subCells[tIdx+1..$].map!((c)=>(c.flex!=0)).any; }
 				
 				if(VisualizeTabColors)
-				{
-					tab.bkColor = mix(clGray, clRainbow[level%$], .25f); //debug coloring
-				}
-				
+				{ (cast(Glyph)(tab)).bkColor = mix(clGray, clRainbow[level%$], .25f); }
 			}
-			processElasticTabs(range, level+1); //recursive
+			processElasticTabs(range, flexMaxWidth, level+1); //recursive
+			
+			if(doFlex && (false || anyFlexToTheRight))
+			{
+				foreach(row; range)
+				{
+					auto 	subCells 	= getSubCells(row),
+						Δ 	= subCells.back.outerRight - flexMaxWidth; 
+					if(Δ>ε /+avoid float sum precision loss+/)
+					{
+						version(/+$DIDE_REGION Find flex cells+/all)
+						{
+							int flexCnt; float totalFlexWidth=0, totalFlexRatio=0; 
+							foreach_reverse(c; subCells[0 .. $])
+							{
+								if(c.isTab) break; 
+								if(c.flex) {
+									flexCnt 	+= 1,
+									totalFlexWidth 	+= c.outerWidth,
+									totalFlexRatio	+= c.flex; 
+								}
+							}
+						}
+						
+						if(flexCnt)
+						{
+							//spread Δ across flex cells, align other cells to the right
+							const invRatio = 1.0f / totalFlexRatio; 
+							float actRightPos = flexMaxWidth; 
+							foreach_reverse(c; subCells[])
+							{
+								if(c.isTab) break; 
+								if(c.flex)
+								{
+									c.outerWidth -= Δ * (c.flex * invRatio); 
+									if(auto cntr = (cast(Container)(c)))
+									{
+										cntr.flags.autoHeight = false; cntr.measure; 
+										//Todo: height can change if wordwrapped!!!
+									}
+								}
+								
+								//align all cells while going to the left
+								c.outerPos.x = actRightPos - c.outerWidth; 
+								actRightPos = c.outerPos.x; //adcance
+							}
+							/+Todo: This must be tested. flex containers left t+/
+						}
+					}
+				}
+			}
 			
 			rows = rows[n..$]; //advance
 		}
 	} 
+	
 	
-	//Todo: this WrappedLine tab processing is terribly unoptimal
-	private bool isTab(in Cell c)
-	{
-		if(const g = cast(Glyph)c)
-		return g.isTab; 
-		else return false; 
-	} 
+	enum WrapMode { clip, wrap, shrink } 
+	//Todo: Implement WrapMode.  break word, spaces on edges, tabs vs wrap???
 	
-	private int tabCnt(in WrappedLine wl)
-	{ return cast(int) wl.cells.count!(c => c.isTab); } 
-	
-	private int tabIdx(in WrappedLine wl, int i)
-	{
-		int j; 
-		foreach(idx, const cell; wl.cells)
-		{
-			if(cell.isTab)
-			{
-				if(j==i)
-				return cast(int) idx; 
-				j++; 
-			}
-		}
-		return -1; 
-	} 
-	
-	float tabPos(WrappedLine wl, int i)
-	{
-		with(wl.cells[wl.tabIdx(i)])
-		return outerRight; 
-	} 
-	
-	void processElasticTabs(WrappedLine[] rows, int level=0)
-	{
-		bool tabCntGood(in WrappedLine wl)
-		{ return wl.tabCnt > level; }       //!!!!!!!!!!!!!!!!
-		
-		while(1)
-		{
-			//search the islands
-			while(rows.length && !tabCntGood(rows[0]))
-			rows = rows[1..$]; 
-			int n; while(n<rows.length && tabCntGood(rows[n]))
-			n++; 
-			if(!n)
-			break; 
-			auto range = rows[0..n]; 
-			
-			auto rightMostTabPos = range.map!(r => r.tabPos(level)).maxElement; 
-			
-			foreach(row; range)
-			{
-				auto 	tIdx 	= row.tabIdx(level),
-					tab 	= cast(Glyph)(row.cells[tIdx]),
-					delta 	= rightMostTabPos-(tab.outerRight); 
-				
-				if(delta)
-				{
-					tab.innerWidth = tab.innerWidth + delta; 
-					
-					//Todo: itt ha tordeles van, akkor ez szar.
-					foreach(g; row.cells[tIdx+1..$])
-					g.outerPos.x += delta; 
-					//row.innerWidth += delta;
-				}
-				
-				if(VisualizeTabColors)
-				{
-					tab.bkColor = avg(clWhite, clRainbow[level%$]); 
-					//debug coloring
-				}
-				
-			}
-			processElasticTabs(range, level+1); //recursive
-			
-			rows = rows[n..$]; //advance
-		}
-	} 
-	
-	
-	//enum WrapMode { clip, wrap, shrink } //todo: break word, spaces on edges, tabs vs wrap???
 	
 	enum ScrollState
 	{ off, on, autoOff, autoOn, auto_ = autoOff} 
@@ -3471,7 +3529,7 @@ version(/+$DIDE_REGION+/all)
 		{ subCells = []; } 
 		
 		final auto subContainers()
-		=> subCells.map!(c => cast(Container)c).filter!"a"; 
+		=> subCells.map!((c)=>((cast(Container)(c)))).filter!"a"; 
 		
 		void appendCell (Cell c)
 		{ if(c)	subCells ~= c; } 
@@ -3627,19 +3685,24 @@ version(/+$DIDE_REGION+/all)
 		vec2 calcContentSize  ()
 		{ return vec2(calcContentWidth, calcContentHeight); } 
 		
-		final void setSubContainerWidths(bool setAll=true)(float targetWidth)
+		final void setSubContainerWidths(bool setAll=true)(float targetWidth, bool DEBUGGG)
 		{
 			foreach(c; subContainers)
-			if(setAll ? true : c.outerWidth!=targetWidth)
+			if(setAll || (magnitude(c.outerWidth-targetWidth)) > AlignEpsilon)
 			{
+				if(DEBUGGG) print(i"$(c.outerWidth) ->"); 
+				
 				c.outerWidth = targetWidth; 
+				
+				if(DEBUGGG) print(i"->$(c.outerWidth)"); 
 				c.flags.autoWidth = false; 
 				c.measure; 
+				if(DEBUGGG) print(i"after measure->$(c.outerWidth)"); 
 			}
 		} 
 		
-		final void setSubContainerWidths_differentOnly(float targetWidth)
-		{ setSubContainerWidths!false(targetWidth); } 
+		final void setSubContainerWidths_differentOnly(float targetWidth, bool DEBUGGG)
+		{ setSubContainerWidths!false(targetWidth, DEBUGGG); } 
 		
 		/// this must overrided by every descendant. Its task is to measure and then place all the subcells.
 		/// must update innerSize if autoWidth or autoHeight is specified.
@@ -3649,7 +3712,7 @@ version(/+$DIDE_REGION+/all)
 			if(flags.autoWidth)
 			innerWidth	= calcContentWidth; 
 			if(flags.autoHeight)
-			innerHeight	= calcContentHeight; 
+			innerHeight = calcContentHeight; 
 		} 
 		
 		/// Mark the container, so it will be re-measured on the next measure() call.
@@ -3689,10 +3752,8 @@ version(/+$DIDE_REGION+/all)
 			
 			//autodetect autoWidth and autoHeight. If the user didn't changed it, then it's auto.
 			if(!flags._measured)
-			{
-				flags.autoWidth	= outerSize.x==0; 
-				flags.autoHeight	= outerSize.y==0; 
-			}
+			flags.autoWidth 	= outerSize.x==0, 
+			flags.autoHeight 	= outerSize.y==0; 
 			
 			const 	hFlow 	= getHFlowConfig, 
 				vFlow 	= getVFlowConfig, 
@@ -4496,10 +4557,11 @@ version(/+$DIDE_REGION+/all)
 	{
 		//for Elastic tabs
 		/+private+/ int[] tabIdxInternal; 
-		bool strictCellOrder/+Todo: put into containerFlags+/; 
+		bool strictCellOrder; 
+		/+bool hasFlex; +/
 		
 		void refreshTabIdx()
-		{ tabIdxInternal = subCells.enumerate.filter!(a => isTab(a.value)).map!(a => cast(int)a.index).array; } 
+		{ tabIdxInternal = subCells.enumerate.filter!((a)=>(isTab(a.value))).map!(a => (cast(int)(a.index))).array; } 
 		
 		void clearTabIdx()
 		{ tabIdxInternal = []; } 
@@ -4508,6 +4570,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			super.clearSubCells; 
 			clearTabIdx; 
+			/+hasFlex = false; +/
 		} 
 		
 		/// Must be called manually when needed for debugging
@@ -4539,6 +4602,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			if(isTab(c))
 			tabIdxInternal ~= cast(int)subCells.length; 
+			/+if(c.flex) hasFlex = true; +/
 			super.appendCell(c); 
 		} 
 		
@@ -4703,7 +4767,7 @@ version(/+$DIDE_REGION+/all)
 			//LOG("wl", wrappedLines, autoWidth, wrappedLines.calcWidth);
 			
 			if(flags.rowElasticTabs)
-			processElasticTabs(wrappedLines); 
+			processElasticTabs(wrappedLines, ((flags.autoWidth)?(float.nan):(innerWidth))); 
 			
 			//hide spaces on the sides by wetting width to 0. This needs for size calculation.
 			//Todo: don't do this for the line being edited!!!
@@ -4799,8 +4863,13 @@ version(/+$DIDE_REGION+/all)
 	
 	class Column : Container
 	{
+		bool DEBUGGG; 
+		
 		override void rearrange()
 		{
+			
+			if(DEBUGGG)
+			{ print(i"DEBUGGG  dontStretchSubCells = $(flags.dontStretchSubCells), autoWidth = $(flags.autoWidth)"); }
 			
 			//measure the subCells and stretch them to a maximum width
 			if(flags.dontStretchSubCells)
@@ -4814,20 +4883,26 @@ version(/+$DIDE_REGION+/all)
 				innerWidth = calcContentWidth; 
 				//at this point all the subCells are measured
 				//now set the width of every subcell in this column if it differs, and remeasure only when necessary
-				setSubContainerWidths_differentOnly(innerWidth); 
+				if(DEBUGGG) print(i"setSubContainerWidths_differentOnly $(innerWidth)"); 
+				setSubContainerWidths_differentOnly(innerWidth, DEBUGGG); 
 				/+
 					Note: this is not perfectly optimal when autoWidth and fixedWidth Rows are mixed. 
-								But that's not an usual case: ListBox: all textCells are fixedWidth, 
-								Document: all paragraphs are autoWidth.
+						But that's not an usual case: ListBox: all textCells are fixedWidth, 
+						Document: all paragraphs are autoWidth.
 				+/
 			}
 			else {
 				//first set the width of every subcell in this column, and measure all (for the first time).
-				setSubContainerWidths(innerWidth); 
+				setSubContainerWidths(innerWidth, DEBUGGG); 
 			}
 			
+			if(DEBUGGG) print("AAAAA", subCells.map!"a.outerWidth"); 
+			
 			if(flags.columnElasticTabs)
-			processElasticTabs(subCells); //Todo: ez a flex=1 -el egyutt bugzik.
+			processElasticTabs(subCells, ((flags.autoWidth)?(float.nan):(innerWidth))); //Todo: ez a flex=1 -el egyutt bugzik.
+			
+			if(DEBUGGG) print("BBBBB", subCells.map!"a.outerWidth"); 
+			
 			
 			//process vertically flexible items
 			if(!flags.autoHeight)
@@ -4860,6 +4935,8 @@ version(/+$DIDE_REGION+/all)
 			
 			if(flags.autoHeight)
 			innerHeight = calcContentHeight; 
+			
+			if(DEBUGGG) print("CCCCC", subCells.map!"a.outerWidth"); 
 		} 
 		
 		override void visitSubCells_cull(bounds2 clipBounds, void delegate(Cell) fun)
@@ -5068,6 +5145,46 @@ version(/+$DIDE_REGION+/all)
 			super.parse(s, ts); 
 		} 
 		
+	} class GrpContainer : Container
+	{
+		override void rearrange()
+		{
+			super.rearrange; 
+			
+			auto 	content 	= (cast(.Container)(subCells.get(0))),
+				title 	= (cast(.Container)(subCells.get(1))); 
+			if(content && title)
+			{
+				bool eq(float a, float b) => (magnitude(a - b))<=AlignEpsilon; 
+				bool set(ref float dst, float src)
+				{
+					if(!eq(src, dst))	{ dst = src; return true; }
+					else	return false; 
+				} 
+				
+				if(!flags.autoWidth)
+				{
+					content.flags.autoWidth = false; 
+					if(set(content.outerWidth, innerWidth))
+					{
+						content.measure; //width forced, height can possibly changed
+						if(content.flags.autoHeight && !eq(content.outerHeight, innerHeight))
+						innerHeight = content.outerHeight; 
+					}
+				}
+				
+				if(!flags.autoHeight)
+				{
+					content.flags.autoHeight = false; 
+					if(set(content.outerHeight, innerHeight))
+					{
+						content.measure; //height forced, width can change
+						if(content.flags.autoWidth && !eq(content.outerWidth, innerWidth))
+						innerWidth = max(content.outerWidth, title.outerRight); 
+					}
+				}
+			}
+		} 
 	} 
 	
 	class SelectionManager(T : Cell)
@@ -5493,9 +5610,12 @@ version(/+$DIDE_REGION+/all)
 		
 		FlexValue -> UpperFloat
 		Border: 6, Cell:32, Glyph:61, Container:104, Row:121, Column:104 
+		
+		260805: Can't remember
+		Border: 6, Cell:32, Glyph:61, Container:96, Row:113, Column:96, Style: 32
 	+/
 	
-	pragma(msg,i"Border: $(Border.sizeof), Cell:$(__traits(classInstanceSize, Cell)), Glyph:$(__traits(classInstanceSize, Glyph)), Container:$(__traits(classInstanceSize, Container)), Row:$(__traits(classInstanceSize, Row)), Column:$(__traits(classInstanceSize, Column))".text.注); 
+	pragma(msg,i"Border: $(Border.sizeof), Cell:$(__traits(classInstanceSize, Cell)), Glyph:$(__traits(classInstanceSize, Glyph)), Container:$(__traits(classInstanceSize, Container)), Row:$(__traits(classInstanceSize, Row)), Column:$(__traits(classInstanceSize, Column)), Style: $(TextStyle.sizeof)".text.注); 
 }
 version(/+$DIDE_REGION+/all)
 {
@@ -6875,7 +6995,7 @@ struct im
 		bool enabled;  //Todo: bad naming.  It should be in flags, in cascaded style.
 		TextStyle textStyle;   alias style = textStyle; //Todo: style.opDispatch("fontHeight=0.5x")
 		string theme; //for now it's a str, later it will be much more complex
-		//valid valus: "", "tool"
+		//valid values: "", "tool"
 		
 		Id actId()
 		{ return actContainer ? actContainer.id : Id.init; } 
@@ -6929,7 +7049,7 @@ struct im
 		
 		private void push(T : .Container)(T c, in Id newId)
 		{
-			 //Todo: ezt a newId-t ki kell valahogy valtani. im.id-t kell inkabb modositani.
+			//Todo: ezt a newId-t ki kell valahogy valtani. im.id-t kell inkabb modositani.
 			c.id = newId; 
 			stack ~= StackEntry(c, enabled, textStyle, theme); 
 			
@@ -6967,19 +7087,27 @@ struct im
 			writeln("---- End of IM dump -------------------------"); 
 		} 
 		
-		private auto find(C:.Container)()
-		{
-			foreach_reverse(ref s;stack)
-			if(auto r = cast(C)(s.container))
-			return r; 
-			return null; 
-		} 
+		/+
+			270804: removed. It was only used in Chapter, this and also the stack artray must go.
+			In the future, stact will be replaced with the actual stack.
+			
+			private auto find(C:.Container)()
+			{
+				foreach_reverse(ref s;stack)
+				if(auto r = cast(C)(s.container))
+				return r; 
+				return null; 
+			} 
+		+/
 		
-		public void append(T)(T c)
+		private void append(T)(T c)
 		{
 			if(actContainer !is null)	actContainer.append(c); 
 			else	rootCells ~= c; 
 		} 
+		
+		public void imAppend(T)(T c)
+		{ append(c); } 
 		
 		.Container removeLastContainer()
 		{
@@ -7423,6 +7551,8 @@ struct im
 					"If there is no () constructor, the first parameter must be a Container."
 					~"actContainer will be sent to it as the parent."
 				); 
+				
+				pragma(msg,i"$(srcModule):$(srcLine) this:$(CType) parent:$(FirstCtorParam)".text.注); 
 				auto cntr = new CType(cast(FirstCtorParam)actContainer); //try to give parent for the new control
 			}
 			
@@ -7763,8 +7893,34 @@ struct im
 				}
 			); 
 			
-			swap(lastContainer.subCells[0], lastContainer.subCells[1]); //nasty trick to measure the caption first
+			swap(lastContainer.subCells[0], lastContainer.subCells[1]); /+nasty trick to measure the caption first}+/
+			
+			
+			version(/+$DIDE_REGION+/none) {
+				Container!GrpContainer
+				(
+					{
+						Row({ padding.left+=fh/4; padding.right+=fh/4; }, title); 
+						lastContainer.outerPos.x = fh/2; 
+						lastContainer.measure; 
+						const hh = lastContainer.outerHeight; 
+						
+						Grp!(Cntr, srcModule, srcLine)
+						(
+							{
+								margin.top += (hh*(3/8.0f)).iround; 
+								padding.top = max(padding.top, hh-margin.top-border.width); 
+								fun(); 
+							}, args
+						); 
+						
+						with(actContainer) swap(subCells[0], subCells[1]); /+Correct Z-Order+/
+					}
+				); 
+			}
 		} 
+		
+		
 		
 		//apply Btn and Edit style////////////////////////////////////
 		
@@ -9407,7 +9563,7 @@ struct im
 				
 				SliderOrientation orientation; 
 				SliderStyle sliderStyle; 
-				RGB bkColor, clLine, clThumb, clRuler; 
+				RGB /+bkColor, <-already defined in Container+/clLine, clThumb, clRuler; 
 				float baseSize; //this is calculated from current fontHeight and theme.
 				float normThumbSize; //if it is a scrollbar, this is not nan and specifies the normalized size of the thumb.
 				//these are the derived sizes
@@ -10429,13 +10585,18 @@ struct im
 			alias FileIcon = FileIcon_normal; 
 			
 			
-				//Document ////////////////////////
+				.Document actDocument; 
+			
 				void Document(string srcModule=__MODULE__, size_t srcLine=__LINE__)(string title, void delegate() contents = null)
 			{
 				auto doc = new .Document; 
+				
+				enforce(actDocument is null, "No Document nesting allowed"); 
+				actDocument =  doc; 
+				
 				doc.title = title; 
 				doc.lastChapterLevel = 0; 
-				append(doc); push(doc, srcId!(srcModule, srcLine)); scope(exit) pop; 
+				append(doc); push(doc, srcId!(srcModule, srcLine)); scope(exit) { pop; actDocument = null; }
 				
 				if(!title.empty)
 				{
@@ -10452,8 +10613,8 @@ struct im
 				//Chapter /////////////////////////
 				void Chapter(string title, void delegate() contents = null)
 			{
-				auto doc = find!(.Document); 
-				enforce(doc, "Document container not found"); 
+				auto doc = actDocument; 
+				enforce(doc, "Document parent container null"); 
 				
 				auto baseLevel = doc.lastChapterLevel; 
 				doc.addChapter(title, baseLevel); 
