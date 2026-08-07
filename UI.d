@@ -3240,6 +3240,55 @@ version(/+$DIDE_REGION+/all)
 			
 			
 		}
+		
+		static struct FlexCellStats
+		{
+			int flexCnt; 
+			float totalFlexWidth=0, totalFlexRatio=0, invFlexRatio=0; 
+			
+			bool valid() const => flexCnt && totalFlexRatio; 
+			bool opCast(B:bool)() const => valid; 
+			
+			void growFlexCellsBackwardsUntilTab(Cell[] cells, float actRightPos, float Δ)
+			{
+				if(!valid) return; 
+				foreach_reverse(c; cells)
+				{
+					if(c.isTab) break; 
+					if(c.flex)
+					{
+						c.outerWidth += Δ * (c.flex * invFlexRatio); 
+						if(auto cntr = (cast(Container)(c)))
+						{
+							cntr.flags.autoHeight = false; cntr.measure; 
+							//Todo: height can change if wordwrapped!!!
+						}
+					}
+					
+					//align all cells while going to the left
+					c.outerPos.x = actRightPos - c.outerWidth; 
+					actRightPos = c.outerPos.x; //adcance
+				}
+			} 
+		} 
+		static FlexCellStats summarizeFlexCellsBackwardsUntilTab(Cell[] cells)
+		{
+			FlexCellStats res; 
+			with(res) {
+				//collect statistics about flex cells
+				foreach_reverse(c; cells)
+				{
+					if(c.isTab) break; 
+					if(c.flex) {
+						flexCnt 	+= 1,
+						totalFlexWidth 	+= c.outerWidth,
+						totalFlexRatio	+= c.flex; 
+					}
+				}
+				if(totalFlexRatio) invFlexRatio = 1.0f / totalFlexRatio; 
+			}
+			return res; 
+		} 
 		
 		enum ε = AlignEpsilon; 
 		const doFlex = !flexMaxWidth.isnan && level==0; 
@@ -3269,43 +3318,13 @@ version(/+$DIDE_REGION+/all)
 				
 				if(Δ>ε /+can't be negative+/)
 				{
-					version(/+$DIDE_REGION Look to the left and find flex cells+/all)
+					if(auto flexStats = summarizeFlexCellsBackwardsUntilTab(subCells[0..tIdx]))
 					{
-						int flexCnt; float totalFlexWidth=0, totalFlexRatio=0; 
-						foreach_reverse(c; subCells[0 .. tIdx])
-						{
-							if(c.isTab) break; 
-							if(c.flex) {
-								flexCnt 	+= 1,
-								totalFlexWidth 	+= c.outerWidth,
-								totalFlexRatio	+= c.flex; 
-							}
-						}
-					}
-					
-					if(flexCnt)
-					{
-						//move the Tab to the right
+						//move the Tab to the right,, flex cells will grow to that space
 						tab.outerPos.x += Δ; 
 						//spread Δ across flex cells, align other cells to the right
-						const invRatio = 1.0f / totalFlexRatio; 
-						foreach_reverse(i; 0 .. tIdx)
-						{
-							auto c = subCells[i], cNext = subCells[i+1]; 
-							if(c.isTab) break; 
-							if(c.flex)
-							{
-								c.outerWidth += Δ * (c.flex * invRatio); 
-								if(auto cntr = (cast(Container)(c)))
-								{
-									cntr.flags.autoHeight = false; cntr.measure; 
-									//Todo: height can change if wordwrapped!!!
-								}
-							}
-							
-							//align all cells while going to the left
-							c.outerPos.x = cNext.outerPos.x - c.outerWidth; 
-						}
+						flexStats.growFlexCellsBackwardsUntilTab
+							(subCells[0..tIdx], tab.outerPos.x, Δ); 
 					}
 					else
 					{
@@ -3324,42 +3343,6 @@ version(/+$DIDE_REGION+/all)
 				{ (cast(Glyph)(tab)).bkColor = mix(clGray, clRainbow[level%$], .25f); }
 			}
 			processElasticTabs(range, flexMaxWidth, level+1); //recursive
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
-			
 			
 			if(doFlex && (false || anyFlexToTheRight))
 			{
@@ -3367,49 +3350,16 @@ version(/+$DIDE_REGION+/all)
 				{
 					auto 	subCells 	= getSubCells(row),
 						Δ 	= subCells.back.outerRight - flexMaxWidth; 
-					
-					
-					
-					
 					if(Δ>ε /+avoid float sum precision loss+/)
 					{
-						version(/+$DIDE_REGION Find flex cells+/all)
-						{
-							int flexCnt; float totalFlexWidth=0, totalFlexRatio=0; 
-							foreach_reverse(c; subCells[0 .. $])
-							{
-								if(c.isTab) break; 
-								if(c.flex) {
-									flexCnt 	+= 1,
-									totalFlexWidth 	+= c.outerWidth,
-									totalFlexRatio	+= c.flex; 
-								}
-							}
-						}
-						
-						if(flexCnt)
+						if(auto flexStats = summarizeFlexCellsBackwardsUntilTab(subCells))
 						{
 							//spread Δ across flex cells, align other cells to the right
-							const invRatio = 1.0f / totalFlexRatio; 
-							float actRightPos = flexMaxWidth; 
-							foreach_reverse(c; subCells[])
-							{
-								if(c.isTab) break; 
-								if(c.flex)
-								{
-									c.outerWidth -= Δ * (c.flex * invRatio); 
-									if(auto cntr = (cast(Container)(c)))
-									{
-										cntr.flags.autoHeight = false; cntr.measure; 
-										//Todo: height can change if wordwrapped!!!
-									}
-								}
-								
-								//align all cells while going to the left
-								c.outerPos.x = actRightPos - c.outerWidth; 
-								actRightPos = c.outerPos.x; //adcance
-							}
-							/+Todo: This must be tested. flex containers left t+/
+							flexStats.growFlexCellsBackwardsUntilTab
+								(
+								subCells, flexMaxWidth, -Δ
+								/+the actual grow direction is negative!+/
+							); 
 						}
 					}
 				}
