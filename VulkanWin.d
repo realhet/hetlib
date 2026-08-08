@@ -581,7 +581,7 @@ version(/+$DIDE_REGION+/all)
 				[q{/+Note: lvl0+/},q{/+Note: lvl1+/},q{/+Note: lvl2+/},q{/+Note: op+/},q{/+Note: comment+/}],
 				[q{/+settings+/}],
 				[q{/+	system+/}],
-				[q{"0"},q{"00"},q{"00"},q{end},q{/+5 zeroed at end of VBO+/}],
+				[q{"0"},q{"00"},q{"00"},q{end},q{/+5 zeroes at end of VBO+/}],
 				[q{},q{},q{"01"},q{setOP},q{/+opacity, affects both colors+/}],
 				[q{},q{},q{"10"},q{setFlags},q{/+FlagFormat Flags+/}],
 				[q{},q{},q{"11"},q{setTrans},q{/+TransformFormat data+/}],

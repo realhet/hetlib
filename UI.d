@@ -176,11 +176,18 @@ version(/+$DIDE_REGION+/all)
 	
 	enum TargetSurface { world = 0, gui = 1 } 
 	
-	immutable DefaultFontName = //this is the cached font
-	"Segoe UI"
-	//"Lucida Console"
-	//"Consolas" <- too curvy
-	//"Times New Roman"
+	version(/+$DIDE_REGION+/none) {
+		immutable DefaultFontName = //this is the cached font
+		"Segoe UI"
+		//"Lucida Console"
+		//"Consolas" <- too curvy
+		//"Times New Roman"
+		; 
+	}
+	
+	immutable DefaultUIFontId = FontId.
+	Segoe_UI
+	//Times_New_Roman
 	; 
 	
 	immutable
@@ -659,23 +666,36 @@ version(/+$DIDE_REGION+/all)
 	
 	struct TextStyle
 	{
-		string font = DefaultFontName; 
+		FontId fontId; 
 		ubyte fontHeight = DefaultFontHeight; 
-		bool bold, italic, underline, strikeout, transparent; 
+		ubyte fontFlags; 
 		RGB fontColor=clBlack, bkColor=clWhite; 
 		
-		ubyte fontFlags() const
-		{ return cast(ubyte)boolMask(bold, italic, underline, strikeout, 0/+isImage+/, transparent); } 
-		//Todo: implement monospaced font style for string literals, but firts I must refactor fontFlags.
+		private static BOOLPROP(string name, int bitIdx)
+		=> iq{
+			@property
+			{
+				bool $(name)()const
+				=> fontFlags.getBit($(bitIdx)); 
+				bool $(name)(bool a)
+				{ fontFlags = (cast(ubyte)(fontFlags.setBit($(bitIdx), a))); return $(name); } 
+			} 
+		}.text; 
+		mixin(
+			BOOLPROP("bold", 0), 
+			BOOLPROP("italic", 1),
+			BOOLPROP("underline", 2),
+			BOOLPROP("strikeout", 3),
+			BOOLPROP("transparent", 5)
+		); 
 		
-		bool isDefaultFont() const
-		{ return font == DefaultFontName; } //Todo: slow. 'font' Should be a property.
+		//Todo: implement monospaced font style for string literals, but firts I must refactor fontFlags.
 		
 		void modify(string[string] map)
 		{
 			map.rehash; 
 			if(auto p="font"	in map)
-			font	  = (*p); 
+			fontId = (*p).nameToStandardFontId; 
 			if(auto p="fontHeight"	in map)
 			fontHeight	  = (*p).toWidthHeight(g_actFontHeight).iround.to!ubyte; 
 			if(auto p="bold"	in map)
@@ -797,7 +817,7 @@ version(/+$DIDE_REGION+/all)
 		{ return (DefaultFontHeight*(r/18.0f)).iround.to!ubyte; } 
 		
 		
-		a("normal"	, tsNormal	, TextStyle(DefaultFontName, rfh(18), false, false, false, false, false, clBlack, clWhite)); 
+		a("normal"	, tsNormal	, TextStyle(DefaultUIFontId, rfh(18), 0, clBlack, clWhite)); 
 		a("larger"	, tsLarger	, tsNormal, { tsLarger.fontHeight = rfh(22); }); 
 		a("smaller"	, tsSmaller	, tsNormal, { tsSmaller.fontHeight = rfh(14); }); 
 		a("half"	, tsHalf	, tsNormal, { tsHalf.fontHeight = rfh(9); }); 
@@ -806,7 +826,7 @@ version(/+$DIDE_REGION+/all)
 		a("bold"	, tsBold	, tsNormal, { tsBold.bold = true; }); 
 		a("bold2"	, tsBold2	, tsBold	, { tsBold2.fontColor = clChapter; }); 
 		a("quote"	, tsQuote	, tsNormal,	{ tsQuote.italic = true; }); 
-		a("code"	, tsCode	, tsNormal, { tsCode.font = "Lucida Console"; tsCode.fontHeight = rfh(18); tsCode.bold = false; }); //Todo: should be half bold?
+		a("code"	, tsCode	, tsNormal, { tsCode.fontId = FontId.Lucida_Console; tsCode.fontHeight = rfh(18); tsCode.bold = false; }); //Todo: should be half bold?
 		a("link"	, tsLink	, tsNormal, { tsLink.underline = true; tsLink.fontColor = clLink; }); 
 		a("title"	, tsTitle	, tsNormal,	{ tsTitle.bold = true; tsTitle.fontColor = clChapter; tsTitle.fontHeight = rfh(64); }); 
 		a("chapter"	, tsChapter	, tsTitle , { tsChapter.fontHeight = rfh(40); }); 
@@ -834,7 +854,9 @@ version(/+$DIDE_REGION+/all)
 		bool act = (QPS.value(second)/60*132).fract<0.66; 
 		tsError.fontColor	= act ? clYellow : clRed; 
 		tsError.bkColor	= act ? clRed : clYellow; 
-		return chkSet(tsError.underline, act); 
+		
+		if(tsError.underline != act)
+		{ tsError.underline = act; return true; }else return false; 
 	} 
 	
 	//Helper functs ///////////////////////////////////////////
@@ -1628,29 +1650,18 @@ version(/+$DIDE_REGION+/all)
 		} 
 	}
 	
-	TexHandle fontTexture(Args...)(in dchar ch, in Args args)
-	if(Args.length==0 || Args.length==1 && (is(Args[0] == TextStyle) || is(Args[0] == string)))
+	TexHandle fontTexture(Args...)(in dchar ch, in TextStyle ts)
 	{
 		TexHandle stIdx; //the result texture index
 		
-		static if(Args.length==0)
-		{
-			enum fontName = DefaultFontName; 
-			enum isDefault = true; 
-		}else static if(is(Args[0] == TextStyle))
-		{
-			auto 	fontName 	= args[0].font,
-				isDefault	= args[0].isDefaultFont; 
-		}else
-		{
-			auto 	fontName 	= args[0],
-				isDefault	= args[0] == DefaultFontName; 
-		}
+		const 	fontId 	= ((ts.fontId)?(ts.fontId):(DefaultUIFontId)),
+			isDefault 	= fontId==DefaultUIFontId; 
 		
 		//ch -> subTexIdx lookup. Cached with a map.   10 FPS -> 13..14 FPS
 		void lookupSubTexIdx()
 		{
-			string glyphSpec = `font:\`~fontName~`\72\x3\?`~[ch].toUTF8; 
+			const fontName = accessFontFace(fontId).name; 
+			const glyphSpec = `font:\`~fontName~`\72\x3\?`~ch.only.toUTF8; 
 			stIdx = textures_getNow(File(glyphSpec)); //fonts are loaded immediatelly
 		} 
 		
@@ -1717,11 +1728,10 @@ version(/+$DIDE_REGION+/all)
 		dchar ch; 
 		
 		RGB fontColor, bkColor; 
-		ubyte fontFlags; //Todo: compress information
+		ubyte fontFlags; 
+		SyntaxKind syntax; //needed for DIDE
 		
 		bool isWhite, isTab, isNewLine, isReturn; //needed for wordwrap and elastic tabs
-		
-		ubyte syntax; //needed for DIDE
 		int lineIdx; //1based. needed for DIDE.
 		
 		this(dchar ch, in TextStyle ts)
@@ -1755,9 +1765,9 @@ version(/+$DIDE_REGION+/all)
 			
 			stIdx = fontTexture(visibleCh, ts); 
 			
-			fontFlags = ts.fontFlags; 
 			fontColor = ts.fontColor; 
 			bkColor = ts.bkColor; 
+			fontFlags = ts.fontFlags; 
 			
 			innerSize = calcGlyphSize_clearType(ts, stIdx); 
 			
@@ -1767,10 +1777,7 @@ version(/+$DIDE_REGION+/all)
 		} 
 		
 		this(dchar ch, in TextStyle ts, SyntaxKind sk)
-		{
-			this(ch, ts); 
-			syntax = cast(ubyte) sk; 
-		} 
+		{ this(ch, ts); syntax = sk; } 
 		
 		override void draw(Drawing dr)
 		{
@@ -2587,10 +2594,10 @@ version(/+$DIDE_REGION+/all)
 				{
 					auto name = params["1"]; 
 					auto ch = segoeSymbolByName(name); 
-					auto oldFont = ts.font; 
-					ts.font = "Segoe MDL2 Assets"; 
+					const oldFontId = ts.fontId; 
+					ts.fontId = FontId.Segoe_MDL2_Assets; 
 					container.appendChar(ch, ts); 
-					ts.font = oldFont; 
+					ts.fontId = oldFontId; 
 				}
 				else if(cmd=="space"	)
 				{
@@ -3570,19 +3577,17 @@ version(/+$DIDE_REGION+/all)
 			appendCodeStr(s, style, sk);  //Todo: syntax and style are redundant: syntax defines the style (more or less)
 		} 
 		
-		void appendSyntaxChar(dchar ch, in TextStyle ts, ubyte syntax)
+		void appendSyntaxChar(dchar ch, in TextStyle ts, in SyntaxKind syntax)
 		{
-			 //Todo: redundant: there is appendCodeChar too
-			auto g = new Glyph(ch, ts); 
-			g.syntax = syntax; 
+			//Todo: redundant: there is appendCodeChar too
+			auto g = new Glyph(ch, ts, syntax); 
 			appendCell(g); 
 		} 
 		
-		void appendSyntaxCharWithLineIdx(dchar ch, in TextStyle ts, ubyte syntax, int lineIdx)
+		void appendSyntaxCharWithLineIdx(dchar ch, in TextStyle ts, in SyntaxKind syntax, in int lineIdx)
 		{
-			 //Todo: this is used from CodeCOlumnBuildet.
-			auto g = new Glyph(ch, ts); 
-			g.syntax = syntax; 
+			//Todo: this is used from CodeCOlumnBuildet.
+			auto g = new Glyph(ch, ts, syntax); 
 			g.lineIdx = lineIdx; 
 			appendCell(g); 
 		} 
