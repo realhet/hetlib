@@ -583,7 +583,7 @@ class FrmMain: UIWindow
 			selection.update(canEdit, view, cards); 
 			workspace.subCells = cast(Cell[]) cards; 
 			workspace.rearrange; 
-			im.root ~= workspace; 
+			im.imAppend(workspace); 
 		}
 		
 		view.subScreenArea = im.clientArea / clientSize; 

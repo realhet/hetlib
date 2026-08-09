@@ -259,8 +259,9 @@ class FrmTetris: UIWindow
 		invalidate; 
 	} 
 	
-	override void beforeImDraw()
+	override void beforeImDraw(IDrawing drWorld, IDrawing drGui)
 	{
+		auto dr = drWorld; 
 		drawField; 
 		
 		if(collapsingRows.empty && (!gameOver || QPS.value(second).fract<0.5))

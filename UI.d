@@ -3539,7 +3539,7 @@ version(/+$DIDE_REGION+/all)
 		} 
 		
 		void adoptSubCells()
-		{ subCells.each!(c => c.setParent(this)); } 
+		{ subCells.each!((c)=>(c.setParent(this))); } 
 		
 		final void append(Cell c)
 		{ appendCell(c); } 
