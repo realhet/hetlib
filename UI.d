@@ -7446,6 +7446,93 @@ struct im
 			else static if(isG!"margin")	margin = a; 
 			else static if(isG!"flex")	flex = a; 
 			else static assert(false, "Unsupported type: "~T.stringof); 
+			
+			/+
+				AI: /+
+					User: /+
+						Code: static if(isFunctionPointer!a)	a(); 
+						else static if(isDelegate!a)	a(); 
+						else static if(isSomeString!T)	Text(a); 
+						else static if(isT! YAlign)	flags.yAlign = a; 
+						else static if(isT! HAlign)	flags.hAlign = a; 
+						else static if(isT! VAlign)	flags.vAlign = a; 
+						else static if(isT! TextStyle)	textStyle = a; 
+						else static if(isT! RGB)	style.bkColor = bkColor = a; 
+						else static if(isT! Padding)	padding = a; 
+						else static if(isT! Border)	border = a; 
+						else static if(isT! Margin)	margin = a; 
+						else static if(isT! SyntaxKind)	{
+							textStyle.applySyntax(a); 
+							bkColor = textStyle.bkColor; 
+						}
+						else static if(isT!PanelPosition)	{/+Already processed +/}
+						else static if(isG!"id")	{/+Already processed by prepareId.srcId+/}
+						else static if(isG!"theme")	theme = a; 
+						else static if(isG!"syntax")	{
+							textStyle.applySyntax(a.to!SyntaxKind); 
+							bkColor = textStyle.bkColor; 
+						}
+						else static if(isG!"fontColor")	style.fontColor = a; 
+						else static if(isG!"bold")	style.bolt = a; 
+						else static if(isG!"italic")	style.italic = a; 
+						else static if(isG!"bkColor")	style.bkColor = bkColor = a; 
+						else static if(isG!"padding")	padding = a; 
+						else static if(isG!"border")	border = a; 
+						else static if(isG!"margin")	margin = a; 
+						else static if(isG!"flex")	flex = a; 
+						else static assert(false, "Unsupported type: "~T.stringof); 
+					+/
+					
+					Please transform it to a table of 2 columns!
+					Example:
+					/+
+						Code: (表([
+							[q{isFunctionPointer!a},q{a(); }],
+							[q{isDelegate!a},q{a(); }],
+						]))
+					+/
+				+/
+				/+
+					Assistant: /+
+						Code: (表([
+							[q{isT!PanelPosition},q{/+Already processed +/}],
+							[q{isG!"id"},q{/+Already processed by prepareId.srcId+/}],
+							[],
+							[q{//container props
+							}],
+							[q{isT!YAlign},q{flags.yAlign = a; }],
+							[q{isT!HAlign},q{flags.hAlign = a; }],
+							[q{isT!VAlign},q{flags.vAlign = a; }],
+							[q{isG!"padding" || isT!Padding},q{padding = a; }],
+							[q{isG!"border" || isT!Border},q{border = a; }],
+							[q{isG!"margin" || isT!Margin},q{margin = a; }],
+							[q{isG!"flex"},q{flex = a; }],
+							[],
+							[q{//inherited state
+							}],
+							[q{isT!TextStyle},q{textStyle = a; }],
+							[q{isG!"style"},q{textStyle.modify(a); }],
+							[q{isG!"syntax" || isT!SyntaxKind},q{
+								textStyle.applySyntax(a.to!SyntaxKind); 
+								bkColor = textStyle.bkColor; 
+							}],
+							[q{isG!"theme"},q{theme = a; }],
+							[q{isG!"fontColor"},q{style.fontColor = a; }],
+							[q{isG!"bold"},q{style.bold = a; }],
+							[q{isG!"italic"},q{style.italic = a; }],
+							[q{isG!"bkColor" || isT!RGB},q{style.bkColor = bkColor = a; }],
+							[],
+							[q{//emitters
+							}],
+							[q{isFunctionPointer!a || isDelegate!a},q{a(); }],
+							[q{isSomeString!T},q{Text(a); }],
+							[],
+							[q{else},q{static assert(false, "Unsupported type: "~T.stringof); }],
+						]))
+					+/
+					/+Note: Usage(prompt_hit: 0, prompt_miss: 800, completion: 6010, HUF: 0.57, price: 100%)+/
+				+/
+			+/
 		} 
 		
 		void Container(CType = .Container, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
@@ -7469,8 +7556,9 @@ struct im
 				}
 			}
 			
-			auto cntr = new CType; 
-			append(cntr); push(cntr, id_); scope(exit) pop; 
+			
+			
+			auto cntr = new CType; append(cntr); push(cntr, id_); scope(exit) pop; 
 			
 			cntr.bkColor = style.bkColor; //Inherit bkcolor from the current fontStyle.
 			
