@@ -5589,7 +5589,10 @@ version(/+$DIDE_REGION+/all)
 		Border: 6, Cell:32, Glyph:61, Container:104, Row:121, Column:104 
 		
 		260805: Can't remember
-		Border: 6, Cell:32, Glyph:61, Container:96, Row:113, Column:96, Style: 32
+		Border: 6, Cell:32, Glyph:61, Container:96, Row:113, Column:96, TextStyle: 32
+		
+		260809: TextStyle.font:  string -> FontId
+		Border: 6, Cell:32, Glyph:61, Container:96, Row:113, Column:97, TextStyle: 9
 	+/
 	
 	pragma(msg,i"Border: $(Border.sizeof), Cell:$(__traits(classInstanceSize, Cell)), Glyph:$(__traits(classInstanceSize, Glyph)), Container:$(__traits(classInstanceSize, Container)), Row:$(__traits(classInstanceSize, Row)), Column:$(__traits(classInstanceSize, Column)), Style: $(TextStyle.sizeof)".text.注); 
@@ -6380,578 +6383,541 @@ struct im
 			return typeof(return).init; 
 		} 
 		
-		enum doTiming = false; 
-		
-		static if(doTiming)
-		{ double tBeginFrame, tEndFrame, tDraw; }
-		
-		//Todo: package visibility is not working as it should -> remains public
-		void _beginFrame(View2D viewWorld, View2D viewGUI)
-		{
-			//called from mainform.update
-			//PING(5);
-			
-			static if(doTiming)
-			{ const T0 = QPS; scope(exit) tBeginFrame = QPS-T0; }
-			enforce(!inFrame, "im.beginFrame() already called."); 
-			
-			setTargetSurfaces(viewWorld, viewGUI); 
-			selectTargetSurface(TargetSurface.gui); //default is the GUI surface
-			
-			//inject stuff into het.uibase. So no import het.ui is needed there.
-			//Todo: het.uibase was merged with het.ui. This is no longer needed.
-			static auto getActFontHeight()
-			{ return float(textStyle.fontHeight); 	} 	.g_actFontHeightFunct	= &getActFontHeight; 
-			static auto getActFontColor ()
-			{ return textStyle.fontColor; 	} 	.g_actFontColorFunct	= &getActFontColor; 
-			version(/+$DIDE_REGION+/none) { .g_getOverlayDrawingFunct = &getOverlayDrawing; }
-			.g_getDrawCallbackFunct = &getDrawCallback; 
-			
-			//update building/measuring/drawing state
-			inFrame = true; 
-			canDraw = false; 
-			
-			im.reset; 
-			//this goes into endFrame, so the latest hit data will be accessible more early. hitTestManager.initFrame;
-			
-			//clear last frame's object references
-			focusedState.container = null; 
-			textEditorState.beginFrame; 
-			
-			popupState.reset; 
-			comboOpening = false; 
-			
-			//this is needed for PanelPosition
-			clientArea = view_gui.screenBounds_anim.bounds2; 
-			//Maybe it is the same as the bounds for clipping rects: flags.clipChildren
-			
-			static DeltaTimer dt; 
-			deltaTime = dt.update; 
-			
-			ImStorageManager.purge(200); 
-			
-			{
-				static uint	tbmp; if(tbmp.chkSet((QPS.value(second).ifloor  )/2))
-				bitmaps	.garbageCollect; 
-			}
-			{
-				static uint tvf; if(tvf .chkSet((QPS.value(second).ifloor+1)/2))
-				virtualFiles.garbageCollect; 
-			}
-			
-			resourceMonitor.update; 
-		} 
-		
-		void _endFrame()
-		{
-			//called from end of update
-			//PING(6);
-			
-			updateFlashMessages_internal_onEndFrame; 
-			
-			static if(doTiming)
-			{ const T0 = QPS; scope(exit) tEndFrame = QPS-T0; }
-			
-			enforce(inFrame, "im.endFrame(): must call beginFrame() first."); 
-			enforce(stack.length==1, "FATAL ERROR: im.endFrame(): stack is corrupted. 1!="~stack.length.text); 
-			
-			selectTargetSurface(TargetSurface.gui); //GUI surface by default
-			
-			auto rc = rootContainers(true); 
-			
-			//it's not sorted in DIDE... It's a problem...
-			//LOG("ISSORTED", rc.isSorted!((a, b)=>(a.flags.targetSurface < b.flags.targetSurface))); 
-			
-			rc = rc.sort!(((a, b)=>(a.flags.targetSurface < b.flags.targetSurface)), SwapStrategy.stable).array; 
-			
-			//measure
-			foreach(a; rc)
-			if(!a.flags._measured)
-			a.measure; //some panels are already have been measured
-			
-			//Todo: remove this: applyScrollers(screenBounds);
-			
-			hScrollInfo.createBars(true); 
-			vScrollInfo.createBars(true); 
-			
-			popupState.doAlign; 
-			
-			//from here, all positions are valid
-			
-			//hittest in zOrder (currently in reverse creation order)
-			bool[2] mouseOverUI; 
-			bool mouseOverPopup; 
-			foreach_reverse(a; rc)
-			{
-				const surf = a.flags.targetSurface; //1: gui, 0:view
-				
-				const uiMousePos = targetSurfaceViews[surf].mousePos.vec2; 
-				if(a.internal_hitTest(uiMousePos))
-				{
-					mouseOverUI[surf] = true; 
-					
-					if(popupState.cell==a)
-					mouseOverPopup = true; 
-					
-					break; //got a hit, so escape now
-				}
-			}
-			
-			version(/+$DIDE_REGION+/none) {
-				if(VisualizeHitStack)
-				{
-					drVisualizeHitStack = new_Drawing; 
-					hitTestManager.draw(drVisualizeHitStack); 
-				}
-			}
-			
-			//all hitTest are done, move hitTestManager to the next frame. Latest hittest data will be accessible right after this.
-			hitTestManager.nextFrame; 
-			
-			//clicking away from popup closes the popup
-			if(comboState && !comboOpening && !mouseOverPopup && (inputs.LMB.pressed || inputs.RMB.pressed))
-			comboState = false; 
-			
-			//the IM GUI wants to use the mouse for scrolling or clicking. Example: It tells the 'view' not to zoom.
-			wantMouse = mouseOverUI[1]; 
-			
-			if(textEditorState.active)
-			{
-				//an edit control is active.
-				//Todo: mainWindow.canProcessUserInput check
-				auto err = textEditorState.processQueue; 
-			}
-			wantKeys = textEditorState.active; 
-			
-			const guiBounds = view_gui.screenBounds_anim.bounds2; 
-			generateHints(guiBounds); 
-			
-			//update building/measuring/drawing state
-			canDraw = true; 
-			inFrame = false; 
-		} 
-		
-		bounds2[2] surfaceBounds; 
-		
-		version(/+$DIDE_REGION+/none) { DrawingOld drVisualizeHitStack; }
-		
-		void _drawFrame(string restrict="")(
-			Drawing drWorld, Drawing drGUI, 
-			void delegate() funBefore=null, void delegate() funAfter=null
-		)
-		{
-			static if(doTiming)
-			{
-				const T0 = QPS; 
-				scope(exit)
-				{
-					tDraw = QPS-T0; print(
-						format!"im.timing: begin %5.1f   end %5.1f   draw %5.1f ms"
-						(tBeginFrame*1000, tEndFrame*1000, tDraw*1000)
-					); 
-				}
-			}
-			
-			static assert(restrict=="system call only", "im.draw() is restricted to call by system only."); 
-			enforce(canDraw, "im.draw(): canDraw must be true. Nothing to draw now."); 
-			
-			Drawing[2] dr = [drWorld, drGUI]; 
-			
-			//init clipbounds
-			foreach(i, ref d; dr)
-			{
-				auto view = targetSurfaceViews[i].enforce; 
-				d.pushClipBounds(view.screenBounds_anim.bounds2); 
-			}
-			
-			foreach(i; 0..2)
-			surfaceBounds[i] = bounds2.init; 
-			
-			
-			if(funBefore) funBefore(); 
-			
-			foreach(a; rootContainers(true))
-			{
-				const s = a.flags.targetSurface; 
-				surfaceBounds[s] |= a.outerBounds; 
-				_targetSurfaceBeingDrawn = s; 
-				a.draw(dr[s]); //draw in zOrder
-			}
-			
-			if(funAfter) funAfter(); 
-			
-			foreach(i, d; dr)
-			{ d.popClipBounds; }
-			
-			version(/+$DIDE_REGION+/none) {
-				if(VisualizeHitStack && drVisualizeHitStack)
-				{
-					drVisualizeHitStack.glDraw(targetSurfaces[1].view); 
-					//Todo: problem with hitStack: it is assumed to be on GUI view
-				}
-				drVisualizeHitStack.destroy; 
-			}
-			
-			//not needed, gc is perfect.  foreach(r; root) if(r){ r.destroy; r=null; } root.clear;
-			//Todo: ezt tesztelni kene sor cell-el is! Hogy mekkorak a gc spyke-ok, ha manualisan destroyozok.
-			
-			//Todo: if window resizing, draw is called without update!!!  canDraw = false; can detect it.
-		} 
-		
-		//PanelPosition ///////////////////////////////////////////
-		//aligns the container on the screen
-		
-		enum PanelPosition
-		{
-			none, 
-			topLeft, 	topCenter, 	topRight, 	
-			leftCenter, 	center, 	rightCenter, 	
-			bottomLeft, 	bottomCenter, 	bottomRight, 	
-				topClient, 		
-			leftClient, 	client, 	rightClient, 	
-				bottomClient		
-		} 
-		
-		private bool isAlignPosition (PanelPosition pp)
-		{
-			with(PanelPosition)
-			return pp.inRange(topLeft, bottomRight ); 
-		} //it will only position the container
-		private bool isClientPosition(PanelPosition pp)
-		{
-			with(PanelPosition)
-			return pp.inRange(topClient, bottomClient); 
-		} //it will change the client rect too
-		
-		private void initializePanelPosition(.Container cntr, PanelPosition pp, in bounds2 area)
-		{
-			with(PanelPosition)
-			{
-				//flags.targetSurface is unknown at this point, will check it later in 'finalize'
-				if(pp.among(client, topClient, bottomClient))
-				cntr.outerWidth = area.width; 
-				else if(pp.among(client, leftClient, rightClient)) cntr.outerHeight	= area.height; 
-			}
-		} 
-		
-		private void finalizePanelPosition(.Container cntr, PanelPosition pp, ref bounds2 area)
-		{
-			with(PanelPosition)
-			{
-				if(pp == none) return; 
-				
-				enforce(cntr.flags.targetSurface == 1, "Unable to set PanelPosition on world_surface."); 
-				
-				cntr.measure; //must know all the sizes from now on
-				
-				if(isAlignPosition(pp))
-				{
-					ivec2 p; divMod((cast(int)(pp-1)), 3, p.y, p.x); 
-					if(p.x.inRange(0, 2) && p.y.inRange(0, 2))
-					{
-						auto 	t = p*.5f,
-							u = vec2(1)-t; 
-						
-						cntr.outerPos = area.topLeft*u 	+ area.bottomRight*t //Todo: bug: fucking vec2.lerp is broken again
-							- cntr.outerSize*t; 
-					}
-				}
-				else if(isClientPosition(pp))
-				{
-					//Todo: put checking for running out of area and scrolling here.
-					switch(pp)
-					{
-						case topClient: 	cntr.outerPos = area.topLeft; 	area.top    += cntr.outerHeight; 	break; 
-						case bottomClient: 	area.bottom -= cntr.outerHeight; 	cntr.outerPos = area.bottomLeft; 	break; 
-						case leftClient: 	cntr.outerPos = area.topLeft; 	area.left    += cntr.outerWidth; 	break; 
-						case rightClient: 	area.right   -= cntr.outerWidth; 	cntr.outerPos = area.topRight; 	break; 
-						case client: 	cntr.outerPos = area.topLeft; 	cntr.outerSize = area.size; area = bounds2.init; 	break; 
-						default: 	ERR("invalid PanelPosition"); 
-					}
-				}
-			}
-		} 
 		
 		static T ARG(T, Args...)(T def, Args args)
-		{ T res = def; static foreach(idx, a; args) static if(is(Unqual!(Args[idx])==T)) res = a; return res; } 
-		
-		void Panel(string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
 		{
-			//Todo: multiple Panels, but not call them frames...
-			enforce(actContainer is null, "Panel() must be on root level"); 
+			T res = def; 
+			static foreach(idx, a; args) static if(is(Unqual!(Args[idx])==T)) res = a; 
+			return res; 
+		} 
+		
+		version(/+$DIDE_REGION Frame handling+/all)
+		{
+			enum doTiming = false; 
 			
-			//Todo: this should work for all containers, not just high level ones
-			auto pp = ARG(PanelPosition.init, args); 
+			static if(doTiming)
+			{ double tBeginFrame, tEndFrame, tDraw; }
 			
-			
-			
-			.Container cntr; 
-			
-			Document!(srcModule, srcLine)
-			(
+			//Todo: package visibility is not working as it should -> remains public
+			void _beginFrame(View2D viewWorld, View2D viewGUI)
+			{
+				//called from mainform.update
+				//PING(5);
+				
+				static if(doTiming)
+				{ const T0 = QPS; scope(exit) tBeginFrame = QPS-T0; }
+				enforce(!inFrame, "im.beginFrame() already called."); 
+				
+				setTargetSurfaces(viewWorld, viewGUI); 
+				selectTargetSurface(TargetSurface.gui); //default is the GUI surface
+				
+				//inject stuff into het.uibase. So no import het.ui is needed there.
+				//Todo: het.uibase was merged with het.ui. This is no longer needed.
+				static auto getActFontHeight()
+				{ return float(textStyle.fontHeight); 	} 	.g_actFontHeightFunct	= &getActFontHeight; 
+				static auto getActFontColor ()
+				{ return textStyle.fontColor; 	} 	.g_actFontColorFunct	= &getActFontColor; 
+				version(/+$DIDE_REGION+/none) { .g_getOverlayDrawingFunct = &getOverlayDrawing; }
+				.g_getDrawCallbackFunct = &getDrawCallback; 
+				
+				//update building/measuring/drawing state
+				inFrame = true; 
+				canDraw = false; 
+				
+				im.reset; 
+				//this goes into endFrame, so the latest hit data will be accessible more early. hitTestManager.initFrame;
+				
+				//clear last frame's object references
+				focusedState.container = null; 
+				textEditorState.beginFrame; 
+				
+				popupState.reset; 
+				comboOpening = false; 
+				
+				//this is needed for PanelPosition
+				clientArea = view_gui.screenBounds_anim.bounds2; 
+				//Maybe it is the same as the bounds for clipping rects: flags.clipChildren
+				
+				static DeltaTimer dt; 
+				deltaTime = dt.update; 
+				
+				ImStorageManager.purge(200); 
+				
 				{
-					//Todo: why document? It should be a template parameter!
-					cntr = actContainer; 
+					static uint	tbmp; if(tbmp.chkSet((QPS.value(second).ifloor  )/2))
+					bitmaps	.garbageCollect; 
+				}
+				{
+					static uint tvf; if(tvf .chkSet((QPS.value(second).ifloor+1)/2))
+					virtualFiles.garbageCollect; 
+				}
+				
+				resourceMonitor.update; 
+			} 
+			
+			void _endFrame()
+			{
+				//called from end of update
+				//PING(6);
+				
+				updateFlashMessages_internal_onEndFrame; 
+				
+				static if(doTiming)
+				{ const T0 = QPS; scope(exit) tEndFrame = QPS-T0; }
+				
+				enforce(inFrame, "im.endFrame(): must call beginFrame() first."); 
+				enforce(stack.length==1, "FATAL ERROR: im.endFrame(): stack is corrupted. 1!="~stack.length.text); 
+				
+				selectTargetSurface(TargetSurface.gui); //GUI surface by default
+				
+				auto rc = rootContainers(true); 
+				
+				//it's not sorted in DIDE... It's a problem...
+				//LOG("ISSORTED", rc.isSorted!((a, b)=>(a.flags.targetSurface < b.flags.targetSurface))); 
+				
+				rc = rc.sort!(((a, b)=>(a.flags.targetSurface < b.flags.targetSurface)), SwapStrategy.stable).array; 
+				
+				//measure
+				foreach(a; rc)
+				if(!a.flags._measured)
+				a.measure; //some panels are already have been measured
+				
+				//Todo: remove this: applyScrollers(screenBounds);
+				
+				hScrollInfo.createBars(true); 
+				vScrollInfo.createBars(true); 
+				
+				popupState.doAlign; 
+				
+				//from here, all positions are valid
+				
+				//hittest in zOrder (currently in reverse creation order)
+				bool[2] mouseOverUI; 
+				bool mouseOverPopup; 
+				foreach_reverse(a; rc)
+				{
+					const surf = a.flags.targetSurface; //1: gui, 0:view
 					
-					//preparations
-					initializePanelPosition(cntr, pp, clientArea); 
-					//Todo: outerSize should be stored, not innerSize, because the padding/border/margin settings after this can fuck up the alignment.
-					
-					//default panel frame
-					
-					
-					version(/+$DIDE_REGION+/none) { padding = "4"; border = "1 normal silver"; }
-					
-					
-					version(/+$DIDE_REGION+/all) {
-						padding = "3"; border = "6 normal silver"; 
-						with(border) inset = true, style = BorderStyle.fullFilletOut, borderFirst = true; 
-						flags.noBackground = true; 
+					const uiMousePos = targetSurfaceViews[surf].mousePos.vec2; 
+					if(a.internal_hitTest(uiMousePos))
+					{
+						mouseOverUI[surf] = true; 
+						
+						if(popupState.cell==a)
+						mouseOverPopup = true; 
+						
+						break; //got a hit, so escape now
 					}
-					
-					//call the delegates
-					static foreach(a; args) static if(__traits(compiles, a())) a(); //delegate/function
 				}
-			); 
-			
-			finalizePanelPosition(cntr, pp, clientArea); 
-		} 
-		
-		//Focus handling /////////////////////////////////
-		struct FocusedState
-		{
-			Id id; 	//globally store the current hash
-			.Container container;  	//this is sent to the Selection/Draw routines. If it is null, then the focus is lost.
-			
-			void reset()
-			{ this = typeof(this).init; } 
-		} 
-		FocusedState focusedState; 
-		
-		TextEditorState textEditorState; //maintained by edit control
-		
-		void onFocusLost(in Id oldId)
-		{
-			if(comboId && oldId==comboId)
-			{
+				
+				version(/+$DIDE_REGION+/none) {
+					if(VisualizeHitStack)
+					{
+						drVisualizeHitStack = new_Drawing; 
+						hitTestManager.draw(drVisualizeHitStack); 
+					}
+				}
+				
+				//all hitTest are done, move hitTestManager to the next frame. Latest hittest data will be accessible right after this.
+				hitTestManager.nextFrame; 
+				
+				//clicking away from popup closes the popup
+				if(comboState && !comboOpening && !mouseOverPopup && (inputs.LMB.pressed || inputs.RMB.pressed))
 				comboState = false; 
-				comboId = Id.init; 
-			}
-		} 
-		
-		/// internal use only
-		bool focusUpdate(
-			.Container container, in Id id, bool canFocus, lazy bool enterFocusNow, lazy bool exitFocusNow, 
-			void delegate() onEnter, void delegate() onFocused, void delegate() onExit
-		)
-		{
-			if(focusedState.id==id)
-			{
-				if(!canFocus || exitFocusNow)
+				
+				//the IM GUI wants to use the mouse for scrolling or clicking. Example: It tells the 'view' not to zoom.
+				wantMouse = mouseOverUI[1]; 
+				
+				if(textEditorState.active)
 				{
-					 //not enabled anymore: exit focus
-					if(onExit)
-					onExit(); 
-					focusedState.reset; 
-					
-					onFocusLost(id); 
+					//an edit control is active.
+					//Todo: mainWindow.canProcessUserInput check
+					auto err = textEditorState.processQueue; 
 				}
-			}else
+				wantKeys = textEditorState.active; 
+				
+				const guiBounds = view_gui.screenBounds_anim.bounds2; 
+				generateHints(guiBounds); 
+				
+				//update building/measuring/drawing state
+				canDraw = true; 
+				inFrame = false; 
+			} 
+			
+			bounds2[2] surfaceBounds; 
+			
+			void _drawFrame(string restrict="")(
+				Drawing drWorld, Drawing drGUI, 
+				void delegate() funBefore=null, void delegate() funAfter=null
+			)
 			{
-				if(canFocus && enterFocusNow)
+				static if(doTiming)
 				{
-					 //newly enter the focus
+					const T0 = QPS; 
+					scope(exit)
+					{
+						tDraw = QPS-T0; print(
+							format!"im.timing: begin %5.1f   end %5.1f   draw %5.1f ms"
+							(tBeginFrame*1000, tEndFrame*1000, tDraw*1000)
+						); 
+					}
+				}
+				
+				static assert(restrict=="system call only", "im.draw() is restricted to call by system only."); 
+				enforce(canDraw, "im.draw(): canDraw must be true. Nothing to draw now."); 
+				
+				Drawing[2] dr = [drWorld, drGUI]; 
+				
+				//init clipbounds
+				foreach(i, ref d; dr)
+				{
+					auto view = targetSurfaceViews[i].enforce; 
+					d.pushClipBounds(view.screenBounds_anim.bounds2); 
+				}
+				
+				foreach(i; 0..2)
+				surfaceBounds[i] = bounds2.init; 
+				
+				
+				if(funBefore) funBefore(); 
+				
+				foreach(a; rootContainers(true))
+				{
+					const s = a.flags.targetSurface; 
+					surfaceBounds[s] |= a.outerBounds; 
+					_targetSurfaceBeingDrawn = s; 
+					a.draw(dr[s]); //draw in zOrder
+				}
+				
+				if(funAfter) funAfter(); 
+				
+				foreach(i, d; dr)
+				{ d.popClipBounds; }
+				
+				version(/+$DIDE_REGION+/none) {
+					if(VisualizeHitStack && drVisualizeHitStack)
+					{
+						drVisualizeHitStack.glDraw(targetSurfaces[1].view); 
+						//Todo: problem with hitStack: it is assumed to be on GUI view
+					}
+					drVisualizeHitStack.destroy; 
+				}
+				
+				//not needed, gc is perfect.  foreach(r; root) if(r){ r.destroy; r=null; } root.clear;
+				//Todo: ezt tesztelni kene sor cell-el is! Hogy mekkorak a gc spyke-ok, ha manualisan destroyozok.
+				
+				//Todo: if window resizing, draw is called without update!!!  canDraw = false; can detect it.
+			} 
+		}
+		version(/+$DIDE_REGION PanelPosition+/all)
+		{
+			//aligns the container on the screen
+			
+			enum PanelPosition
+			{
+				none, 
+				topLeft, 	topCenter, 	topRight, 	
+				leftCenter, 	center, 	rightCenter, 	
+				bottomLeft, 	bottomCenter, 	bottomRight, 	
+					topClient, 		
+				leftClient, 	client, 	rightClient, 	
+					bottomClient		
+			} 
+			
+			private void initializePanelPosition(.Container cntr, PanelPosition pp, in bounds2 area)
+			{
+				with(PanelPosition)
+				{
+					//flags.targetSurface is unknown at this point, will check it later in 'finalize'
+					if(pp.among(client, topClient, bottomClient))	cntr.outerWidth = area.width; 
+					else if(pp.among(client, leftClient, rightClient))	cntr.outerHeight = area.height; 
+				}
+			} 
+			
+			private void finalizePanelPosition(.Container cntr, PanelPosition pp, ref bounds2 area)
+			{
+				with(PanelPosition)
+				{
+					if(pp)
+					{
+						
+						enforce(cntr.flags.targetSurface == 1, "Unable to set PanelPosition on world_surface."); 
+						
+						cntr.measure; //must know all the sizes from now on
+						
+						static isAlignPosition (PanelPosition pp)
+						=> pp.inRange(topLeft, bottomRight ); //it will only position the container
+						static isClientPosition(PanelPosition pp)
+						=> pp.inRange(topClient, bottomClient); //it will change the client rect too
+						
+						if(isAlignPosition(pp))
+						{
+							ivec2 p; divMod((cast(int)(pp-1)), 3, p.y, p.x); 
+							if(p.x.inRange(0, 2) && p.y.inRange(0, 2))
+							{
+								auto 	t = p*.5f,
+									u = vec2(1)-t; 
+								
+								cntr.outerPos = area.topLeft*u 	+ area.bottomRight*t //Todo: bug: fucking vec2.lerp is broken again
+									- cntr.outerSize*t; 
+							}
+						}
+						else if(isClientPosition(pp))
+						{
+							//Todo: put checking for running out of area and scrolling here.
+							switch(pp)
+							{
+								case topClient: 	cntr.outerPos = area.topLeft; 	area.top    += cntr.outerHeight; 	break; 
+								case bottomClient: 	area.bottom -= cntr.outerHeight; 	cntr.outerPos = area.bottomLeft; 	break; 
+								case leftClient: 	cntr.outerPos = area.topLeft; 	area.left    += cntr.outerWidth; 	break; 
+								case rightClient: 	area.right   -= cntr.outerWidth; 	cntr.outerPos = area.topRight; 	break; 
+								case client: 	cntr.outerPos = area.topLeft; 	cntr.outerSize = area.size; area = bounds2.init; 	break; 
+								default: 	ERR("invalid PanelPosition"); 
+							}
+						}
+					}
+				}
+			} 
+		}
+		
+		
+		version(/+$DIDE_REGION Focus+/all)
+		{
+			struct FocusedState
+			{
+				Id id; 	//globally store the current hash
+				.Container container;  	//this is sent to the Selection/Draw routines. If it is null, then the focus is lost.
+				
+				void reset()
+				{ this = typeof(this).init; } 
+			} 
+			FocusedState focusedState; 
+			
+			TextEditorState textEditorState; //maintained by edit control
+			
+			void onFocusLost(in Id oldId)
+			{
+				if(comboId && oldId==comboId)
+				{
+					comboState = false; 
+					comboId = Id.init; 
+				}
+			} 
+			
+			/// internal use only
+			bool focusUpdate(
+				.Container container, in Id id, bool canFocus, lazy bool enterFocusNow, lazy bool exitFocusNow, 
+				void delegate() onEnter, void delegate() onFocused, void delegate() onExit
+			)
+			{
+				if(focusedState.id==id)
+				{
+					if(!canFocus || exitFocusNow)
+					{
+						 //not enabled anymore: exit focus
+						if(onExit)
+						onExit(); 
+						focusedState.reset; 
+						
+						onFocusLost(id); 
+					}
+				}else
+				{
+					if(canFocus && enterFocusNow)
+					{
+						 //newly enter the focus
+						onFocusLost(focusedState.id); 
+						
+						focusedState.reset; 
+						focusedState.id = id;     //Todo: ez bugos, mert nem hivodik meg a focusExit, amikor ez elveszi a focust
+						focusedState.container = container; 
+						if(onEnter)
+						onEnter(); 
+					}
+				}
+				
+				bool res = focusedState.id==id; 
+				if(res)
+				focusedState.container = container; 
+				container.flags.focused = res; 
+				
+				if(res && onFocused)
+				onFocused(); 
+				
+				return res; 
+			} 
+			
+			bool isFocused(in Id id)	
+			{ return focusedState.id!=Id.init	&& focusedState.id == id; } 
+			bool isFocused(.Container container)	
+			{ return focusedState.container !is null	&& focusedState.container is container; } 
+			
+			void focusNothing()
+			{
+				if(focusedState.id)
+				{
 					onFocusLost(focusedState.id); 
 					
 					focusedState.reset; 
-					focusedState.id = id;     //Todo: ez bugos, mert nem hivodik meg a focusExit, amikor ez elveszi a focust
-					focusedState.container = container; 
-					if(onEnter)
-					onEnter(); 
 				}
-			}
+			} 
 			
-			bool res = focusedState.id==id; 
-			if(res)
-			focusedState.container = container; 
-			container.flags.focused = res; 
-			
-			if(res && onFocused)
-			onFocused(); 
-			
-			return res; 
-		} 
-		
-		bool isFocused(in Id id)	
-		{ return focusedState.id!=Id.init	&& focusedState.id == id; } 
-		bool isFocused(.Container container)	
-		{ return focusedState.container !is null	&& focusedState.container is container; } 
-		
-		void focusNothing()
+			//void focusExit(in Id id)	  { if(isFocused(id)) focusedState.reset; }
+			//void focusExit(Container container)	  { if(isFocused(container)) focusedState.reset; }
+			//void focusExit()	  { focusedState.reset; }
+		}
+		version(/+$DIDE_REGION Hints+/all)
 		{
-			if(focusedState.id)
+			const float HintActivate_sec	 = 0.5,
+										HintDetails_sec	 = 2.5,
+										HintRelease_sec	 = 1; 
+			
+			struct HintRec
 			{
-				onFocusLost(focusedState.id); 
-				
-				focusedState.reset; 
-			}
-		} 
-		
-		//void focusExit(in Id id)	  { if(isFocused(id)) focusedState.reset; }
-		//void focusExit(Container container)	  { if(isFocused(container)) focusedState.reset; }
-		//void focusExit()	  { focusedState.reset; }
-		
-		//hints /////////////////////////////////////////////////////////////////
-		
-		const float HintActivate_sec	 = 0.5,
-									HintDetails_sec	 = 2.5,
-									HintRelease_sec	 = 1; 
-		
-		struct HintRec
-		{
-			.Container owner; 
-			bounds2 bounds; 
-			string markup, markupDetails; //Todo: support delegates too
-		} 
-		private HintRec[] hints; 
-		
-		enum HintState
-		{ idle, active, details} 
-		static hintState = HintState.idle; 
-		
-		/// This can be used to inject a hint into the parameters of a Control
-		auto hint(string markup, string markupDetails="")
-		{
-			 //Todo: delegate too
-			return HintRec(null, bounds2.Null, markup, markupDetails); //Todo: lazyness
-		} 
-		
-		void addHint(HintRec hr)
-		{ hints ~= hr; } 
-		
-		void hideHints()
-		{ hintState = HintState.idle; } 
-		
-		private enum hintHandler = q{
+				.Container owner; 
+				bounds2 bounds; 
+				string markup, markupDetails; //Todo: support delegates too
+			} 
+			private HintRec[] hints; 
+			
+			enum HintState
+			{ idle, active, details} 
+			static hintState = HintState.idle; 
+			
+			/// This can be used to inject a hint into the parameters of a Control
+			auto hint(string markup, string markupDetails="")
 			{
-				static foreach(a; args)
-				static if(is(Unqual!(typeof(a)) == HintRec))
+				 //Todo: delegate too
+				return HintRec(null, bounds2.Null, markup, markupDetails); //Todo: lazyness
+			} 
+			
+			void addHint(HintRec hr)
+			{ hints ~= hr; } 
+			
+			void hideHints()
+			{ hintState = HintState.idle; } 
+			
+			private enum hintHandler = q{
 				{
-					if(a.markup.length && hit.hover)
+					static foreach(a; args)
+					static if(is(Unqual!(typeof(a)) == HintRec))
 					{
-						auto hr = a; 
-						hr.owner = actContainer; 
-						hr.bounds = hit.hitBounds; 
-						addHint(hr); 
+						if(a.markup.length && hit.hover)
+						{
+							auto hr = a; 
+							hr.owner = actContainer; 
+							hr.bounds = hit.hitBounds; 
+							addHint(hr); 
+						}
 					}
 				}
-			}
-		}; 
-		
-		private void generateHints(in bounds2 screenBounds)
-		{
-			 //called on the end of the frame
-			static float mouseStopped_secs = 0; 
-			static float noHint_secs = 0; 
-			
-			const userBlocking = 	["Esc", "Enter", "LMB", "RMB", "MMB", "Space"]
-				.map!((k)=>(inputs[k].active)).any; 
-			
-			if(inputs.MX.delta==0 && inputs.MY.delta==0)	mouseStopped_secs += deltaTime; 
-			else	mouseStopped_secs = 0; 
-			
-			if(hints.empty)	noHint_secs += deltaTime; 
-			else	noHint_secs = 0; 
-			
-			//enter hint mode
-			if(!hints.empty && !userBlocking)
+			}; 
+			
+			private void generateHints(in bounds2 screenBounds)
 			{
-				if(hintState==HintState.idle && mouseStopped_secs>HintActivate_sec)
-				hintState = HintState.active; 
-				if(hintState==HintState.active && mouseStopped_secs>HintDetails_sec)
-				hintState = HintState.details; 
-			}
-			
-			//exit hint mode
-			if(hintState != HintState.idle)
-			{
-				//immediately hide on particular user events
-				if(userBlocking)
-				hideHints; 
+				 //called on the end of the frame
+				static float mouseStopped_secs = 0; 
+				static float noHint_secs = 0; 
 				
-				//hide after no hints to display for a while
-				if(noHint_secs>HintRelease_sec)
-				hideHints; 
-			}
-			
-			//actual hint generation
-			HintRec lastHint; 
-			if(hints.length)
-			lastHint = hints[$-1]; 
-			auto hintOwner = lastHint.owner; 
-			
-			if(hintState != HintState.idle && hintOwner)
-			{
-				.Container hintContainer; 
+				const userBlocking = 	["Esc", "Enter", "LMB", "RMB", "MMB", "Space"]
+					.map!((k)=>(inputs[k].active)).any; 
 				
-				Panel(
-					{
-						hintContainer = actContainer; 
-						padding = "0"; 
-						border.color = clGray; 
-						
-						if(lastHint.markup!="")
-						Row(
-							{
-								//Todo: row kell?
-								padding = "4"; 
-								style.fontColor = clHintText; 
-								style.bkColor = bkColor = clHintBk; 
-								flags.rowElasticTabs = true; 
-								
-								Text(lastHint.markup); 
-							}
-						); 
-						
-						if(
-							hintState == HintState.details 
-							&& lastHint.markupDetails!=""
-						)
-						Row(
-							{
-								padding = "4"; 
-								style.fontColor = clHintDetailsText; 
-								style.bkColor = bkColor = clHintDetailsBk; 
-								flags.rowElasticTabs = true; 
-								//Todo: Why is this redundancy?
-								
-								Text(lastHint.markupDetails); 
-							}
-						); 
-						
-						
-					}
-				); 
+				if(inputs.MX.delta==0 && inputs.MY.delta==0)	mouseStopped_secs += deltaTime; 
+				else	mouseStopped_secs = 0; 
 				
-				hintContainer.measure; 
+				if(hints.empty)	noHint_secs += deltaTime; 
+				else	noHint_secs = 0; 
 				
-				//align the hint
-				hintContainer.outerPos = 	lastHint.bounds.bottomCenter //Bounds.bottomCenter
-					+ vec2(-hintContainer.outerWidth*.5, 5); 
+				//enter hint mode
+				if(!hints.empty && !userBlocking)
+				{
+					if(hintState==HintState.idle && mouseStopped_secs>HintActivate_sec)
+					hintState = HintState.active; 
+					if(hintState==HintState.active && mouseStopped_secs>HintDetails_sec)
+					hintState = HintState.details; 
+				}
 				
-				//clamp horizontaly
-				const remainingWidth = max(0, screenBounds.width-hintContainer.outerWidth); 
-				hintContainer.outerPos.x = clamp(
-					hintContainer.outerPos.x, 0, 
-					remainingWidth
-				); 
+				//exit hint mode
+				if(hintState != HintState.idle)
+				{
+					//immediately hide on particular user events
+					if(userBlocking)
+					hideHints; 
+					
+					//hide after no hints to display for a while
+					if(noHint_secs>HintRelease_sec)
+					hideHints; 
+				}
 				
-				//Todo: HintSettings: on/off, hintLocation:nextTo/statusBar/bottomRight, save to ini
-			}
-			
-			hints = []; 
-		} 
-		
+				//actual hint generation
+				HintRec lastHint; 
+				if(hints.length)
+				lastHint = hints[$-1]; 
+				auto hintOwner = lastHint.owner; 
+				
+				if(hintState != HintState.idle && hintOwner)
+				{
+					.Container hintContainer; 
+					
+					Panel(
+						{
+							hintContainer = actContainer; 
+							padding = "0"; 
+							border.color = clGray; 
+							
+							if(lastHint.markup!="")
+							Row(
+								{
+									//Todo: row kell?
+									padding = "4"; 
+									style.fontColor = clHintText; 
+									style.bkColor = bkColor = clHintBk; 
+									flags.rowElasticTabs = true; 
+									
+									Text(lastHint.markup); 
+								}
+							); 
+							
+							if(
+								hintState == HintState.details 
+								&& lastHint.markupDetails!=""
+							)
+							Row(
+								{
+									padding = "4"; 
+									style.fontColor = clHintDetailsText; 
+									style.bkColor = bkColor = clHintDetailsBk; 
+									flags.rowElasticTabs = true; 
+									//Todo: Why is this redundancy?
+									
+									Text(lastHint.markupDetails); 
+								}
+							); 
+							
+							
+						}
+					); 
+					
+					hintContainer.measure; 
+					
+					//align the hint
+					hintContainer.outerPos = 	lastHint.bounds.bottomCenter //Bounds.bottomCenter
+						+ vec2(-hintContainer.outerWidth*.5, 5); 
+					
+					//clamp horizontaly
+					const remainingWidth = max(0, screenBounds.width-hintContainer.outerWidth); 
+					hintContainer.outerPos.x = clamp(
+						hintContainer.outerPos.x, 0, 
+						remainingWidth
+					); 
+					
+					//Todo: HintSettings: on/off, hintLocation:nextTo/statusBar/bottomRight, save to ini
+				}
+				
+				hints = []; 
+			} 
+		}
+		
 		//! im internal state ////////////////////////////////////////////////////////////////
 		
 		Cell[] rootCells; //when containerStack is empty, this is the container
@@ -7167,93 +7133,96 @@ struct im
 		struct selected
 		{ bool val; 	 enum M = q{auto _selected = false; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == selected)) _selected	= a.val; 	}; } 
 		
-		enum RangeType
-		{ linear, log, circular, endless} 
-		struct range
+		version(/+$DIDE_REGION Range+/all)
 		{
-			//endless can go out of range, circular always using modulo.
-			float min, max, step=1; RangeType type;  //Todo: this is an 1D bounds
-			
-			//Todo: handle invalid intervals
-			bool isComplete() const
-			{ return !isnan(min) && !isnan(max); } 
-			
-			bool isLinear	 () const
-			{ return type==RangeType.linear	; } 
-			bool isLog	 () const
-			{ return type==RangeType.log	; } 
-			bool isCircular() const
-			{ return type==RangeType.circular; } 
-			bool isEndless () const
-			{ return type==RangeType.endless; } 
-			bool isClamped () const
-			{ return isLinear || isLog || isCircular; } 
-			bool isOrdered () const
-			{ return min <= max; } 
-			
-			float normalize(float x) const
+			enum RangeType
+			{ linear, log, circular, endless} 
+			struct range
 			{
-				auto n = isLog 	? x.log2.remap(min.log2, max.log2, 0, 1)
-					: x     .remap(min    , max    , 0, 1); 
-				//Todo: handle log(0)
-				if(isCircular) if(n<0 || n>1) n = n-n.floor; 
-				if(isClamped) n = n.clamp(0, 1); 
-				return n; 
-			} 
-			
-			float denormalize(float n) const
-			{
-				if(isCircular) if(n<0 || n>1) n = n-n.floor; 
-				if(isClamped) n = n.clamp(0, 1); 
-				return clamp(
-					isLog 	? 2 ^^ n.remap(0, 1, min.log2, max.log2)
-						:       n.remap(0, 1, min    , max    )
-				)
-				/+clamp is needed because of rounding errors+/; 
-			} 
-			
-			Unqual!T clamp(T)(T f) const
-			{
-				if(isComplete)
+				//endless can go out of range, circular always using modulo.
+				float min, max, step=1; RangeType type;  //Todo: this is an 1D bounds
+				
+				//Todo: handle invalid intervals
+				bool isComplete() const
+				{ return !isnan(min) && !isnan(max); } 
+				
+				bool isLinear	 () const
+				{ return type==RangeType.linear	; } 
+				bool isLog	 () const
+				{ return type==RangeType.log	; } 
+				bool isCircular() const
+				{ return type==RangeType.circular; } 
+				bool isEndless () const
+				{ return type==RangeType.endless; } 
+				bool isClamped () const
+				{ return isLinear || isLog || isCircular; } 
+				bool isOrdered () const
+				{ return min <= max; } 
+				
+				float normalize(float x) const
 				{
-					static if(isIntegral!T)
+					auto n = isLog 	? x.log2.remap(min.log2, max.log2, 0, 1)
+						: x     .remap(min    , max    , 0, 1); 
+					//Todo: handle log(0)
+					if(isCircular) if(n<0 || n>1) n = n-n.floor; 
+					if(isClamped) n = n.clamp(0, 1); 
+					return n; 
+				} 
+				
+				float denormalize(float n) const
+				{
+					if(isCircular) if(n<0 || n>1) n = n-n.floor; 
+					if(isClamped) n = n.clamp(0, 1); 
+					return clamp(
+						isLog 	? 2 ^^ n.remap(0, 1, min.log2, max.log2)
+							:       n.remap(0, 1, min    , max    )
+					)
+					/+clamp is needed because of rounding errors+/; 
+				} 
+				
+				Unqual!T clamp(T)(T f) const
+				{
+					if(isComplete)
 					{
-						if(isOrdered)
-						f = f.clamp(min.ceil.to!T, max.floor.to!T); 
-						else f = f.clamp(max.ceil.to!T, min.floor.to!T); 
+						static if(isIntegral!T)
+						{
+							if(isOrdered)
+							f = f.clamp(min.ceil.to!T, max.floor.to!T); 
+							else f = f.clamp(max.ceil.to!T, min.floor.to!T); 
+						}else
+						{
+							if(isOrdered)
+							f = f.clamp(min.to!T, max.to!T); 
+							else f = f.clamp(max.to!T, min.to!T); 
+						}
 					}else
 					{
-						if(isOrdered)
-						f = f.clamp(min.to!T, max.to!T); 
-						else f = f.clamp(max.to!T, min.to!T); 
+						//incomplete range: eiter min or max is nan
+						static if(isIntegral!T)
+						{
+							if(!isnan(min) && f<min.iceil)
+							f = min.iceil; else if(!isnan(max) && f>max.ifloor)
+							f = max.ifloor; 
+						}else
+						{
+							if(!isnan(min) && f<min)
+							f = min; else if(!isnan(max) && f>max)
+							f = max; 
+						}
 					}
-				}else
-				{
-					//incomplete range: eiter min or max is nan
-					static if(isIntegral!T)
-					{
-						if(!isnan(min) && f<min.iceil)
-						f = min.iceil; else if(!isnan(max) && f>max.ifloor)
-						f = max.ifloor; 
-					}else
-					{
-						if(!isnan(min) && f<min)
-						f = min; else if(!isnan(max) && f>max)
-						f = max; 
-					}
-				}
-				return f; 
+					return f; 
+				} 
+				
+				private enum M = q{range _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == range)) _range = a; }; 
 			} 
 			
-			private enum M = q{range _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == range)) _range = a; }; 
-		} 
-		
-		auto logRange     (float min, float max, float step=1)
-		{ return range(min, max, step, RangeType.log     ); } 
-		auto circularRange(float min, float max, float step=1)
-		{ return range(min, max, step, RangeType.circular); } 
-		auto endlessRange (float min, float max, float step=1)
-		{ return range(min, max, step, RangeType.endless ); } 
+			auto logRange(float min, float max, float step=1)
+			=> range(min, max, step, RangeType.log); 
+			auto circularRange(float min, float max, float step=1)
+			=> range(min, max, step, RangeType.circular); 
+			auto endlessRange (float min, float max, float step=1)
+			=> range(min, max, step, RangeType.endless); 
+		}
 		
 		static auto hitTest(.Container container, bool enabled=true)
 		{
@@ -7266,30 +7235,6 @@ struct im
 		auto hitTest(bool enabled=true)
 		{ return hitTest(actContainer, enabled); } 
 		
-		string symbol(string def)
-		{ return tag(`symbol `~def); } 
-		void Symbol(string def)
-		{ Text(symbol(def)); } 
-		
-		void Img(string def)
-		{ Img(File(def)); } 
-		
-		void Img(File f)
-		{
-			//Text(tag(`img ` ~ f.fullName.optionallyQuotedFileName));
-			//Todo: Markup thing is broken with complicated filenames. Quoted filename not works: range error.
-			
-			version(VulkanUI) {
-				bitmaps[f]; /+
-					Todo: In vulkan there is no delayed refresh of images.
-					All this have to be solved! 
-					26.02.03 It is temporarily fixed.
-				+/
-			}
-			else { bitmaps(f); }
-			
-			append(new .Img(f)); 
-		} 
 		
 		struct ScrollInfo
 		{
@@ -7360,7 +7305,7 @@ struct im
 			/+
 				2. called after measure when the final local positions are known. 
 					It creates the bars if needed and registers them with hitTestManager
-			+/
+			+/
 			void createBars(bool doPurge)
 			{
 				assert(orientation.among('H', 'V')); 
@@ -7462,82 +7407,78 @@ struct im
 		auto hScrollInfo = ScrollInfo('H'); 
 		auto vScrollInfo = ScrollInfo('V'); 
 		
-		private void processContainerArgs(Args...)(in Args args)
+		private void processContainerArg(T)(in T a)
 		{
-			static foreach(a; args)
-			{
-				{
-					alias T = typeof(cast()a); 
-					enum isT(Type) 	= is(T == Type),
-					isG(string Name) 	= isGenericArg!(T, Name); 
-					
-					static GEN_static_if(T)(T table)
-					{ return table.rows.map!((r){ return iq{if($(r[0])) {$(r[1])}}.text; }).join("\nelse "); } 
-					
-					static if(isFunctionPointer!a)	a(); 
-					else static if(isDelegate!a)	a(); 
-					else static if(isSomeString!T)	Text(a); 
-					else static if(isT! YAlign)	flags.yAlign = a; 
-					else static if(isT! HAlign)	flags.hAlign = a; 
-					else static if(isT! VAlign)	flags.vAlign = a; 
-					else static if(isT! TextStyle)	textStyle = a; 
-					else static if(isT! RGB)	style.bkColor = bkColor = a; 
-					else static if(isT! Padding)	padding = a; 
-					else static if(isT! Border)	border = a; 
-					else static if(isT! Margin)	margin = a; 
-					else static if(isT! SyntaxKind)	{
-						textStyle.applySyntax(a); 
-						bkColor = textStyle.bkColor; 
-					}
-					else static if(isG!"id")	{/+Already processed by prepareId.srcId+/}
-					else static if(isG!"theme")	theme = a; 
-					else static if(isG!"syntax")	{
-						textStyle.applySyntax(a.to!SyntaxKind); 
-						bkColor = textStyle.bkColor; 
-					}
-					else static if(isG!"fontColor")	style.fontColor = a; 
-					else static if(isG!"bold")	style.bolt = a; 
-					else static if(isG!"italic")	style.italic = a; 
-					else static if(isG!"bkColor")	style.bkColor = bkColor = a; 
-					else static if(isG!"padding")	padding = a; 
-					else static if(isG!"border")	border = a; 
-					else static if(isG!"margin")	margin = a; 
-					else static if(isG!"flex")	flex = a; 
-					else
-					static assert(false, "Unsupported type: "~T.stringof); 
-				}
+			enum isT(Type) 	= is(T == Type),
+			isG(string Name) 	= isGenericArg!(T, Name); 
+			
+			static GEN_static_if(T)(T table)
+			=> table.rows.map!((r)=>(iq{if($(r[0])) {$(r[1])}}.text)).join("\nelse "); 
+			
+			static if(isFunctionPointer!a)	a(); 
+			else static if(isDelegate!a)	a(); 
+			else static if(isSomeString!T)	Text(a); 
+			else static if(isT! YAlign)	flags.yAlign = a; 
+			else static if(isT! HAlign)	flags.hAlign = a; 
+			else static if(isT! VAlign)	flags.vAlign = a; 
+			else static if(isT! TextStyle)	textStyle = a; 
+			else static if(isT! RGB)	style.bkColor = bkColor = a; 
+			else static if(isT! Padding)	padding = a; 
+			else static if(isT! Border)	border = a; 
+			else static if(isT! Margin)	margin = a; 
+			else static if(isT! SyntaxKind)	{
+				textStyle.applySyntax(a); 
+				bkColor = textStyle.bkColor; 
 			}
+			else static if(isT!PanelPosition)	{/+Already processed +/}
+			else static if(isG!"id")	{/+Already processed by prepareId.srcId+/}
+			else static if(isG!"theme")	theme = a; 
+			else static if(isG!"syntax")	{
+				textStyle.applySyntax(a.to!SyntaxKind); 
+				bkColor = textStyle.bkColor; 
+			}
+			else static if(isG!"fontColor")	style.fontColor = a; 
+			else static if(isG!"bold")	style.bolt = a; 
+			else static if(isG!"italic")	style.italic = a; 
+			else static if(isG!"bkColor")	style.bkColor = bkColor = a; 
+			else static if(isG!"padding")	padding = a; 
+			else static if(isG!"border")	border = a; 
+			else static if(isG!"margin")	margin = a; 
+			else static if(isG!"flex")	flex = a; 
+			else static assert(false, "Unsupported type: "~T.stringof); 
 		} 
 		
 		void Container(CType = .Container, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
 		{
 			mixin(prepareId, enable.M); 
 			
-			/+
-				const pp = ARG(PanelPosition.init, args); 
-				if(pp) { initializePanelPosition; }
-				scope(exit) if(pp) finalizePanelPosition; 
-			+/
-			
-			static if(__traits(compiles, new CType))
-			{ auto cntr = new CType; }else
-			{
-				alias FirstCtorParam = ParameterTypeTuple!(__traits(getOverloads, CType, "__ctor")[0])[0]; 
-				static assert(
-					is(FirstCtorParam : .Container), 
-					"If there is no () constructor, the first parameter must be a Container."
-					~"actContainer will be sent to it as the parent."
-				); 
-				
-				pragma(msg,i"$(srcModule):$(srcLine) this:$(CType) parent:$(FirstCtorParam)".text.注); 
-				auto cntr = new CType(cast(FirstCtorParam)actContainer); //try to give parent for the new control
+			version(/+$DIDE_REGION+/none) {
+				//260809: Not used in DIDE, Karc -> removed.
+				static if(__traits(compiles, new CType))
+				{ auto cntr = new CType; }else
+				{
+					alias FirstCtorParam = ParameterTypeTuple!(__traits(getOverloads, CType, "__ctor")[0])[0]; 
+					static assert(
+						is(FirstCtorParam : .Container), 
+						"If there is no () constructor, the first parameter must be a Container."
+						~"actContainer will be sent to it as the parent."
+					); 
+					
+					pragma(msg,i"$(srcModule):$(srcLine) this:$(CType) parent:$(FirstCtorParam)".text.注); 
+					auto cntr = new CType((cast(FirstCtorParam)(actContainer))); //try to give parent for the new control
+				}
 			}
 			
+			auto cntr = new CType; 
 			append(cntr); push(cntr, id_); scope(exit) pop; 
 			
-			cntr.bkColor = style.bkColor; //Note: inheriting bkcolor in a weird way, from the fontStyle
+			cntr.bkColor = style.bkColor; //Inherit bkcolor from the current fontStyle.
 			
-			processContainerArgs(args); 
+			const panelPosition = ARG(PanelPosition.init, args); 
+			if(panelPosition) initializePanelPosition(cntr, panelPosition, clientArea); 
+			scope(exit) if(panelPosition) finalizePanelPosition(cntr, panelPosition, clientArea); 
+			
+			static foreach(a; args) processContainerArg(a); 
 		} 
 		
 		void Row   (string	srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
@@ -7545,18 +7486,26 @@ struct im
 		void Column(string	srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
 		{ Container!(.Column, srcModule, srcLine)(args); } 
 		
-		/// It is used to put cached cells or subcells into the imgui.
-		void CellRef(Cell cell)
+		void Panel(CType = .Column, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
 		{
-			if(cell)
-			Container({ actContainer.append(cell); }); 
+			enforce(actContainer is null, "Panel() must be on root level"); 
+			Container!(CType, srcModule, srcLine)
+			(
+				{
+					padding = "3"; border = "6 normal silver"; 
+					with(border) inset = true, style = BorderStyle.fullFilletOut, borderFirst = true; 
+					flags.noBackground = true; 
+				}
+				, args
+			); 
 		} 
 		
+		/// It is used to put cached cells or subcells into the imgui.
+		void CellRef(Cell cell)
+		{ if(cell) Container({ actContainer.append(cell); }); } 
+		
 		void CellRef(Cell[] cells)
-		{
-			if(cells.length)
-			Container({ actContainer.append(cells); }); 
-		} 
+		{ if(cells.length) Container({ actContainer.append(cells); }); } 
 		
 		//popup state
 		struct PopupState
@@ -7605,8 +7554,11 @@ struct im
 		
 		private void Popup(Cell parent, void delegate() contents)
 		{
-			 //Popup for combobox only ////////////////////////////////////
-			//Todo: this check is not working because of the IM gui. When ComboBox1 is pulled down and the user clicks on ComboBox2
+			//Popup for combobox only ////////////////////////////////////
+			/+
+				Todo: this check is not working because of the IM gui. 
+				When ComboBox1 is pulled down and the user clicks on ComboBox2
+			+/
 			//commented out intentionally: enforce(popupState.cell is null, "im.Popup() already called.");
 			
 			auto oldLen = actContainer.subCells.length; 
@@ -7626,36 +7578,34 @@ struct im
 		} 
 		
 		
-		deprecated void Code_old(string src)
-		{
-			 //Code /////////////////////////////
-			//Todo: syntax highlight
-			//Spacer(0.5*fh);
-			Column(
-				{
-					margin = Margin(0.5*fh, 0.5*fh, 0.5*fh, 0.5*fh); 
-					
-					style = tsCode; 
-					const bkColors = [0.06f, 0.09f].map!(t => mix(textStyle.bkColor, textStyle.fontColor, t)).array; 
-					border = "1 single gray"; 
-					
-					foreach(idx, line; src.split('\n'))
-					{
-						style.bkColor = bkColors[idx&1]; //alternated bkColor
-						line = line.withoutEnding('\r'); 
-						Text(line); 
-					}
-					
-					//don't hide any spaces
-					foreach(r; actContainer.subCells)
-					(cast(.Container)r).flags.dontHideSpaces = true; 
-				}
-			); 
-			//Spacer(0.5*fh);
-		} 
 		
 		void Flex(float value = 1)
 		{ Row({ flex = value; }); } 
+		
+		string symbol(string def)
+		{ return tag(`symbol `~def); } 
+		void Symbol(string def)
+		{ Text(symbol(def)); } 
+		
+		void Img(string def)
+		{ Img(File(def)); } 
+		
+		void Img(File f)
+		{
+			//Text(tag(`img ` ~ f.fullName.optionallyQuotedFileName));
+			//Todo: Markup thing is broken with complicated filenames. Quoted filename not works: range error.
+			
+			version(VulkanUI) {
+				bitmaps[f]; /+
+					Todo: In vulkan there is no delayed refresh of images.
+					All this have to be solved! 
+					26.02.03 It is temporarily fixed.
+				+/
+			}
+			else { bitmaps(f); }
+			
+			append(new .Img(f)); 
+		} 
 		
 		string bold	  (string s)	
 		=> tag("style bold=1"	  )~s~tag("style bold=0"	  ); 
