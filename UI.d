@@ -1264,7 +1264,8 @@ version(/+$DIDE_REGION+/all)
 	); 
 	
 	struct _FlexValue
-	{ UpperFloat value=0; alias this = value; } //ganyolas
+	{ UpperFloat value=0; alias this = value; } 
+	static assert(_FlexValue.sizeof==2); 
 	
 	///This struct is returned by locate()
 	struct CellLocation
@@ -1299,6 +1300,8 @@ version(/+$DIDE_REGION+/all)
 	
 	class Cell
 	{
+		vec2 outerPos, outerSize; 
+		
 		///Optionally the container can have a parent.
 		inout(Container) getParent() inout
 		{ return null; } 
@@ -1346,8 +1349,6 @@ version(/+$DIDE_REGION+/all)
 		
 		auto allParents(Base : Cell = Container)() inout
 		{ return thisAndAllParents!(Base, false); } 
-		
-		vec2 outerPos, outerSize; 
 		
 		ref _FlexValue flex()
 		{
@@ -3485,7 +3486,18 @@ version(/+$DIDE_REGION+/all)
 {
 	class Container : Cell
 	{
+		Cell[] subCells; 
 		SrcId id; //Scrolling needs it. Also useful for debugging.
+		ContainerFlags flags; 
+		protected
+		{
+			Margin margin_; 
+			Padding padding_; 
+			Border border_; 
+			_FlexValue flex_; 
+		} 
+		RGB bkColor=clWhite; //Todo: background struct
+		
 		
 		auto getHScrollBar()
 		{ return flags.hasHScrollBar ? im.hScrollInfo.getScrollBar(id) : null; } 
@@ -3498,28 +3510,7 @@ version(/+$DIDE_REGION+/all)
 		auto getScrollOffset()
 		{ return vec2(getHScrollOffset, getVScrollOffset); } 
 		
-		protected
-		{
-			public
-			{
-				//Todo: ezt a publicot leszedni es megoldani szepen
-				_FlexValue flex_; 
-				Margin margin_; 
-				Padding padding_; 
-				Border border_; 
-			} 
-		} 
 		
-		/*
-			 override{
-			 void clearSubCells(){ subCells_ = []; }
-			 @property Cell[] subCells() { return subCells_; }
-			 @property void subCells(Cell[] cells) { subCells_ = cells; }
-			}
-		*/
-		
-		//subCells
-		Cell[] subCells; 
 		void clearSubCells()
 		{ subCells = []; } 
 		
@@ -3547,34 +3538,27 @@ version(/+$DIDE_REGION+/all)
 		{ r.each!(c => appendCell(c)); } 
 		
 		final void append(void delegate() fun)
-		{
-			import het.ui : im; 
-			append(im.build(fun)); 
-		} 
+		{ append(im.build(fun)); } 
 		
-		void	appendImg (File	fn, in TextStyle ts)
-		{ appendCell(new Img(fn, ts.bkColor)); } 	//Todo: ezeknek az appendeknek a Container-ben lenne a helyuk
-		void	appendChar(dchar	ch, in TextStyle ts)
+		void	appendImg (File fn, in TextStyle ts)
+		{ appendCell(new Img(fn, ts.bkColor)); } 
+		void	appendChar(dchar ch, in TextStyle ts)
 		{ appendCell(new Glyph(ch, ts)); } 
 		void appendStr (string s, in TextStyle ts)
 		{
-			foreach(ch; s.byDchar)
-			appendChar(ch, ts); 
-		} //Todo: elvileg NEM kell a byDchar mert az az alapertelmezett a foreach-ban.
+			foreach(ch; s.byDchar) appendChar(ch, ts); 
+			/+byDchar is important! char is the default for string!+/
+		} 
 		
 		void appendCodeChar(dchar	ch, in TextStyle ts, SyntaxKind sk)
 		{ appendCell(new Glyph(ch, ts, sk)); } 
 		void appendCodeStr(string s, in TextStyle ts, SyntaxKind sk)
-		{
-			foreach(ch; s.byDchar)
-			appendCodeChar(ch, ts, sk); 
-		} 
+		{ foreach(ch; s.byDchar) appendCodeChar(ch, ts, sk); } 
 		
 		void appendCodeStr(string s, SyntaxKind sk)
 		{
-			static TextStyle style; 
-			style.applySyntax(sk); 
-			appendCodeStr(s, style, sk);  //Todo: syntax and style are redundant: syntax defines the style (more or less)
+			static TextStyle style; style.applySyntax(sk); 
+			appendCodeStr(s, style, sk); 
 		} 
 		
 		void appendSyntaxChar(dchar ch, in TextStyle ts, in SyntaxKind syntax)
@@ -3606,8 +3590,6 @@ version(/+$DIDE_REGION+/all)
 				subCells = subCells[0..$-1]; 
 				return true; 
 			}
-				
-			
 			return false; 
 		} 
 		
@@ -3621,26 +3603,17 @@ version(/+$DIDE_REGION+/all)
 			return false; 
 		} 
 		
-		void internal_setSubCells(Cell[] c)
-		{
-			 //Todo: remove this
-			subCells = c; 
-		} 
-		
 		final override
 		{
 			ref _FlexValue flex()
-			{ return flex_	; } 
-			ref Margin	margin ()
-			{ return margin_	; } //Todo: ezeknek nem kene virtualnak lennie, csak a containernek van borderje, a glyphnek nincs.
-			ref Padding	padding()
-			{ return padding_; } 
-			ref Border	border ()
-			{ return border_; } 
+			=> flex_	; 
+			ref Margin margin ()
+			=> margin_	; 
+			ref Padding padding()
+			=> padding_; 
+			ref Border border ()
+			=> border_; 
 		} 
-		
-		RGB bkColor=clWhite; //Todo: background struct
-		ContainerFlags flags; 
 		
 		override void setProps(string[string] p)
 		{
@@ -4851,8 +4824,6 @@ version(/+$DIDE_REGION+/all)
 	
 	class Column : Container
 	{
-		bool DEBUGGG; 
-		
 		override void rearrange()
 		{
 			//measure the subCells and stretch them to a maximum width
@@ -5593,9 +5564,12 @@ version(/+$DIDE_REGION+/all)
 		
 		260809: TextStyle.font:  string -> FontId
 		Border: 6, Cell:32, Glyph:61, Container:96, Row:113, Column:97, TextStyle: 9
+		
+		260810: realigning fields in Container
+		Border: 6, Padding:8, Cell:32, Glyph:61, Container:91, Row:113, Column:91, Style: 9
 	+/
 	
-	pragma(msg,i"Border: $(Border.sizeof), Cell:$(__traits(classInstanceSize, Cell)), Glyph:$(__traits(classInstanceSize, Glyph)), Container:$(__traits(classInstanceSize, Container)), Row:$(__traits(classInstanceSize, Row)), Column:$(__traits(classInstanceSize, Column)), Style: $(TextStyle.sizeof)".text.注); 
+	pragma(msg,i"Border: $(Border.sizeof), Padding:$(Padding.sizeof), Cell:$(__traits(classInstanceSize, Cell)), Glyph:$(__traits(classInstanceSize, Glyph)), Container:$(__traits(classInstanceSize, Container)), Row:$(__traits(classInstanceSize, Row)), Column:$(__traits(classInstanceSize, Column)), Style: $(TextStyle.sizeof)".text.注); 
 }
 version(/+$DIDE_REGION+/all)
 {
@@ -6941,7 +6915,7 @@ struct im
 		//valid values: "", "tool"
 		
 		Id actId()
-		{ return actContainer ? actContainer.id : Id.init; } 
+		=> ((actContainer)?(actContainer.id):(Id.init)); 
 		
 		auto lastCell(T:Cell=Cell)()
 		{
@@ -7413,39 +7387,86 @@ struct im
 			isG(string Name) 	= isGenericArg!(T, Name); 
 			
 			static GEN_static_if(T)(T table)
-			=> table.rows.map!((r)=>(iq{if($(r[0])) {$(r[1])}}.text)).join("\nelse "); 
+			=> table.rows.map!((r)=>(((r[0]==q{else})?(r[1]):(iq{static if($(r[0])) {$(r[1])}}.text)))).join(q{ else }); 
 			
-			static if(isFunctionPointer!a)	a(); 
-			else static if(isDelegate!a)	a(); 
-			else static if(isSomeString!T)	Text(a); 
-			else static if(isT! YAlign)	flags.yAlign = a; 
-			else static if(isT! HAlign)	flags.hAlign = a; 
-			else static if(isT! VAlign)	flags.vAlign = a; 
-			else static if(isT! TextStyle)	textStyle = a; 
-			else static if(isT! RGB)	style.bkColor = bkColor = a; 
-			else static if(isT! Padding)	padding = a; 
-			else static if(isT! Border)	border = a; 
-			else static if(isT! Margin)	margin = a; 
-			else static if(isT! SyntaxKind)	{
-				textStyle.applySyntax(a); 
-				bkColor = textStyle.bkColor; 
+			version(/+$DIDE_REGION+/none) {
+				static if(isFunctionPointer!a)	a(); 
+				else static if(isDelegate!a)	a(); 
+				else static if(isSomeString!T)	Text(a); 
+				else static if(isT! YAlign)	flags.yAlign = a; 
+				else static if(isT! HAlign)	flags.hAlign = a; 
+				else static if(isT! VAlign)	flags.vAlign = a; 
+				else static if(isT! TextStyle)	textStyle = a; 
+				else static if(isT! RGB)	style.bkColor = bkColor = a; 
+				else static if(isT! Padding)	padding = a; 
+				else static if(isT! Border)	border = a; 
+				else static if(isT! Margin)	margin = a; 
+				else static if(isT! SyntaxKind)	{
+					textStyle.applySyntax(a); 
+					bkColor = textStyle.bkColor; 
+				}
+				else static if(isT!PanelPosition)	{/+Already processed +/}
+				else static if(isG!"id")	{/+Already processed by prepareId.srcId+/}
+				else static if(isG!"theme")	theme = a; 
+				else static if(isG!"syntax")	{
+					textStyle.applySyntax(a.to!SyntaxKind); 
+					bkColor = textStyle.bkColor; 
+				}
+				else static if(isG!"fontColor")	style.fontColor = a; 
+				else static if(isG!"bold")	style.bolt = a; 
+				else static if(isG!"italic")	style.italic = a; 
+				else static if(isG!"bkColor")	style.bkColor = bkColor = a; 
+				else static if(isG!"padding")	padding = a; 
+				else static if(isG!"border")	border = a; 
+				else static if(isG!"margin")	margin = a; 
+				else static if(isG!"flex")	flex = a; 
+				else static assert(false, "Unsupported type: "~T.stringof); 
 			}
-			else static if(isT!PanelPosition)	{/+Already processed +/}
-			else static if(isG!"id")	{/+Already processed by prepareId.srcId+/}
-			else static if(isG!"theme")	theme = a; 
-			else static if(isG!"syntax")	{
-				textStyle.applySyntax(a.to!SyntaxKind); 
-				bkColor = textStyle.bkColor; 
-			}
-			else static if(isG!"fontColor")	style.fontColor = a; 
-			else static if(isG!"bold")	style.bolt = a; 
-			else static if(isG!"italic")	style.italic = a; 
-			else static if(isG!"bkColor")	style.bkColor = bkColor = a; 
-			else static if(isG!"padding")	padding = a; 
-			else static if(isG!"border")	border = a; 
-			else static if(isG!"margin")	margin = a; 
-			else static if(isG!"flex")	flex = a; 
-			else static assert(false, "Unsupported type: "~T.stringof); 
+			
+			
+			
+			mixin((
+				(表([
+					[q{isT!PanelPosition},q{/+Already processed +/}],
+					[q{isG!"id"},q{/+Already processed by prepareId.srcId+/}],
+					[],
+					[q{//Properties (set only once)
+					}],
+					[q{isT!YAlign},q{flags.yAlign = a; }],
+					[q{isT!HAlign},q{flags.hAlign = a; }],
+					[q{isT!VAlign},q{flags.vAlign = a; }],
+					[q{isG!"padding" || isT!Padding},q{padding = a; }],
+					[q{isG!"border" || isT!Border},q{border = a; }],
+					[q{isG!"margin" || isT!Margin},q{margin = a; }],
+					[q{isG!"flex"},q{flex = a; }],
+					[],
+					[q{//State updates (can be changed any time)
+					}],
+					[q{isT!TextStyle},q{textStyle = a; }],
+					[q{isG!"style"},q{textStyle.modify(a); }],
+					[q{isG!"syntax" || isT!SyntaxKind},q{
+						textStyle.applySyntax(a.to!SyntaxKind); 
+						bkColor = textStyle.bkColor; 
+					}],
+					[q{isG!"theme"},q{theme = a; }],
+					[q{isG!"fontColor"},q{style.fontColor = a; }],
+					[q{isG!"bold"},q{style.bold = a; }],
+					[q{isG!"italic"},q{style.italic = a; }],
+					[q{isG!"bkColor" || isT!RGB},q{style.bkColor = bkColor = a; }],
+					[],
+					[q{//Emitters
+					}],
+					[q{isFunctionPointer!a || isDelegate!a},q{a(); }],
+					[q{isSomeString!T},q{Text(a); }],
+					[],
+					[q{else},q{
+						static assert(
+							0, "Unsupported type: "
+							~T.stringof
+						); 
+					}],
+				]))
+			).調!(GEN_static_if)); 
 			
 			/+
 				AI: /+
@@ -7498,7 +7519,7 @@ struct im
 							[q{isT!PanelPosition},q{/+Already processed +/}],
 							[q{isG!"id"},q{/+Already processed by prepareId.srcId+/}],
 							[],
-							[q{//container props
+							[q{//Properties (set only once)
 							}],
 							[q{isT!YAlign},q{flags.yAlign = a; }],
 							[q{isT!HAlign},q{flags.hAlign = a; }],
@@ -7508,7 +7529,7 @@ struct im
 							[q{isG!"margin" || isT!Margin},q{margin = a; }],
 							[q{isG!"flex"},q{flex = a; }],
 							[],
-							[q{//inherited state
+							[q{//State updates (can be changed any time)
 							}],
 							[q{isT!TextStyle},q{textStyle = a; }],
 							[q{isG!"style"},q{textStyle.modify(a); }],
@@ -7522,7 +7543,7 @@ struct im
 							[q{isG!"italic"},q{style.italic = a; }],
 							[q{isG!"bkColor" || isT!RGB},q{style.bkColor = bkColor = a; }],
 							[],
-							[q{//emitters
+							[q{//Emitters
 							}],
 							[q{isFunctionPointer!a || isDelegate!a},q{a(); }],
 							[q{isSomeString!T},q{Text(a); }],
@@ -7535,10 +7556,20 @@ struct im
 			+/
 		} 
 		
+		void createContainer(CType = .Container, Args...)(in Args args)
+		{} 
+		
 		void Container(CType = .Container, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
 		{
 			mixin(prepareId, enable.M); 
 			
+			/+prepareId: /+Structured: auto id_ = combine(actId, srcId!(srcModule, srcLine)(args)); +/+/
+			/+
+				enable.M: /+
+					Code: auto oldEnabled = enabled; scope(exit) enabled = oldEnabled; 
+					static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled = enabled && a.val; 
+				+/
+			+/
 			version(/+$DIDE_REGION+/none) {
 				//260809: Not used in DIDE, Karc -> removed.
 				static if(__traits(compiles, new CType))
