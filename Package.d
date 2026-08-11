@@ -2186,6 +2186,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	{
 		//generates a static foreach. "code" is a static if chain evaluating N (name) and T (type). Inputs: args:
 		return "static foreach(a; args){{ static if(isGenericArg!(typeof(a))){ enum N = a.name; alias T = a.type; }else{ enum N = ``; alias T = typeof(a); } "~code~" }}"; 
+		
+		/+Structured: static foreach(a; args) { { static if(isGenericArg!(typeof(a))) { enum N = a.name; alias T = a.type; }else { enum N = ``; alias T = typeof(a); }$(code)}}+/
 	} 
 	
 	string appendGenericIds(string idVariable)
@@ -2203,6 +2205,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	//SrcId ////////////////////////////////////////////////////////////
 	
 	enum srcLocationStr(string srcModule, size_t srcLine) = srcModule ~ `.d(` ~ srcLine.text ~ ')'; 
+	string srcLocationStr2(string srcModule, size_t srcLine) => srcModule ~ `.d(` ~ srcLine.text ~ ')'; 
 	
 	struct SrcId
 	{
@@ -2234,6 +2237,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		auto combine(T)(in SrcId i1, in T i2) { return SrcId(cast(SrcId.T)hashOf(i2, i1.value)); } 
 		void appendIdx(T)(ref SrcId id, in T idx) { id = combine(id, idx); } 
 		
+		SrcId srcId2(string srcModule, size_t srcLine)
+		=> SrcId(cast(SrcId.T)hashOf(srcLine, hashOf(srcModule))); 
+		
 		//Note: string hash is 32 bit only, so the proper way to combine line and module is hash(line, hash(module))
 		auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args)
 		{
@@ -2250,6 +2256,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		auto combine(T)(in SrcId i1, in T i2) { return SrcId(i1.value ~ '.' ~ i2.text); } 
 		void appendIdx(T)(ref SrcId id, in T idx) { id ~= '[' ~ idx.text ~ ']'; } 
 		//for clarity string uses the [idx] form, instead of a.b;
+		
+		SrcId srcId2(string srcModule, size_t srcLine)
+		=> SrcId(srcLocationStr2(srcModule, srcLine)); 
 		
 		auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args)
 		{
@@ -3322,15 +3331,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A1B559F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A3AB59F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A27D59F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A47359F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1A32759F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1A39C59F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1A51D59F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1A59259F156A1})); 
 						+/
 					+/
 				+/

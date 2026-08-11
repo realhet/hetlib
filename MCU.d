@@ -393,15 +393,18 @@ struct ConnectorInfo
 //A clickable button with the connector type. Clicking shows a ConnectorPanel.
 
 //ConnectorBtn //////////////////////////////////////////////////
-void ConnectorBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isWhite=false, T...)(string conn, T args)
+void ConnectorBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isWhite=false, T...)(string conn, string[string] pinColorMap, T args)
 {
 	with(im)
 	{
 		
-		//optional parameter
-		string[string] pinColorMap; 
-		static if(args.length && is(T[0] == string[string]))
-		pinColorMap = args[0]; 
+		/+
+			//260811 -> become non optional
+			//optional parameter
+			string[string] pinColorMap; 
+			static if(args.length && is(T[0] == string[string]))
+			pinColorMap = args[0]; 
+		+/
 		
 		auto	ci = connectorInfo(conn); 
 		const	hasDetail = ci.valid && ci.type!=ConnectorInfo.Type.Wire,
@@ -416,7 +419,7 @@ void ConnectorBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isW
 		IMData* imData; 
 		
 		if(
-			Btn!(srcModule, srcLine)(
+			Btn!(srcModule, srcLine, isWhite)(
 				{
 					
 					if(!ci.valid)

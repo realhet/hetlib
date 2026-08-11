@@ -979,7 +979,7 @@ version(/+$DIDE_REGION+/all)
 	
 	struct Padding
 	{
-		  //Padding, Margin ///////////////////////////////////////////////////
+		//This is the same as Margin
 		//alias all this; not working that way
 		
 		//float top=0, right=0, bottom=0, left=0; 
@@ -3450,8 +3450,7 @@ version(/+$DIDE_REGION+/all)
 					//2: Console - no syntax, \33 coloring
 					//3: Arduino 
 				+/}],
-				[],
-				[],
+				[q{bool},q{1},q{"enabled"},q{1},q{/++/}],
 			]))
 		) .GEN!q{GEN_bitfields}); 
 	} 
@@ -5724,8 +5723,8 @@ version(/+$DIDE_REGION+/all)
 					{
 						Text(thisFieldProps.getCaption, "\t"); 
 						if(thisFieldProps.choices.length)
-						{ ComboBox(data, thisFieldProps.choices, genericId(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*10; }); }else
-						{ Edit(data, genericId(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*10; }); }
+						{ ComboBox(data, thisFieldProps.choices, genericId(thisFieldProps.hash), hint(thisFieldProps.hint), ((!thisFieldProps.isReadOnly).名!q{enabled}), { width = fh*10; }); }else
+						{ Edit(data, genericId(thisFieldProps.hash), hint(thisFieldProps.hint), ((!thisFieldProps.isReadOnly).名!q{enabled}), { width = fh*10; }); }
 					}
 				); 
 			}else static if(isFloatingPoint!T)
@@ -5734,7 +5733,7 @@ version(/+$DIDE_REGION+/all)
 					{
 						Text(thisFieldProps.getCaption, "\t"); 
 						auto s = format("%g", data); 
-						Edit(s, genericId(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*4.5; }); 
+						Edit(s, genericId(thisFieldProps.hash), hint(thisFieldProps.hint), ((!thisFieldProps.isReadOnly).名!q{enabled}), { width = fh*4.5; }); 
 						try
 						{ data = s.to!T; }catch(Throwable)
 						{}
@@ -5742,7 +5741,7 @@ version(/+$DIDE_REGION+/all)
 						if(
 							thisFieldProps.range.valid//Todo: im.range() conflict
 						)
-						Slider(data, hint(thisFieldProps.hint), range(thisFieldProps.range.low, thisFieldProps.range.high), genericId(thisFieldProps.hash+1), { width = 180; }); //Todo: rightclick
+						Slider(data, hint(thisFieldProps.hint), range(thisFieldProps.range.low, thisFieldProps.range.high), genericId(thisFieldProps.hash+1), ((!thisFieldProps.isReadOnly).名!q{enabled}), { width = 180; }); //Todo: rightclick
 						//Todo: Bigger slider height when (theme!="tool")
 					}
 				); 
@@ -5752,7 +5751,7 @@ version(/+$DIDE_REGION+/all)
 					{
 						Text(thisFieldProps.getCaption, "\t"); 
 						auto s = data.text; 
-						Edit(s, genericId(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = fh*4.5; }); 
+						Edit(s, genericId(thisFieldProps.hash), hint(thisFieldProps.hint), ((!thisFieldProps.isReadOnly).名!q{enabled}), { width = fh*4.5; }); 
 						try
 						{ data = s.to!T; }catch(Throwable)
 						{}
@@ -5760,7 +5759,7 @@ version(/+$DIDE_REGION+/all)
 						if(
 							thisFieldProps.range.valid//Todo: im.range() conflict
 						)
-						Slider(data, range(thisFieldProps.range.low, thisFieldProps.range.high), genericId(thisFieldProps.hash+1), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly), { width = 180; }); //Todo: rightclick
+						Slider(data, range(thisFieldProps.range.low, thisFieldProps.range.high), genericId(thisFieldProps.hash+1), hint(thisFieldProps.hint), ((!thisFieldProps.isReadOnly).名!q{enabled}), { width = 180; }); //Todo: rightclick
 					}
 				); 
 			}else static if(is(T == bool))
@@ -5768,7 +5767,7 @@ version(/+$DIDE_REGION+/all)
 				Row(
 					{
 						Text(thisFieldProps.getCaption, "\t"); 
-						ChkBox(data, "", genericId(thisFieldProps.hash), hint(thisFieldProps.hint), enable(!thisFieldProps.isReadOnly)); 
+						ChkBox(data, "", genericId(thisFieldProps.hash), hint(thisFieldProps.hint), ((!thisFieldProps.isReadOnly).名!q{enabled})); 
 						Text("\t"); 
 					}
 				); 
@@ -6688,7 +6687,7 @@ struct im
 				{
 					if(!canFocus || exitFocusNow)
 					{
-						 //not enabled anymore: exit focus
+						//not enabled anymore: exit focus
 						if(onExit)
 						onExit(); 
 						focusedState.reset; 
@@ -6909,13 +6908,20 @@ struct im
 		
 		//Todo: ezt egy alias this-el egyszerusiteni. Jelenleg az im-ben is meg az im.StackEntry-ben is ugyanaz van redundansan deklaralva
 		.Container actContainer, lastContainer; //top of the containerStack for faster access
-		bool enabled;  //Todo: bad naming.  It should be in flags, in cascaded style.
 		TextStyle textStyle;   alias style = textStyle; //Todo: style.opDispatch("fontHeight=0.5x")
 		string theme; //for now it's a str, later it will be much more complex
 		//valid values: "", "tool"
 		
-		Id actId()
-		=> ((actContainer)?(actContainer.id):(Id.init)); 
+		@property
+		{
+			Id actId()
+			=> ((actContainer)?(actContainer.id):(Id.init)); 
+			
+			bool enabled()
+			=> ((actContainer)?(actContainer.flags.enabled):(true/+empty root is always enabled+/)); 
+			bool enabled(bool e)
+			{ if(actContainer) actContainer.flags.enabled = e; return e; } 
+		} 
 		
 		auto lastCell(T:Cell=Cell)()
 		{
@@ -6926,7 +6932,7 @@ struct im
 		} 
 		
 		private struct StackEntry
-		{ .Container container; bool enabled; TextStyle textStyle; string theme; } 
+		{ .Container container; TextStyle textStyle; string theme; } 
 		private StackEntry[] stack; 
 		
 		//Note: build* functions are only callable from update()
@@ -6952,15 +6958,14 @@ struct im
 		void reset()
 		{
 			//statck reset
-			enabled = true; 
 			textStyle = tsNormal; 
 			theme = ""; 
 			
 			rootCells = []; 
-			stack = [StackEntry(null, enabled, textStyle, theme)]; 
+			stack = [StackEntry(null, textStyle, theme)]; 
 			actContainer = null; 
+			_incomingId = Id.init; 
 			
-			version(/+$DIDE_REGION+/none) { overlayDrawings.clear; }
 			drawCallbacks.clear; 
 		} 
 		
@@ -6968,7 +6973,7 @@ struct im
 		{
 			//Todo: ezt a newId-t ki kell valahogy valtani. im.id-t kell inkabb modositani.
 			c.id = newId; 
-			stack ~= StackEntry(c, enabled, textStyle, theme); 
+			stack ~= StackEntry(c, textStyle, theme); 
 			
 			//actContainer is the top of the stack or null
 			actContainer = c; 
@@ -6981,9 +6986,8 @@ struct im
 			enforce(stack.length>1); //stack[0] is always null and it is never popped.
 			
 			//restore	the last textStyle & theme. Changes inside a subHierarchy doesn't count.
-			enabled	= stack.back.enabled; 
-			textStyle	= stack.back.textStyle; 
-			theme	= stack.back.theme; 
+			textStyle = stack.back.textStyle; 
+			theme = stack.back.theme; 
 			
 			stack.popBack; 
 			
@@ -7102,8 +7106,10 @@ struct im
 		//deprecated struct id      { uint val;  /*private*/ enum M = q{ auto id_ = file.xxh(line)^baseId;                          static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
 		immutable prepareId = q{auto id_ = combine(actId, srcId!(srcModule, srcLine)(args)); }; 
 		
-		struct enable 
-		{ bool val; 	 enum M = q{auto oldEnabled = enabled; scope(exit) enabled = oldEnabled; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled = enabled && a.val; 	}; } 
+		/*
+			struct enable 
+				{ bool val; 	 enum M = q{auto oldEnabled = enabled; scope(exit) enabled = oldEnabled; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled = enabled && a.val; 	}; } 
+		*/
 		struct selected
 		{ bool val; 	 enum M = q{auto _selected = false; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == selected)) _selected	= a.val; 	}; } 
 		
@@ -7381,234 +7387,89 @@ struct im
 		auto hScrollInfo = ScrollInfo('H'); 
 		auto vScrollInfo = ScrollInfo('V'); 
 		
-		private void processContainerArg(T)(in T a)
+		/+
+			Todo: Play with disabled inlining of Composable functions: /+Code: pragma(inline, false)+/
+			It requires an ASM inspector first.
+			Also I can try put _incomingId on the `im` scope too, so the parameters can remain the same.
+		+/
+		
+		private
 		{
-			enum isT(Type) 	= is(T == Type),
-			isG(string Name) 	= isGenericArg!(T, Name); 
+			Id _incomingId; //This must be loaded from __MODULE__ and __LINE__ before Container creation.
 			
-			static GEN_static_if(T)(T table)
-			=> table.rows.map!((r)=>(((r[0]==q{else})?(r[1]):(iq{static if($(r[0])) {$(r[1])}}.text)))).join(q{ else }); 
+			enum Debug_incomingId 	= (常!(bool)(0)),
+			Log_incomingId 	= (常!(bool)(0)); 
 			
-			version(/+$DIDE_REGION+/none) {
-				static if(isFunctionPointer!a)	a(); 
-				else static if(isDelegate!a)	a(); 
-				else static if(isSomeString!T)	Text(a); 
-				else static if(isT! YAlign)	flags.yAlign = a; 
-				else static if(isT! HAlign)	flags.hAlign = a; 
-				else static if(isT! VAlign)	flags.vAlign = a; 
-				else static if(isT! TextStyle)	textStyle = a; 
-				else static if(isT! RGB)	style.bkColor = bkColor = a; 
-				else static if(isT! Padding)	padding = a; 
-				else static if(isT! Border)	border = a; 
-				else static if(isT! Margin)	margin = a; 
-				else static if(isT! SyntaxKind)	{
-					textStyle.applySyntax(a); 
-					bkColor = textStyle.bkColor; 
-				}
-				else static if(isT!PanelPosition)	{/+Already processed +/}
-				else static if(isG!"id")	{/+Already processed by prepareId.srcId+/}
-				else static if(isG!"theme")	theme = a; 
-				else static if(isG!"syntax")	{
-					textStyle.applySyntax(a.to!SyntaxKind); 
-					bkColor = textStyle.bkColor; 
-				}
-				else static if(isG!"fontColor")	style.fontColor = a; 
-				else static if(isG!"bold")	style.bolt = a; 
-				else static if(isG!"italic")	style.italic = a; 
-				else static if(isG!"bkColor")	style.bkColor = bkColor = a; 
-				else static if(isG!"padding")	padding = a; 
-				else static if(isG!"border")	border = a; 
-				else static if(isG!"margin")	margin = a; 
-				else static if(isG!"flex")	flex = a; 
-				else static assert(false, "Unsupported type: "~T.stringof); 
-			}
+			void setIncomingId(string srcModule, size_t srcLine)()
+			{
+				static if(Debug_incomingId) enforce(!_incomingId, "_incomingId already set."); 
+				_incomingId = srcId2(srcModule, srcLine); 
+			} 
 			
-			
-			
-			mixin((
-				(表([
-					[q{isT!PanelPosition},q{/+Already processed +/}],
-					[q{isG!"id"},q{/+Already processed by prepareId.srcId+/}],
-					[],
-					[q{//Properties (set only once)
-					}],
-					[q{isT!YAlign},q{flags.yAlign = a; }],
-					[q{isT!HAlign},q{flags.hAlign = a; }],
-					[q{isT!VAlign},q{flags.vAlign = a; }],
-					[q{isG!"padding" || isT!Padding},q{padding = a; }],
-					[q{isG!"border" || isT!Border},q{border = a; }],
-					[q{isG!"margin" || isT!Margin},q{margin = a; }],
-					[q{isG!"flex"},q{flex = a; }],
-					[],
-					[q{//State updates (can be changed any time)
-					}],
-					[q{isT!TextStyle},q{textStyle = a; }],
-					[q{isG!"style"},q{textStyle.modify(a); }],
-					[q{isG!"syntax" || isT!SyntaxKind},q{
-						textStyle.applySyntax(a.to!SyntaxKind); 
-						bkColor = textStyle.bkColor; 
-					}],
-					[q{isG!"theme"},q{theme = a; }],
-					[q{isG!"fontColor"},q{style.fontColor = a; }],
-					[q{isG!"bold"},q{style.bold = a; }],
-					[q{isG!"italic"},q{style.italic = a; }],
-					[q{isG!"bkColor" || isT!RGB},q{style.bkColor = bkColor = a; }],
-					[],
-					[q{//Emitters
-					}],
-					[q{isFunctionPointer!a || isDelegate!a},q{a(); }],
-					[q{isSomeString!T},q{Text(a); }],
-					[],
-					[q{else},q{
-						static assert(
-							0, "Unsupported type: "
-							~T.stringof
-						); 
-					}],
-				]))
-			).調!(GEN_static_if)); 
-			
-			/+
-				AI: /+
-					User: /+
-						Code: static if(isFunctionPointer!a)	a(); 
-						else static if(isDelegate!a)	a(); 
-						else static if(isSomeString!T)	Text(a); 
-						else static if(isT! YAlign)	flags.yAlign = a; 
-						else static if(isT! HAlign)	flags.hAlign = a; 
-						else static if(isT! VAlign)	flags.vAlign = a; 
-						else static if(isT! TextStyle)	textStyle = a; 
-						else static if(isT! RGB)	style.bkColor = bkColor = a; 
-						else static if(isT! Padding)	padding = a; 
-						else static if(isT! Border)	border = a; 
-						else static if(isT! Margin)	margin = a; 
-						else static if(isT! SyntaxKind)	{
-							textStyle.applySyntax(a); 
-							bkColor = textStyle.bkColor; 
-						}
-						else static if(isT!PanelPosition)	{/+Already processed +/}
-						else static if(isG!"id")	{/+Already processed by prepareId.srcId+/}
-						else static if(isG!"theme")	theme = a; 
-						else static if(isG!"syntax")	{
-							textStyle.applySyntax(a.to!SyntaxKind); 
-							bkColor = textStyle.bkColor; 
-						}
-						else static if(isG!"fontColor")	style.fontColor = a; 
-						else static if(isG!"bold")	style.bolt = a; 
-						else static if(isG!"italic")	style.italic = a; 
-						else static if(isG!"bkColor")	style.bkColor = bkColor = a; 
-						else static if(isG!"padding")	padding = a; 
-						else static if(isG!"border")	border = a; 
-						else static if(isG!"margin")	margin = a; 
-						else static if(isG!"flex")	flex = a; 
-						else static assert(false, "Unsupported type: "~T.stringof); 
-					+/
-					
-					Please transform it to a table of 2 columns!
-					Example:
-					/+
-						Code: (表([
-							[q{isFunctionPointer!a},q{a(); }],
-							[q{isDelegate!a},q{a(); }],
-						]))
-					+/
-				+/
-				/+
-					Assistant: /+
-						Code: (表([
-							[q{isT!PanelPosition},q{/+Already processed +/}],
-							[q{isG!"id"},q{/+Already processed by prepareId.srcId+/}],
-							[],
-							[q{//Properties (set only once)
-							}],
-							[q{isT!YAlign},q{flags.yAlign = a; }],
-							[q{isT!HAlign},q{flags.hAlign = a; }],
-							[q{isT!VAlign},q{flags.vAlign = a; }],
-							[q{isG!"padding" || isT!Padding},q{padding = a; }],
-							[q{isG!"border" || isT!Border},q{border = a; }],
-							[q{isG!"margin" || isT!Margin},q{margin = a; }],
-							[q{isG!"flex"},q{flex = a; }],
-							[],
-							[q{//State updates (can be changed any time)
-							}],
-							[q{isT!TextStyle},q{textStyle = a; }],
-							[q{isG!"style"},q{textStyle.modify(a); }],
-							[q{isG!"syntax" || isT!SyntaxKind},q{
-								textStyle.applySyntax(a.to!SyntaxKind); 
-								bkColor = textStyle.bkColor; 
-							}],
-							[q{isG!"theme"},q{theme = a; }],
-							[q{isG!"fontColor"},q{style.fontColor = a; }],
-							[q{isG!"bold"},q{style.bold = a; }],
-							[q{isG!"italic"},q{style.italic = a; }],
-							[q{isG!"bkColor" || isT!RGB},q{style.bkColor = bkColor = a; }],
-							[],
-							[q{//Emitters
-							}],
-							[q{isFunctionPointer!a || isDelegate!a},q{a(); }],
-							[q{isSomeString!T},q{Text(a); }],
-							[],
-							[q{else},q{static assert(false, "Unsupported type: "~T.stringof); }],
-						]))
-					+/
-					/+Note: Usage(prompt_hit: 0, prompt_miss: 800, completion: 6010, HUF: 0.57, price: 100%)+/
-				+/
-			+/
+			auto fetchIncomingId()
+			{
+				static if(Debug_incomingId) enforce(_incomingId, "_incomingId not set."); 
+				auto res = _incomingId; 
+				static if(Debug_incomingId) _incomingId = Id.init; 
+				static if(Log_incomingId) LOG(res); 
+				return res; 
+			} 
 		} 
 		
-		void createContainer(CType = .Container, Args...)(in Args args)
-		{} 
 		
-		void Container(CType = .Container, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
+		private void _Container(CType, Args...)(in Args args)
 		{
-			mixin(prepareId, enable.M); 
-			
-			/+prepareId: /+Structured: auto id_ = combine(actId, srcId!(srcModule, srcLine)(args)); +/+/
-			/+
-				enable.M: /+
-					Code: auto oldEnabled = enabled; scope(exit) enabled = oldEnabled; 
-					static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled = enabled && a.val; 
-				+/
-			+/
-			version(/+$DIDE_REGION+/none) {
-				//260809: Not used in DIDE, Karc -> removed.
-				static if(__traits(compiles, new CType))
-				{ auto cntr = new CType; }else
-				{
-					alias FirstCtorParam = ParameterTypeTuple!(__traits(getOverloads, CType, "__ctor")[0])[0]; 
-					static assert(
-						is(FirstCtorParam : .Container), 
-						"If there is no () constructor, the first parameter must be a Container."
-						~"actContainer will be sent to it as the parent."
-					); 
-					
-					pragma(msg,i"$(srcModule):$(srcLine) this:$(CType) parent:$(FirstCtorParam)".text.注); 
-					auto cntr = new CType((cast(FirstCtorParam)(actContainer))); //try to give parent for the new control
-				}
+			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
+			{
+				mixin(Scripting.CreateCustomContainer); //it leaves the `_container`, `_id` variables on this scope
 			}
 			
+			version(/+$DIDE_REGION Local variable declarations+/all)
+			{}
 			
+			version(/+$DIDE_REGION Load all properties+/all)
+			{
+				enum CustomPropertyDefs = (表([[],])); 
+				mixin(Scripting.CustomComponent_processProperties); 
+			}
 			
-			auto cntr = new CType; append(cntr); push(cntr, id_); scope(exit) pop; 
+			version(/+$DIDE_REGION Do custom behavior+/all)
+			{}
 			
-			cntr.bkColor = style.bkColor; //Inherit bkcolor from the current fontStyle.
+			version(/+$DIDE_REGION Handle the recursive composition+/all)
+			{
+				enum CustomCompositionDefs = (表([[],])); 
+				mixin(Scripting.CustomComponent_processComposition); 
+			}
 			
-			const panelPosition = ARG(PanelPosition.init, args); 
-			if(panelPosition) initializePanelPosition(cntr, panelPosition, clientArea); 
-			scope(exit) if(panelPosition) finalizePanelPosition(cntr, panelPosition, clientArea); 
-			
-			static foreach(a; args) processContainerArg(a); 
+			version(/+$DIDE_REGION Return custom results+/all)
+			{ return; }
 		} 
 		
-		void Row   (string	srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
-		{ Container!(.Row	, srcModule, srcLine)(args); } 
-		void Column(string	srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
-		{ Container!(.Column, srcModule, srcLine)(args); } 
+		void Container(CType=.Container, string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args)
+		{
+			setIncomingId!(srcModule, srcLine)(); 
+			return _Container!(CType)(args); 
+		} 
+		
+		
+		
+		void Row(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args)
+		{
+			setIncomingId!(srcModule, srcLine)(); 
+			return _Container!(.Row)(args); 
+		} 
+		void Column(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args)
+		{
+			setIncomingId!(srcModule, srcLine)(); 
+			return _Container!(.Column)(args); 
+		} 
 		
 		void Panel(CType = .Column, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
 		{
 			enforce(actContainer is null, "Panel() must be on root level"); 
-			Container!(CType, srcModule, srcLine)
+			setIncomingId!(srcModule, srcLine)(); 
+			_Container!(CType)
 			(
 				{
 					padding = "3"; border = "6 normal silver"; 
@@ -7908,7 +7769,7 @@ struct im
 		{ Row({ innerHeight = 1; bkColor = mix(clWinBackground, clWinText, .25f); }); } 
 		
 		void Grp(alias Cntr=Column, string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)
-			(void delegate() fun, A args)
+			(void delegate() fun, in A args)
 		{
 			Cntr(
 				{
@@ -7919,7 +7780,7 @@ struct im
 		} 
 		
 		void Grp(alias Cntr=Column, string srcModule=__MODULE__, size_t srcLine=__LINE__, T, A...)
-			(T title, void delegate() fun, A args)
+			(T title, void delegate() fun, in A args)
 		{
 			Container!GrpContainer
 			(
@@ -8074,7 +7935,7 @@ struct im
 			
 			enum IsNum = std.traits.isNumeric!T0; 
 			
-			mixin(prepareId, enable.M); 
+			mixin(prepareId); 
 			static if(IsNum)
 			mixin(range.M); 
 			
@@ -8327,7 +8188,7 @@ struct im
 						if(res.changed)
 						{
 							//Todo: These buttons ain't work with mouse. Only Enter/Esc works.
-							if(Btn(symbol("Accept"), enable(res.valid)))
+							if(Btn(symbol("Accept"), ((res.valid).名!q{enabled})))
 							{
 								act = *edited; 
 								res.editing = false; 
@@ -8404,7 +8265,7 @@ struct im
 			(ref T0 value, T args)
 			if(sign!=0 && isNumeric!T0)
 		{
-			mixin(enable.M, range.M); 
+			mixin(range.M); 
 			
 			auto capt = symbol(`Calculator` ~ ((sign>0)?(`Addition`):(`Subtract`))); 
 			enum isInt = isIntegral!T0; 
@@ -8462,27 +8323,163 @@ struct im
 		auto WhiteBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(T0 text, T args)
 		{ return Btn!(srcModule, srcLine, true, T0, T)(text, args); } 
 		
-		auto Btn(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)
-			if(isSomeString!T0 || __traits(compiles, text()) )
-		{
-			mixin(prepareId, enable.M, selected.M); 
+		version(/+$DIDE_REGION+/all) {
+			auto Btn0(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)
+				if(isSomeString!T0 || __traits(compiles, text()) )
+			{
+				mixin(prepareId, selected.M); 
+				
+				bool focusOnPress = false; 
+				mixin(processGenericArgs(q{static if(N=="focusOnPress")	focusOnPress = a; })); 
+				
+				const isToolBtn = theme=="tool"; 
+				
+				HitInfo hit; 
+				
+				Row(
+					{
+						actContainer.id = id_; 
+						hit = hitTest(enabled); 
+						mixin(hintHandler); 
+						
+						bool focused = focusUpdate
+						(
+							actContainer, id_,
+							enabled, ((focusOnPress)?(hit.pressed) :(hit.clicked)), inputs.Esc.pressed,  //enabled, enter, exit
+							/*onEnter	*/ {},
+							/*onFocus	*/ {},
+							/*onExit	*/ {}
+						); 
+						
+						//flags.wordWrap = false;
+						flags.hAlign = HAlign.center; 
+						
+						applyBtnStyle(isWhite, enabled, focused, _selected, hit.captured, hit.hover_smooth); 
+						
+						static if(isSomeString!T0)
+						Text(text); 
+						else text();  static foreach(a; args)
+						static if(__traits(compiles, a()))
+						a(); 
+					}
+				); 
+				
+				//KeyCombo in click mode.
+				static foreach(a; args)
+				static if(is(typeof(a) == KeyCombo))
+				if(mainWindow.canProcessUserInput && a.pressed)
+				hit.clicked = true; 
+				
+				return hit; 
+			} 
+			auto Btn1(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isWhite=false, Args...)(in Args args)
+			{
+				
+				CustomContainer!
+				(
+					.Row, 
+					
+					/+Local variable declarations+/
+					q{
+						bool focusOnPress, _selected; 
+						const isToolBtn = theme=="tool"; 
+						HitInfo hit; 
+					},
+					
+					//Property declarations
+					(表([
+						[q{isG!"focusOnPress"},q{focusOnPress = a; }],
+						[q{isG!"selected"},q{_selected = a; }],
+						[q{isT!selected},q{_selected = a.val; }],
+						[q{isT!HintRec},q{/+Todo: hintHandler+/}],
+						[q{isT!range},q{/+Todo: IncBtn!!!+/}],
+					])),
+					
+					//After properties, before composition
+					q{
+						hit = hitTest(enabled); 
+						//Todo: mixin(hintHandler); 
+						
+						bool focused = focusUpdate
+						(
+							actContainer, id_,
+							enabled, ((focusOnPress)?(hit.pressed) :(hit.clicked)), inputs.Esc.pressed,  //enabled, enter, exit
+							/*onEnter	*/ {},
+							/*onFocus	*/ {},
+							/*onExit	*/ {}
+						); 
+						
+						//flags.wordWrap = false;
+						flags.hAlign = HAlign.center; 
+						
+						applyBtnStyle(
+							false/+Todo: isWhite+/, enabled, focused, 
+							_selected, hit.captured, hit.hover_smooth
+						); 
+					}, 
+					
+					//Composition
+					(表([[],])), 
+					
+					//After composition, finalization
+					q{}
+				)
+				(srcId2(srcModule, srcLine), args); 
+				
+				HitInfo hit;  //Todo: hit
+				//Todo: keycombo
+				
+				return hit; 
+			} 
+			HitInfo Btn(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isWhite=false, Args...)(in Args args)
+			{
+				setIncomingId!(srcModule, srcLine)(); 
+				return _Btn!(isWhite)(args); 
+			} 
 			
-			bool focusOnPress = false; 
-			mixin(processGenericArgs(q{static if(N=="focusOnPress")	focusOnPress = a; })); 
-			
-			const isToolBtn = theme=="tool"; 
-			
-			HitInfo hit; 
-			
-			Row(
+			private HitInfo _Btn(bool isWhite=false, Args...)(in Args args)
+			{
+				version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
 				{
-					actContainer.id = id_; 
+					alias CType = .Row; 
+					mixin(Scripting.CreateCustomContainer); //it leaves the `_container`, `_id` variables on this scope
+				}
+				
+				version(/+$DIDE_REGION Local variable declarations+/all)
+				{
+					bool focusOnPress, _selected; 
+					const isToolBtn = theme=="tool"; 
+					HitInfo hit; 
+					HintRec hintRec; 
+				}
+				
+				version(/+$DIDE_REGION Load all properties+/all)
+				{
+					enum CustomPropertyDefs = 
+					(表([
+						[q{isG!"focusOnPress"},q{focusOnPress = a; }],
+						[q{isG!"selected"},q{_selected = a; }],
+						[q{isT!selected},q{_selected = a.val; }],
+						[q{isT!HintRec},q{hintRec = cast()a; }],
+						[q{isT!range},q{/+Todo: IncBtn!!!+/}],
+					])); 
+					mixin(Scripting.CustomComponent_processProperties); 
+				}
+				
+				version(/+$DIDE_REGION Do custom behavior+/all)
+				{
 					hit = hitTest(enabled); 
-					mixin(hintHandler); 
+					
+					if(hintRec.markup.length && hit.hover)
+					{
+						hintRec.owner = _container; 
+						hintRec.bounds = hit.hitBounds; 
+						addHint(hintRec); 
+					}
 					
 					bool focused = focusUpdate
 					(
-						actContainer, id_,
+						_container, _id,
 						enabled, ((focusOnPress)?(hit.pressed) :(hit.clicked)), inputs.Esc.pressed,  //enabled, enter, exit
 						/*onEnter	*/ {},
 						/*onFocus	*/ {},
@@ -8493,24 +8490,125 @@ struct im
 					flags.hAlign = HAlign.center; 
 					
 					applyBtnStyle(isWhite, enabled, focused, _selected, hit.captured, hit.hover_smooth); 
-					
-					static if(isSomeString!T0)
-					Text(text); 
-					else text();  static foreach(a; args)
-					static if(__traits(compiles, a()))
-					a(); 
 				}
-			); 
+				
+				version(/+$DIDE_REGION Handle the recursive composition+/all)
+				{
+					enum CustomCompositionDefs = 
+					(表([[q{/+
+						nothing to do here for Btn, 
+						it is mixed in with an empty table to handle standart composition state updates.
+					+/}],])); 
+					mixin(Scripting.CustomComponent_processComposition); 
+				}
+				
+				version(/+$DIDE_REGION Return custom results+/all)
+				{
+					//Todo: keycombo
+					
+					return hit; 
+				}
+			} 
 			
-			//KeyCombo in click mode.
-			static foreach(a; args)
-			static if(is(typeof(a) == KeyCombo))
-			if(mainWindow.canProcessUserInput && a.pressed)
-			hit.clicked = true; 
-			
-			return hit; 
-		} 
-		
+			version(/+$DIDE_REGION+/all) {
+				struct Scripting
+				{
+					static: 
+					enum StdPropertyDefs = 
+					(表([
+						[q{isG!"id"},q{/+already handled+/}],
+						[q{isT!PanelPosition},q{panelPosition = a; }],
+						[],
+						[q{//Properties (set only once at creation)
+						}],
+						[q{isT!YAlign},q{flags.yAlign = a; }],
+						[q{isT!HAlign},q{flags.hAlign = a; }],
+						[q{isT!VAlign},q{flags.vAlign = a; }],
+						[q{isG!"padding" || isT!Padding},q{padding = a; }],
+						[q{isG!"border" || isT!Border},q{border = a; }],
+						[q{isG!"margin" || isT!Margin},q{margin = a; }],
+						[q{isG!"flex"},q{flex = a; }],
+						[q{isG!"enabled"},q{enabled = a; }],
+					])),
+					
+					StdCompositionDefs = 
+					(表([
+						[q{//Composition updates (can be changed any time)
+						}],
+						[q{isT!TextStyle},q{textStyle = a; }],
+						[q{isG!"style"},q{textStyle.modify(a); }],
+						[q{isG!"syntax" || isT!SyntaxKind},q{
+							textStyle.applySyntax(a.to!SyntaxKind); 
+							bkColor = textStyle.bkColor; 
+						}],
+						[q{isG!"theme"},q{theme = a; }],
+						[q{isG!"fontColor"},q{style.fontColor = a; }],
+						[q{isG!"bold"},q{style.bold = a; }],
+						[q{isG!"italic"},q{style.italic = a; }],
+						[q{isG!"bkColor" || isT!RGB},q{style.bkColor = bkColor = a; }],
+						[],
+						[q{//Emitters
+						}],
+						[q{isFunctionPointer!a || isDelegate!a},q{a(); }],
+						[q{isSomeString!T},q{Text(a); }],
+					])); 
+					string CreateCustomContainer()
+					=> iq{
+						auto _id = combine(actId, fetchIncomingId); 
+						static foreach(a; args) static if(isGenericArg!(typeof(cast()a), "id")) _id.appendIdx(a.value); 
+						
+						const parentEnabled = enabled; 
+						
+						auto _container = new CType; 
+						append(_container); push(_container, _id); scope(exit) pop; 
+						enabled = parentEnabled; //Inherit from parent
+						_container.bkColor = style.bkColor; //Inherit bkcolor from the current fontStyle.
+						
+						PanelPosition panelPosition; 
+					}.text; 
+					
+					string CustomComponent_processProperties()
+					=> iq{
+						enum AllPropertyDefRows = CustomPropertyDefs.rows.array ~ Scripting.StdPropertyDefs.rows.array; 
+						static foreach(a; args)
+						{
+							{
+								alias T = typeof(cast()a); enum isT(Type) 	= is(T == Type),
+								isG(string Name) 	= isGenericArg!(T, Name); 
+								mixin(
+									AllPropertyDefRows.map!((r)=>(iq{static if($(r[0])) {$(r[1])}}.text))
+									.join(q{ else })
+								); 
+							}
+						}
+						
+						if(panelPosition) initializePanelPosition(_container, panelPosition, clientArea); 
+						scope(exit) if(panelPosition) finalizePanelPosition(_container, panelPosition, clientArea); 
+					}.text; 
+					
+					string CustomComponent_processComposition()
+					=> iq{
+						enum AllCompositionDefRows = CustomCompositionDefs.rows.array ~ Scripting.StdCompositionDefs.rows.array; 
+						static foreach(a; args)
+						{
+							{
+								alias T = typeof(cast()a); enum isT(Type) 	= is(T == Type),
+								isG(string Name) 	= isGenericArg!(T, Name); 
+								mixin(
+									chain(
+										AllPropertyDefRows.map!((r)=>(iq{static if($(r[0])) {}}.text)),
+										AllCompositionDefRows.map!((r)=>(iq{static if($(r[0])) {$(r[1])}}.text))
+									)
+									.join(q{ else })
+									~q{else static assert(0, "Unsupported type: "~T.stringof); }
+								); 
+							}
+						}
+					}.text; 
+				} 
+				
+			}
+		}
 		//BtnRow //////////////////////////////////
 		
 		auto BtnRow(Cntr = .Row, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(void delegate() fun, in T args)
@@ -8546,8 +8644,6 @@ struct im
 		
 		auto BtnRow(Cntr = .Row, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(ref int idx, in string[] captions, in T args)
 		{
-			mixin(enable.M); 
-			
 			auto last = idx; 
 			
 			BtnRow!(Cntr, srcModule, srcLine)(
@@ -8741,7 +8837,7 @@ struct im
 		auto Link(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(T0 text, T args)
 			if(isSomeString!T0 || __traits(compiles, text()) )
 		{
-			mixin(prepareId, enable.M); 
+			mixin(prepareId); 
 			
 			HitInfo hit; 
 			
@@ -8855,7 +8951,7 @@ struct im
 		//ChkBox //////////////////////////////
 		auto ChkBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, string chkBoxStyle="chk", C, T...)(ref bool state, C caption, T args)
 		{
-			mixin(prepareId, enable.M, selected.M); 
+			mixin(prepareId, selected.M); 
 			
 			HitInfo hit; 
 			Row(
@@ -9882,7 +9978,7 @@ struct im
 			auto Slider(string srcModule=__MODULE__, size_t srcLine=__LINE__, V, T...)(ref V value, T args)
 				if(isFloatingPoint!V || isIntegral!V)
 			{
-				mixin(prepareId, enable.M, selected.M, range.M);  //Todo: selected???
+				mixin(prepareId, selected.M, range.M);  //Todo: selected???
 				
 				//flipped range interval. Needed for vertical scrollbar
 				const flipped = !_range.isOrdered; 
