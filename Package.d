@@ -620,7 +620,92 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		//Todo: interpolated string support for print, write*, LOG, ERR, WARN
 	}version(/+$DIDE_REGION+/all)
 	{
-		version(/+$DIDE_REGION UDAs+/all)
+		version(/+$DIDE_REGION ValueRange+/all)
+		{
+			struct ValueRange
+			{
+				enum Type: ubyte { linear, log, circular, endless} 
+				//endless can go out of range, circular always using modulo.
+				
+				float min=0, max=0, step=0; 
+				Type type; 
+				
+				//Todo: handle invalid intervals
+				
+				bool isLinear() const
+				=> type==Type.linear	; bool isLog() const
+				=> type==Type.log; 
+				bool isCircular() const
+				=> type==Type.circular; bool isEndless() const
+				=> type==Type.endless; 
+				
+				bool isClamped() const
+				=> isLinear || isLog || isCircular; bool isOrdered () const
+				=> min <= max; 
+				bool isComplete() const
+				=> !isnan(min) && !isnan(max); 
+				
+				
+				float normalize(float x) const
+				{
+					auto n = isLog 	? x.log2.remap(min.log2, max.log2, 0, 1)
+						: x     .remap(min    , max    , 0, 1); 
+					//Todo: handle log(0)
+					if(isCircular) if(n<0 || n>1) n = n-n.floor; 
+					if(isClamped) n = n.clamp(0, 1); 
+					return n; 
+				} 
+				
+				float denormalize(float n) const
+				{
+					if(isCircular) if(n<0 || n>1) n = n-n.floor; 
+					if(isClamped) n = n.clamp(0, 1); 
+					return clamp(
+						isLog 	? 2 ^^ n.remap(0, 1, min.log2, max.log2)
+							:       n.remap(0, 1, min    , max    )
+					)
+					/+clamp is needed because of rounding errors+/; 
+				} 
+				
+				Unqual!T clamp(T)(T f) const
+				{
+					if(isComplete)
+					{
+						static if(isIntegral!T)
+						{
+							if(isOrdered)	f = f.clamp(min.ceil.to!T, max.floor.to!T); 
+							else	f = f.clamp(max.ceil.to!T, min.floor.to!T); 
+						}else
+						{
+							if(isOrdered)	f = f.clamp(min.to!T, max.to!T); 
+							else	f = f.clamp(max.to!T, min.to!T); 
+						}
+					}else
+					{
+						//incomplete range: eiter min or max is nan
+						static if(isIntegral!T)
+						{
+							if(!isnan(min) && f<min.iceil)	f = min.iceil; 
+							else if(!isnan(max) && f>max.ifloor)	f = max.ifloor; 
+						}else
+						{
+							if(!isnan(min) && f<min)	f = min; 
+							else if(!isnan(max) && f>max)	f = max; 
+						}
+					}
+					return f; 
+				} 
+			} 
+			
+			auto linRange(float min, float max, float step=1)
+			=> ValueRange(min, max, step, ValueRange.Type.linear); 
+			auto logRange(float min, float max, float step=1)
+			=> ValueRange(min, max, step, ValueRange.Type.log); 
+			auto circularRange(float min, float max, float step=1)
+			=> ValueRange(min, max, step, ValueRange.Type.circular); 
+			auto endlessRange (float min, float max, float step=1)
+			=> ValueRange(min, max, step, ValueRange.Type.endless); 
+		}version(/+$DIDE_REGION UDAs+/all)
 		{
 			struct UDA
 			{} 
@@ -653,11 +738,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				//het_ui
 				//struct UI{}    // similar to @Composable.  It alters the UI's state
 				//Note: UI is ised for the default UI function. Conflicts with this UDA
-							
+				
 				//het_opengl
 				struct UNIFORM
 				{ string name=""; } //marks a variable as gl.Shader attribute
-							
+				
 				//het_ui
 				struct CAPTION
 				{ string text; } 
@@ -665,13 +750,24 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				{ string text; } 
 				struct UNIT
 				{ string text; } 
-				struct RANGE
-				{
-					float low, high; bool valid()const
-					{ return !low.isnan && !high.isnan; } 
-				} 
-				struct STEP
-				{ float s = 1; } 
+				
+				alias RANGE 	= ValueRange,
+				RANGE_log 	= logRange,
+				RANGE_circular 	= circularRange, 
+				RANGE_endless 	= endlessRange; 
+				/+
+					Before 260812:
+					/+
+						Highlighted: struct RANGE
+						{
+							float low, high; bool valid()const
+							{ return !low.isnan && !high.isnan; } 
+						} 
+						struct STEP
+						{ float s = 1; } 
+					+/
+				+/
+				
 				struct INDENT
 				{} 
 				struct HIDDEN
@@ -3334,15 +3430,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A3FC59F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1AEF659F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A4C459F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1AFBE59F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1A56E59F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1A5E359F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B06859F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B0DD59F156A1})); 
 						+/
 					+/
 				+/
@@ -11282,16 +11378,16 @@ version(/+$DIDE_REGION Colors+/all)
 		
 		string stats() const
 		{
-				//Todo: erre a stats()-ra valami mixint csinalni, tul sok az ismetles
+			//Todo: erre a stats()-ra valami mixint csinalni, tul sok az ismetles
 			return format(
 				"undoCnt:%d redoCnt:%d isChanged:%d isNew:%d memUsage:%d savedCnt:%d fileName:%s",
-								   undoCount, redoCount, isChanged,   isNew,   memUsage,   savedCnt,   fileName
+				undoCount, redoCount, isChanged,   isNew,   memUsage,   savedCnt,   fileName
 			); 
 		} 
 		
 		bool canCloseApp()
 		{
-				//should be called before exit
+			//should be called before exit
 			return trySaveBeforeNewOrOpen; 
 		} 
 		
@@ -17542,7 +17638,7 @@ Source field: 	$("baseDeco") 	Source field: 	$(a)"
 			shared static this()
 			{ registerStoredClass!(typeof(this)); } 
 			
-			@STORED int act, def, min, max, step=0; 
+			@STORED int act, def, min, max, step=0;  //Todo: support RANGE
 			
 			override string asText()
 			{ return act.text; } 
@@ -17552,8 +17648,8 @@ Source field: 	$("baseDeco") 	Source field: 	$(a)"
 				auto s = "@STORED int "~name; 
 				if(def) s ~= " = "~def.text; 
 				s ~= ";\n"; 
-				if(min || max) s = format!"@RANGE(%s, %s) %s"(min, max, s); 
-				if(step) s = format!"@STEP(%s) %s"(step, s); 
+				if(min || max) s = format!"@RANGE(%g, %g, %g) %s"(min, max, step, s); 
+				//if(step) s = format!"@STEP(%s) %s"(step, s); 
 				return s; 
 			} 
 		} 
@@ -17563,7 +17659,7 @@ Source field: 	$("baseDeco") 	Source field: 	$(a)"
 			shared static this()
 			{ registerStoredClass!(typeof(this)); } 
 			
-			@STORED float act=0, def=0, min=0, max=0, step=0; 
+			@STORED float act=0, def=0, min=0, max=0, step=0;  //Todo: support RANGE
 			
 			override string asText()
 			{ return act.text; } 
@@ -17573,8 +17669,8 @@ Source field: 	$("baseDeco") 	Source field: 	$(a)"
 				auto s = "@STORED float "~name; 
 				s ~= " = "~def.text; 
 				s ~= ";\n"; 
-				if(min || max) s = format!"@RANGE(%g, %g) %s"(min, max, s); 
-				if(step) s = format!"@STEP(%g) %s"(step, s); 
+				if(min || max) s = format!"@RANGE(%g, %g, %g) %s"(min, max, step, s); 
+				//if(step) s = format!"@STEP(%g) %s"(step, s); 
 				return s; 
 			} 
 		} 
@@ -17603,8 +17699,7 @@ Source field: 	$("baseDeco") 	Source field: 	$(a)"
 			shared static this()
 			{ registerStoredClass!(typeof(this)); } 
 			
-			@STORED Property[]
-			properties; 
+			@STORED Property[] properties; 
 			
 			override string asText()
 			{ return ""; } 
@@ -17737,7 +17832,6 @@ Source field: 	$("baseDeco") 	Source field: 	$(a)"
 		
 		struct PropArray
 		{
-			 //PropArray ////////////////////////////////////////////
 			string queryName; //name of the
 			Property[] props; 
 			string pendingQuery; //url of changed settings

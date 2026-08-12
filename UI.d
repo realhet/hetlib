@@ -5474,15 +5474,15 @@ version(/+$DIDE_REGION+/all)
 		alias f = __traits(getMember, T, fieldName); 
 		FieldProps p; 
 		
-		p.fullName	   = FieldProps.makeFullName(parentFullName, fieldName); 
-		p.name	   = fieldName; 
-		p.caption	   = getUDA!(f, CAPTION).text; 
-		p.hint	   = getUDA!(f, HINT   ).text; 
+		p.fullName 	= FieldProps.makeFullName(parentFullName, fieldName),
+		p.name	= fieldName,
+		p.caption	= getUDA!(f, CAPTION).text,
+		p.hint	= getUDA!(f, HINT).text,
+		p.unit	= getUDA!(f, UNIT).text,
+		p.range	= getUDA!(f, RANGE),
+		p.indent	= hasUDA2!(f, INDENT),
+		p.choices	= EnumMemberNames!T; 
 		//Todo: readonly
-		p.unit	    = getUDA!(f, UNIT   ).text; 
-		p.range	    = getUDA!(f, RANGE); 
-		p.indent	    = hasUDA2!(f, INDENT); 
-		p.choices	    = EnumMemberNames!T; 
 		
 		return p; 
 	} 
@@ -5509,36 +5509,39 @@ version(/+$DIDE_REGION+/all)
 	
 	void stdUI(Property prop, string parentFullName="")
 	{
-		 //Todo: ennek inkabb benne kene lennie a Property class-ban...
-		if(prop is null)
-		return; 
-		auto fp = FieldProps(FieldProps.makeFullName(parentFullName, prop.name), prop.name, prop.caption, prop.hint); 
+		//Todo: ennek inkabb benne kene lennie a Property class-ban...
+		if(prop is null) return; 
+		auto fp = FieldProps(
+			FieldProps.makeFullName(parentFullName, prop.name), 
+			prop.name, prop.caption, prop.hint
+		); 
 		fp.isReadOnly = prop.isReadOnly; 
 		
 		void doit(T)(ref T act)
-		{
-			immutable old = act; 
-			stdUI(act, fp); 
-			prop.uiChanged |= old != act; 
-		} 
+		{ immutable old = act; stdUI(act, fp); prop.uiChanged |= old != act; } 
 		
-		if(auto p = cast(IntProperty)prop)
-		{
-			fp.range.low = p.min; 
-			fp.range.high = p.max; 
+		if(auto p = cast(IntProperty)prop)	{
+			fp.range.min = p.min; 
+			fp.range.max = p.max; 
 			doit(p.act); 
-		}else if(auto p = cast(FloatProperty)prop)
-		{
-			fp.range.low = p.min; 
-			fp.range.high = p.max; 
+		}
+		else if(auto p = cast(FloatProperty)prop)	{
+			fp.range.min = p.min; 
+			fp.range.max = p.max; 
 			doit(p.act); 
-		}else if(auto p = cast(StringProperty)prop)
-		{
+		}
+		else if(auto p = cast(StringProperty)prop)	{
 			fp.choices = p.choices; 
 			doit(p.act); 
-		}else if(auto p = cast(BoolProperty)prop)
-		{ doit(p.act); }else if(auto p = cast(PropertySet)prop)
-		{ stdStructFrame(fp.getCaption, { p.properties.each!stdUI; }); }
+		}
+		else if(auto p = cast(BoolProperty)prop)	{ doit(p.act); }
+		else if(auto p = cast(PropertySet)prop)	{
+			stdStructFrame
+			(
+				fp.getCaption, 
+				{ p.properties.each!stdUI; }
+			); 
+		}
 	} 
 	
 	void stdUI(T)(ref T data, in FieldProps thisFieldProps=FieldProps.init)
@@ -5577,10 +5580,8 @@ version(/+$DIDE_REGION+/all)
 						{ data = s.to!T; }catch(Throwable)
 						{}
 						Text(thisFieldProps.unit, "\t"); 
-						if(
-							thisFieldProps.range.valid//Todo: im.range() conflict
-						)
-						Slider(data, hint(thisFieldProps.hint), range(thisFieldProps.range.low, thisFieldProps.range.high), genericId(thisFieldProps.hash+1), ((!thisFieldProps.isReadOnly).名!q{enabled}), { width = 180; }); //Todo: rightclick
+						if(thisFieldProps.range.isComplete)
+						Slider(data, hint(thisFieldProps.hint), thisFieldProps.range, genericId(thisFieldProps.hash+1), ((!thisFieldProps.isReadOnly).名!q{enabled}), { width = 180; }); //Todo: rightclick
 						//Todo: Bigger slider height when (theme!="tool")
 					}
 				); 
@@ -5595,10 +5596,8 @@ version(/+$DIDE_REGION+/all)
 						{ data = s.to!T; }catch(Throwable)
 						{}
 						Text(thisFieldProps.unit, "\t"); 
-						if(
-							thisFieldProps.range.valid//Todo: im.range() conflict
-						)
-						Slider(data, range(thisFieldProps.range.low, thisFieldProps.range.high), genericId(thisFieldProps.hash+1), hint(thisFieldProps.hint), ((!thisFieldProps.isReadOnly).名!q{enabled}), { width = 180; }); //Todo: rightclick
+						if(thisFieldProps.range.isComplete)
+						Slider(data, thisFieldProps.range, genericId(thisFieldProps.hash+1), hint(thisFieldProps.hint), ((!thisFieldProps.isReadOnly).名!q{enabled}), { width = 180; }); //Todo: rightclick
 					}
 				); 
 			}else static if(is(T == bool))
@@ -6117,7 +6116,7 @@ version(/+$DIDE_REGION+/all)
 								{
 									theme = "tool"; 
 									Text(idx.format!"float%d\t"); 
-									Slider(f, range(0, 1), { width = 12*fh; }, genericId(idx)); 
+									Slider(f, linRange(0, 1), { width = 12*fh; }, genericId(idx)); 
 								}
 							); 
 							
@@ -6927,96 +6926,10 @@ struct im
 		struct selected
 		{ bool val; 	 enum M = q{auto _selected = false; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == selected)) _selected	= a.val; 	}; } 
 		
-		version(/+$DIDE_REGION Range+/all)
-		{
-			enum RangeType
-			{ linear, log, circular, endless} 
-			struct range
-			{
-				//endless can go out of range, circular always using modulo.
-				float min, max, step=1; RangeType type;  //Todo: this is an 1D bounds
-				
-				//Todo: handle invalid intervals
-				bool isComplete() const
-				{ return !isnan(min) && !isnan(max); } 
-				
-				bool isLinear	 () const
-				{ return type==RangeType.linear	; } 
-				bool isLog	 () const
-				{ return type==RangeType.log	; } 
-				bool isCircular() const
-				{ return type==RangeType.circular; } 
-				bool isEndless () const
-				{ return type==RangeType.endless; } 
-				bool isClamped () const
-				{ return isLinear || isLog || isCircular; } 
-				bool isOrdered () const
-				{ return min <= max; } 
-				
-				float normalize(float x) const
-				{
-					auto n = isLog 	? x.log2.remap(min.log2, max.log2, 0, 1)
-						: x     .remap(min    , max    , 0, 1); 
-					//Todo: handle log(0)
-					if(isCircular) if(n<0 || n>1) n = n-n.floor; 
-					if(isClamped) n = n.clamp(0, 1); 
-					return n; 
-				} 
-				
-				float denormalize(float n) const
-				{
-					if(isCircular) if(n<0 || n>1) n = n-n.floor; 
-					if(isClamped) n = n.clamp(0, 1); 
-					return clamp(
-						isLog 	? 2 ^^ n.remap(0, 1, min.log2, max.log2)
-							:       n.remap(0, 1, min    , max    )
-					)
-					/+clamp is needed because of rounding errors+/; 
-				} 
-				
-				Unqual!T clamp(T)(T f) const
-				{
-					if(isComplete)
-					{
-						static if(isIntegral!T)
-						{
-							if(isOrdered)
-							f = f.clamp(min.ceil.to!T, max.floor.to!T); 
-							else f = f.clamp(max.ceil.to!T, min.floor.to!T); 
-						}else
-						{
-							if(isOrdered)
-							f = f.clamp(min.to!T, max.to!T); 
-							else f = f.clamp(max.to!T, min.to!T); 
-						}
-					}else
-					{
-						//incomplete range: eiter min or max is nan
-						static if(isIntegral!T)
-						{
-							if(!isnan(min) && f<min.iceil)
-							f = min.iceil; else if(!isnan(max) && f>max.ifloor)
-							f = max.ifloor; 
-						}else
-						{
-							if(!isnan(min) && f<min)
-							f = min; else if(!isnan(max) && f>max)
-							f = max; 
-						}
-					}
-					return f; 
-				} 
-				
-				private enum M = q{range _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == range)) _range = a; }; 
-			} 
-			
-			auto logRange(float min, float max, float step=1)
-			=> range(min, max, step, RangeType.log); 
-			auto circularRange(float min, float max, float step=1)
-			=> range(min, max, step, RangeType.circular); 
-			auto endlessRange (float min, float max, float step=1)
-			=> range(min, max, step, RangeType.endless); 
-		}
+		/+private enum range_M = q{range _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == range)) _range = a; }; +/
+		private enum range_M = q{ValueRange _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == ValueRange)) _range = a; }; 
+		
+		
 		struct ScrollInfo
 		{
 			char orientation; 
@@ -7142,7 +7055,7 @@ struct im
 					auto sl = new SliderClass
 						(
 						combine(info.container.id, orientation), enabled, normValue, 
-						range(0, 1), userModified, view_gui.mousePos.vec2, tsNormal, hit,
+						linRange(0, 1), userModified, view_gui.mousePos.vec2, tsNormal, hit,
 						orientation=='H' ? SliderOrientation.horz : SliderOrientation.vert, 
 						SliderStyle.scrollBar, 1, normThumbSize
 					); 
@@ -7232,25 +7145,6 @@ struct im
 			{ .Container container; TextStyle textStyle; string theme; } 
 			private StackEntry[] stack; 
 			
-			//Note: build* functions are only callable from update()
-			
-			//Build an array of cells using a temporary container
-			Cell[] build(string _M_=__MODULE__, size_t _L_=__LINE__,A...)(in A args)
-			{
-				Container!(.Container, _M_, _L_)(args); 
-				return removeLastContainer.subCells; 
-			} 
-			
-			auto buildContainer(T : .Container, string _M_=__MODULE__, size_t _L_=__LINE__, A...)(in A args)
-			{
-				Container!(T, srcModule, srcLine)(args); 
-				return cast(T)removeLastContainer; 
-			} 
-			
-			auto buildRow   (string _M_=__MODULE__, size_t _L_=__LINE__, A...)(in A args)
-			{ return buildContainer!(.Row   , srcModule, srcLine)(args); } 
-			auto buildColumn(string _M_=__MODULE__, size_t _L_=__LINE__, A...)(in A args)
-			{ return buildContainer!(.Column, srcModule, srcLine)(args); } 
 			
 			void reset()
 			{
@@ -7296,8 +7190,8 @@ struct im
 				//Todo: the first stack container is always 0.
 			} 
 			
-			public void imPop() { pop; } 
-			
+			public void imPop() { pop; } 
+			
 			void dump()
 			{
 				writeln("---- IM dump --------------------------------"); 
@@ -7355,6 +7249,27 @@ struct im
 				else return null; 
 			} 
 			
+			
+			//Note: build* functions are only callable from update()
+			
+			//Build an array of cells using a temporary container
+			Cell[] build(string _M_=__MODULE__, size_t _L_=__LINE__,A...)(in A args)
+			{
+				Container!(.Container, _M_, _L_)(args); 
+				return removeLastContainer.subCells; 
+			} 
+			
+			auto buildContainer(T : .Container, string _M_=__MODULE__, size_t _L_=__LINE__, A...)(in A args)
+			{
+				Container!(T, srcModule, srcLine)(args); 
+				return cast(T)removeLastContainer; 
+			} 
+			
+			auto buildRow   (string _M_=__MODULE__, size_t _L_=__LINE__, A...)(in A args)
+			{ return buildContainer!(.Row   , srcModule, srcLine)(args); } 
+			auto buildColumn(string _M_=__MODULE__, size_t _L_=__LINE__, A...)(in A args)
+			{ return buildContainer!(.Column, srcModule, srcLine)(args); } 
+			
 			//easy access
 			
 			@property
@@ -7373,7 +7288,6 @@ struct im
 			{ return actContainer.subContainers; } 
 			
 			//container delegates
-			//void opDispatch(string name, T...)(T args) { mixin("containerStack[$-1]." ~ name)(args); }
 			
 			private auto ContainerProp(string name)
 			=> q{
@@ -7398,6 +7312,8 @@ struct im
 				].map!ContainerProp.join ~
 				["flags", "flex", "margin", "border", "padding", "bkColor"].map!ContainerRef.join
 			); 
+			
+			
 			
 			/+
 				Todo: Play with disabled inlining of Composable functions: /+Code: pragma(inline, false)+/
@@ -8031,7 +7947,7 @@ struct im
 			
 			mixin(prepareId); 
 			static if(IsNum)
-			mixin(range.M); 
+			mixin(range_M); 
 			
 			static struct EditResult
 			{
@@ -8323,7 +8239,7 @@ struct im
 			(ref T0 value, T args)
 			if(sign!=0 && isNumeric!T0)
 		{
-			mixin(range.M); 
+			mixin(range_M); 
 			
 			auto capt = symbolStr(`Calculator` ~ ((sign>0)?(`Addition`):(`Subtract`))); 
 			enum isInt = isIntegral!T0; 
@@ -8520,7 +8436,7 @@ struct im
 						[q{isG!"selected"},q{_selected = a; }],
 						[q{isT!selected},q{_selected = a.val; }],
 						[q{isT!HintRec},q{hintRec = cast()a; }],
-						[q{isT!range},q{/+Todo: IncBtn!!!+/}],
+						[q{isT!ValueRange},q{/+Todo: Just let it pass for IncBtn!!!+/}],
 					])); 
 					mixin(Scripting.CustomComponent_processProperties); 
 				}
@@ -8562,11 +8478,6 @@ struct im
 					return hit; 
 				}
 			} 
-			
-			version(/+$DIDE_REGION+/all) {
-				
-				
-			}
 		}
 		//BtnRow //////////////////////////////////
 		
@@ -9587,10 +9498,10 @@ struct im
 					else { raise("Invalid orientation"); }
 				} 
 				
-				void mouseAdjust(ref float nPos, in vec2 mousePos, in range range_, ref int wrapCnt, float adjustSpeed)
+				void mouseAdjust(ref float nPos, in vec2 mousePos, in ValueRange range_, ref int wrapCnt, float adjustSpeed)
 				{ mouseAdjust(nPos, mousePos, range_.isClamped, range_.isCircular, range_.isEndless, wrapCnt, adjustSpeed); } 
 				
-				bool handleKeyboard(ref float nPos, in range range_, float pageSize)
+				bool handleKeyboard(ref float nPos, in ValueRange range_, float pageSize)
 				{
 					if(nPos.isnan)
 					return false; 
@@ -9614,7 +9525,7 @@ struct im
 						/+Todo: this layout is incompatible with the mouse Shift = slow behavior.+/
 						
 						auto nStep()
-						{ return range_.step / (range_.max-range_.min); } 
+						{ return range_.step.ifz(1) / (range_.max-range_.min); } 
 						set(nPos + nStep *scale); 
 					} 
 					
@@ -9645,7 +9556,7 @@ struct im
 					return userModified; 
 				} 
 				
-				bool handleMouse(in Id id, in HitInfo hit, ref float nPos, in vec2 mousePos, in range range_, ref int wrapCnt)
+				bool handleMouse(in Id id, in HitInfo hit, ref float nPos, in vec2 mousePos, in ValueRange range_, ref int wrapCnt)
 				{
 					if(nPos.isnan)
 					return false; 
@@ -9744,7 +9655,7 @@ struct im
 				bool focused; 
 				
 				this(
-					in Id id, bool enabled, ref float nPos_, in im.range range_, ref bool userModified, vec2 mousePos, 
+					in Id id, bool enabled, ref float nPos_, in ValueRange range_, ref bool userModified, vec2 mousePos, 
 					TextStyle ts, out HitInfo hit, SliderOrientation orientation, SliderStyle sliderStyle, float fhScale, float normThumbSize=float.init
 				)
 				{
@@ -10006,7 +9917,7 @@ struct im
 			auto Slider(string _M_=__MODULE__, size_t _L_=__LINE__, V, T...)(ref V value, T args)
 				if(isFloatingPoint!V || isIntegral!V)
 			{
-				mixin(prepareId, selected.M, range.M);  //Todo: selected???
+				mixin(prepareId, selected.M, range_M);  //Todo: selected???
 				
 				//flipped range interval. Needed for vertical scrollbar
 				const flipped = !_range.isOrdered; 
@@ -10080,7 +9991,7 @@ struct im
 				
 				const variant = 0; 
 				
-				auto range = im.range(prop.min, prop.max, prop.step); 
+				auto range = ValueRange(prop.min, prop.max, prop.step); 
 				auto hint = im.hint(prop.hint); 
 				
 				const last = prop.act; 
@@ -10303,7 +10214,7 @@ struct im
 					ulong w, w_outer; 
 					float nPos; 
 					float pageSize; 
-					im.range rng; 
+					ValueRange rng; 
 					
 					int wrapCnt; 
 					
@@ -10319,7 +10230,7 @@ struct im
 						
 						nPos = (((float(t0.raw - tMin.raw)))/(w_outer - w)); 
 						pageSize = (((float(w)))/(w_outer)); 
-						rng = im.range(0, 1, pageSize / 8); 
+						rng = ValueRange(0, 1, pageSize / 8); 
 					} 
 					
 					bool handleKeyboard()
