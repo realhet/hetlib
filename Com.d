@@ -563,7 +563,7 @@ class ComPort
 			 //UI //////////////////////////////////////
 			
 			Row(
-				bold(title=="" ? "Serial Communication" : title), "  ", 
+				boldStr(title=="" ? "Serial Communication" : title), "  ", 
 				{
 					ChkBox(this.enabled, "Enabled");  //Todo: enabled conflicts with im.enable
 					

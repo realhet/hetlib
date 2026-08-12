@@ -382,163 +382,6 @@ version(/+$DIDE_REGION+/all)
 		} 
 	} 
 	
-	
-	//HitTest ///////////////////////////////
-	
-	struct HitInfo
-	{
-		 //Btn returns it
-		SrcId id; 
-		bool enabled = true; 
-		bool hover, captured, clicked, pressed, released; 
-		float hover_smooth, captured_smooth; 
-		bounds2 hitBounds; //this is in ui coordinates. Problematic with zoomable and GUI views.
-		
-		@property bool down() const
-		{ return captured && enabled; } 
-		
-		@property bool clickedAndEnabled() const
-		{ return clicked & enabled; } 
-		alias clickedAndEnabled this; 
-		
-		bool repeated() const
-		{
-			return pressed || captured && inputs.LMB.repeated; 
-			//Todo: architectural bug: captured is delayed by 1 frame according to repeated
-		} 
-	} 
-	
-	struct HitTestManager
-	{
-		
-		struct HitTestRec
-		{
-			SrcId id; 	//in the	next frame this must be the isSame
-			bounds2 hitBounds; 	//absolute bounds on the drawing where the hittesi was made, later must be combined with View's transformation
-			vec2 localPos; 	//relative to outerPos
-			bool clickable; 
-		} 
-		
-		//act frame
-		HitTestRec[] hitStack, lastHitStack; 
-		
-		float[SrcId] smoothHover; 
-		private void updateSmoothHover(ref HitTestRec[] actHitStack)
-		{
-			enum upSpeed = 0.5f, downSpeed = 0.25f; 
-			
-			//raise hover values
-			auto hoveredIds = actHitStack.map!"a.id".filter!"a".array.sort; 
-			foreach(id; hoveredIds)
-			smoothHover[id] = mix(smoothHover.get(id, 0), 1, upSpeed); 
-			
-			//lower (and remove) hover values
-			SrcId[] toRemove; 
-			foreach(id, ref value; smoothHover)
-			{
-				if(!hoveredIds.canFind(id))
-				{
-					value = mix(value, 0, downSpeed); 
-					if(value<0.02f)
-					toRemove ~= id; 
-				}
-			}
-			
-			foreach(h; toRemove)
-			smoothHover.remove(h); 
-		} 
-		
-		SrcId capturedId, clickedId, pressedId, releasedId; 
-		private void updateMouseCapture(ref HitTestRec[] hits)
-		{
-			//const topClickableId = hits.get(hits.length-1).id;
-			const topId = hits.retro.filter!(h => h.clickable).take(1).array.get(0).id; 
-			
-			//if LMB was just pressed, then it will be the captured control
-			//if LMB released, and the captured id is also hovered, the it is clicked.
-			
-			clickedId = pressedId = releasedId = SrcId.init; //normally it's 0 all the time, except that one frame it's clicked.
-			
-			with(mainWindow)
-			{
-				//Todo: get the mouse state from elsewhere!!!!!!!!!!!!!
-				if(topId && mouse.LMB && mouse.justPressed && canProcessUserInput)
-				{
-					 //Note: isForeground will not work with a toolwindow
-					pressedId = capturedId = topId; 
-				}
-				if(mouse.justReleased)
-				{
-					if(capturedId)
-					{
-						releasedId = capturedId; 
-						if(topId==capturedId)
-						clickedId = capturedId; 
-					}
-					capturedId = SrcId.init; 
-				}
-			}
-		} 
-		
-		void nextFrame()
-		{
-			lastHitStack = hitStack; 
-			hitStack = []; 
-			
-			updateSmoothHover(lastHitStack); 
-			updateMouseCapture(lastHitStack); 
-		} 
-		
-		void addHitRect(in SrcId id, in bounds2 hitBounds, in vec2 localPos, in bool clickable)
-		{
-			//must be called from each cell that needs mouse hit test
-			static if(addHitRectAsserts)
-			{
-				assert(id, "Null Id is illegal"); 
-				assert(!hitStack.any!(a => a.id==id), "Id already defined for cell: "~id.text); 
-			}
-			hitStack ~= HitTestRec(id, hitBounds, localPos, clickable); 
-		} 
-		
-		auto check(in SrcId id)
-		{
-			HitInfo h; 
-			h.id = id; 
-			if(id==SrcId.init)
-			return h; 	
-			h.hover		=	lastHitStack.map!"a.id".canFind(id); 
-			h.pressed		=	pressedId ==id; 
-			h.released		= releasedId==id; 
-			h.clicked	  = clickedId ==id; 
-			h.captured	  = h.pressed || capturedId==id && h.hover; //Todo: architectural bug: captured is delayed by 1 frame according to repeated
-			h.hover_smooth	  = smoothHover.get(id, 0); 
-			h.captured_smooth	  = max(h.hover_smooth, h.captured); 
-			h.hitBounds	  = lastHitStack.get(lastHitStack.map!"a.id".countUntil(id)).hitBounds; 
-			return h; 
-		} 
-		
-		version(/+$DIDE_REGION+/none) {
-			void draw(DrawingOld dr)
-			{
-				if(VisualizeHitStack)
-				{
-					dr.lineWidth = (QPS.value(second)*3).fract; 
-					dr.color = clFuchsia; 
-					
-					hitStack.map!"a.hitBounds".each!(b => dr.drawRect(b)); 
-					
-					dr.lineWidth = 1; 
-					dr.lineStyle = LineStyle.normal; 
-				}
-			} 
-		}
-		
-		auto stats()
-		{ return format("HitTest lengths: hitStack:%s, lastHitStack::%s, smoothHover::%s", hitStack.length, lastHitStack.length, smoothHover.length); } 
-		
-	} 
-	
-	__gshared HitTestManager hitTestManager; 
 	
 	
 	
@@ -1263,9 +1106,9 @@ version(/+$DIDE_REGION+/all)
 			LineStyle.normal
 	); 
 	
-	struct _FlexValue
+	struct FlexAmount
 	{ UpperFloat value=0; alias this = value; } 
-	static assert(_FlexValue.sizeof==2); 
+	static assert(FlexAmount.sizeof==2); 
 	
 	///This struct is returned by locate()
 	struct CellLocation
@@ -1350,9 +1193,9 @@ version(/+$DIDE_REGION+/all)
 		auto allParents(Base : Cell = Container)() inout
 		{ return thisAndAllParents!(Base, false); } 
 		
-		ref _FlexValue flex()
+		ref FlexAmount flex()
 		{
-			static _FlexValue nullFlex; return nullFlex; 
+			static FlexAmount nullFlex; return nullFlex; 
 			//Todo: this is bad, but fast. maybe do it with a setter and const ref.
 		} 
 		ref Margin	margin()
@@ -1429,12 +1272,8 @@ version(/+$DIDE_REGION+/all)
 		
 		@property
 		{
-			//calculated prioperties. No += operators are allowed.
+			//calculated properties. No += operators are allowed.
 			
-			/+
-				Todo: ezt at kell irni, hogy az outerSize legyen a tarolt cucc, ne az inner. Indoklas: az outerSize kizarolag csak az
-							outerSize ertek atriasakor valtozzon meg, a border modositasatol ne. Viszont az autoSizet ekkor mashogy kell majd detektalni...
-			+/
 			const(vec2) innerPos () const
 			{ return outerPos+topLeftGapSize; } 	void innerPos (in vec2 p)
 			{ outerPos	= p-topLeftGapSize; } 
@@ -1453,10 +1292,10 @@ version(/+$DIDE_REGION+/all)
 			
 			auto borderBounds(float location=0.5f)()
 			{
-				const hb = border.width*location; 
+				const hb = border.width*location + extraMargin; 
 				return bounds2(
-					outerPos	+ vec2(margin.left  + extraMargin + hb, margin.top    + extraMargin + hb),
-					outerBottomRight 	- vec2(margin.right + extraMargin + hb, margin.bottom + extraMargin + hb)
+					outerPos	+ (vec2((float(margin.left)) , (float(margin.top))   ) + hb),
+					outerBottomRight 	- (vec2((float(margin.right)), (float(margin.bottom))) + hb)
 				); 
 			} 
 			auto borderBounds_inner()
@@ -1561,7 +1400,7 @@ version(/+$DIDE_REGION+/all)
 				{
 					if(container.flags.noHitTest)
 					return false; //Note: false means -> keep continue the search
-					hitTestManager.addHitRect(container.id, hitBnd, mouse-(innerPos+ofs), container.flags.clickable); 
+					im.hitTestManager.addHitRect(container.id, hitBnd, mouse-(innerPos+ofs), container.flags.clickable); 
 				}else
 				{
 					//it's just a regular cell. Can't add to hitTest because it has no ID.
@@ -3493,7 +3332,7 @@ version(/+$DIDE_REGION+/all)
 			Margin margin_; 
 			Padding padding_; 
 			Border border_; 
-			_FlexValue flex_; 
+			FlexAmount flex_; 
 		} 
 		RGB bkColor=clWhite; //Todo: background struct
 		
@@ -3604,7 +3443,7 @@ version(/+$DIDE_REGION+/all)
 		
 		final override
 		{
-			ref _FlexValue flex()
+			ref FlexAmount flex()
 			=> flex_	; 
 			ref Margin margin ()
 			=> margin_	; 
@@ -6016,7 +5855,7 @@ version(/+$DIDE_REGION+/all)
 				void Legend(string title, float size=float.nan, RGB color = RGB(1, 2, 3), string suffix="")
 				{
 					if(color != RGB(1, 2, 3))
-					Text(color, symbol("CheckboxFill"), tsNormal.fontColor, " "); 
+					Text(color, symbolStr("CheckboxFill"), tsNormal.fontColor, " "); 
 					Text(title); 
 					if(!isnan(size))
 					Row(HAlign.right, shortSizeText!1024(size)~suffix, { width = fh*(2.25 + suffix.length*0.3); }); 
@@ -6202,7 +6041,7 @@ version(/+$DIDE_REGION+/all)
 						padding = "4"; 
 						border = "1 normal silver"; 
 						theme = "tool"; 
-						Text(bold("Resource Monitor")); 	Spacer; 
+						Text(boldStr("Resource Monitor")); 	Spacer; 
 						VirtualFileGraph; 	Spacer; 
 						BitmapCacheGraph; 	Spacer; 
 						TextureCacheGraph; 	Spacer; 
@@ -6355,14 +6194,6 @@ struct im
 			}
 			return typeof(return).init; 
 		} 
-		
-		
-		static T ARG(T, Args...)(T def, Args args)
-		{
-			T res = def; 
-			static foreach(idx, a; args) static if(is(Unqual!(Args[idx])==T)) res = a; 
-			return res; 
-		} 
 		
 		version(/+$DIDE_REGION Frame handling+/all)
 		{
@@ -6370,6 +6201,10 @@ struct im
 			
 			static if(doTiming)
 			{ double tBeginFrame, tEndFrame, tDraw; }
+			
+			private bool _canProcessUserInput; //it is latched per every frame
+			bool canProcessUserInput()
+			=> _canProcessUserInput; 
 			
 			//Todo: package visibility is not working as it should -> remains public
 			void _beginFrame(View2D viewWorld, View2D viewGUI)
@@ -6380,6 +6215,8 @@ struct im
 				static if(doTiming)
 				{ const T0 = QPS; scope(exit) tBeginFrame = QPS-T0; }
 				enforce(!inFrame, "im.beginFrame() already called."); 
+				
+				_canProcessUserInput = mainWindow.canProcessUserInput; 
 				
 				setTargetSurfaces(viewWorld, viewGUI); 
 				selectTargetSurface(TargetSurface.gui); //default is the GUI surface
@@ -6504,7 +6341,7 @@ struct im
 				if(textEditorState.active)
 				{
 					//an edit control is active.
-					//Todo: mainWindow.canProcessUserInput check
+					//Todo: canProcessUserInput check
 					auto err = textEditorState.processQueue; 
 				}
 				wantKeys = textEditorState.active; 
@@ -6653,7 +6490,183 @@ struct im
 			} 
 		}
 		
-		
+		version(/+$DIDE_REGION HitTest+/all)
+		{
+			HitTestManager hitTestManager; 
+			
+			struct HitInfo
+			{
+				SrcId id; 
+				bool enabled = true; 
+				bool hover, captured, clicked, pressed, released; 
+				float hover_smooth, captured_smooth; 
+				bounds2 hitBounds; //this is in ui coordinates. Problematic with zoomable and GUI views.
+				
+				@property bool down() const
+				{ return captured && enabled; } 
+				
+				@property bool clickedAndEnabled() const
+				{ return clicked & enabled; } 
+				alias clickedAndEnabled this; 
+				
+				bool repeated() const
+				{
+					return pressed || captured && inputs.LMB.repeated; 
+					//Todo: architectural bug: captured is delayed by 1 frame according to repeated
+				} 
+			} 
+			
+			struct HitTestManager
+			{
+				
+				struct HitTestRec
+				{
+					SrcId id; 	//in the	next frame this must be the isSame
+					bounds2 hitBounds; 	/+
+						absolute bounds on the drawing where the hit test was made, 
+						later must be combined with View's transformation
+					+/
+					vec2 localPos; 	//relative to outerPos
+					bool clickable; 
+				} 
+				
+				//act frame
+				HitTestRec[] hitStack, lastHitStack; 
+				
+				float[SrcId] smoothHover; 
+				private void updateSmoothHover(ref HitTestRec[] actHitStack)
+				{
+					enum upSpeed = 0.5f, downSpeed = 0.25f; 
+					
+					//raise hover values
+					auto hoveredIds = actHitStack.map!"a.id".filter!"a".array.sort; 
+					foreach(id; hoveredIds)
+					smoothHover[id] = mix(smoothHover.get(id, 0), 1, upSpeed); 
+					
+					//lower (and remove) hover values
+					SrcId[] toRemove; 
+					foreach(id, ref value; smoothHover)
+					{
+						if(!hoveredIds.canFind(id))
+						{
+							value = mix(value, 0, downSpeed); 
+							if(value<0.02f)
+							toRemove ~= id; 
+						}
+					}
+					
+					foreach(h; toRemove)
+					smoothHover.remove(h); 
+				} 
+				
+				SrcId capturedId, clickedId, pressedId, releasedId; 
+				private void updateMouseCapture(ref HitTestRec[] hits)
+				{
+					//const topClickableId = hits.get(hits.length-1).id;
+					const topId = hits.retro.filter!(h => h.clickable).take(1).array.get(0).id; 
+					
+					//if LMB was just pressed, then it will be the captured control
+					//if LMB released, and the captured id is also hovered, the it is clicked.
+					
+					clickedId = pressedId = releasedId = SrcId.init; 
+					//normally it's 0 all the time, except that one frame it's clicked.
+					
+					with(mainWindow)
+					{
+						//Todo: get the mouse state from elsewhere!!!!!!!!!!!!!
+						if(topId && mouse.LMB && mouse.justPressed && canProcessUserInput)
+						{
+							 //Note: isForeground will not work with a toolwindow
+							pressedId = capturedId = topId; 
+						}
+						if(mouse.justReleased)
+						{
+							if(capturedId)
+							{
+								releasedId = capturedId; 
+								if(topId==capturedId)
+								clickedId = capturedId; 
+							}
+							capturedId = SrcId.init; 
+						}
+					}
+				} 
+				
+				void nextFrame()
+				{
+					lastHitStack = hitStack; 
+					hitStack = []; 
+					
+					updateSmoothHover(lastHitStack); 
+					updateMouseCapture(lastHitStack); 
+				} 
+				
+				void addHitRect(in SrcId id, in bounds2 hitBounds, in vec2 localPos, in bool clickable)
+				{
+					//must be called from each cell that needs mouse hit test
+					static if(addHitRectAsserts)
+					{
+						assert(id, "Null Id is illegal"); 
+						assert(!hitStack.any!(a => a.id==id), "Id already defined for cell: "~id.text); 
+					}
+					hitStack ~= HitTestRec(id, hitBounds, localPos, clickable); 
+				} 
+				
+				auto check(in SrcId id)
+				{
+					HitInfo h; 
+					h.id = id; 
+					if(id==SrcId.init)
+					return h; 	
+					h.hover		=	lastHitStack.map!"a.id".canFind(id); 
+					h.pressed		=	pressedId ==id; 
+					h.released		= releasedId==id; 
+					h.clicked	  = clickedId ==id; 
+					
+					h.captured	  = h.pressed || capturedId==id && h.hover; 
+					//Todo: architectural bug: captured is delayed by 1 frame according to repeated
+					
+					h.hover_smooth	  = smoothHover.get(id, 0); 
+					h.captured_smooth	  = max(h.hover_smooth, h.captured); 
+					h.hitBounds	  = lastHitStack.get(lastHitStack.map!"a.id".countUntil(id)).hitBounds; 
+					return h; 
+				} 
+				
+				version(/+$DIDE_REGION+/none) {
+					void draw(DrawingOld dr)
+					{
+						if(VisualizeHitStack)
+						{
+							dr.lineWidth = (QPS.value(second)*3).fract; 
+							dr.color = clFuchsia; 
+							
+							hitStack.map!"a.hitBounds".each!(b => dr.drawRect(b)); 
+							
+							dr.lineWidth = 1; 
+							dr.lineStyle = LineStyle.normal; 
+						}
+					} 
+				}
+				
+				auto stats()
+				{
+					return format(
+						"HitTest lengths: hitStack:%s, lastHitStack::%s, smoothHover::%s", 
+						hitStack.length, lastHitStack.length, smoothHover.length
+					); 
+				} 
+				
+			} 
+			
+			static auto hitTest(.Container container, bool enabled=true)
+			{
+				assert(container !is null); 
+				auto res = hitTestManager.check(container.id); 
+				res.enabled = enabled; 
+				return res; 
+			}  auto hitTest(bool enabled=true)
+			{ return hitTest(actContainer, enabled); } 
+		}
 		version(/+$DIDE_REGION Focus+/all)
 		{
 			struct FocusedState
@@ -6741,9 +6754,9 @@ struct im
 		}
 		version(/+$DIDE_REGION Hints+/all)
 		{
-			const float HintActivate_sec	 = 0.5,
-										HintDetails_sec	 = 2.5,
-										HintRelease_sec	 = 1; 
+			const 	float HintActivate_sec	 = 0.5,
+				HintDetails_sec	 = 2.5,
+				HintRelease_sec	 = 1; 
 			
 			struct HintRec
 			{
@@ -6770,7 +6783,9 @@ struct im
 			void hideHints()
 			{ hintState = HintState.idle; } 
 			
-			private enum hintHandler = q{
+			
+			deprecated private enum hintHandler = 
+			q{
 				{
 					static foreach(a; args)
 					static if(is(Unqual!(typeof(a)) == HintRec))
@@ -6785,6 +6800,16 @@ struct im
 					}
 				}
 			}; 
+			
+			void handleHint(.Container container, ref HintRec hintRec, ref HitInfo hit)
+			{
+				if(hintRec.markup.length && hit.hover)
+				{
+					hintRec.owner = container; 
+					hintRec.bounds = hit.hitBounds; 
+					addHint(hintRec); 
+				}
+			} 
 			
 			private void generateHints(in bounds2 screenBounds)
 			{
@@ -6891,220 +6916,9 @@ struct im
 			} 
 		}
 		
-		//! im internal state ////////////////////////////////////////////////////////////////
-		
-		Cell[] rootCells; //when containerStack is empty, this is the container
-		
-		auto rootContainers(bool forceAll)
-		{
-			auto res = rootCells.map!((c)=>((cast(.Container)(c)))).filter!"a".array; 
-			if(forceAll)
-			enforce(rootCells.length == res.length, "FATAL ERROR: All of rootCells[] must be non null and a descendant of Container."); 
-			return res; 
-		} 
-		
-		//double QPS=0, lastQPS=0, dt=0;
-		//Todo: ez qrvara megteveszto igy, jobb azonositokat kell kitalalni QPS helyett
-		
-		//Todo: ezt egy alias this-el egyszerusiteni. Jelenleg az im-ben is meg az im.StackEntry-ben is ugyanaz van redundansan deklaralva
-		.Container actContainer, lastContainer; //top of the containerStack for faster access
-		TextStyle textStyle;   alias style = textStyle; //Todo: style.opDispatch("fontHeight=0.5x")
-		string theme; //for now it's a str, later it will be much more complex
-		//valid values: "", "tool"
-		
-		@property
-		{
-			Id actId()
-			=> ((actContainer)?(actContainer.id):(Id.init)); 
-			
-			bool enabled()
-			=> ((actContainer)?(actContainer.flags.enabled):(true/+empty root is always enabled+/)); 
-			bool enabled(bool e)
-			{ if(actContainer) actContainer.flags.enabled = e; return e; } 
-		} 
-		
-		auto lastCell(T:Cell=Cell)()
-		{
-			Cell cell; 
-			if(actContainer && actContainer.subCells.length)
-			cell = actContainer.subCells[$-1]; 
-			return cast(T)cell; 
-		} 
-		
-		private struct StackEntry
-		{ .Container container; TextStyle textStyle; string theme; } 
-		private StackEntry[] stack; 
-		
-		//Note: build* functions are only callable from update()
-		
-		//Build an array of cells using a temporary container
-		Cell[] build(string srcModule=__MODULE__, size_t srcLine=__LINE__,A...)(in A args)
-		{
-			Container!(.Container, srcModule, srcLine)(args); 
-			return removeLastContainer.subCells; 
-		} 
-		
-		auto buildContainer(T : .Container, string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(in A args)
-		{
-			Container!(T, srcModule, srcLine)(args); 
-			return cast(T)removeLastContainer; 
-		} 
-		
-		auto buildRow   (string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(in A args)
-		{ return buildContainer!(.Row   , srcModule, srcLine)(args); } 
-		auto buildColumn(string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(in A args)
-		{ return buildContainer!(.Column, srcModule, srcLine)(args); } 
-		
-		void reset()
-		{
-			//statck reset
-			textStyle = tsNormal; 
-			theme = ""; 
-			
-			rootCells = []; 
-			stack = [StackEntry(null, textStyle, theme)]; 
-			actContainer = null; 
-			_incomingId = Id.init; 
-			
-			drawCallbacks.clear; 
-		} 
-		
-		private void push(T : .Container)(T c, in Id newId)
-		{
-			//Todo: ezt a newId-t ki kell valahogy valtani. im.id-t kell inkabb modositani.
-			c.id = newId; 
-			stack ~= StackEntry(c, textStyle, theme); 
-			
-			//actContainer is the top of the stack or null
-			actContainer = c; 
-		} 
-		
-		public void imPush(T : .Container)(T c, in Id newId) { push(c, newId); } 
-		
-		private void pop()
-		{
-			enforce(stack.length>1); //stack[0] is always null and it is never popped.
-			
-			//restore	the last textStyle & theme. Changes inside a subHierarchy doesn't count.
-			textStyle = stack.back.textStyle; 
-			theme = stack.back.theme; 
-			
-			stack.popBack; 
-			
-			//save actContainer here.
-			lastContainer = actContainer; 
-			
-			//actContainer is the top of the stack or null
-			actContainer = stack.empty ? null : stack.back.container; 
-			//Todo: the first stack container is always 0.
-		} 
-		
-		public void imPop() { pop; } 
-		
-		void dump()
-		{
-			writeln("---- IM dump --------------------------------"); 
-			foreach(cell; rootCells) cell.dump; 
-			writeln("---- End of IM dump -------------------------"); 
-		} 
-		
-		/+
-			270804: removed. It was only used in Chapter, this and also the stack artray must go.
-			In the future, stact will be replaced with the actual stack.
-			
-			private auto find(C:.Container)()
-			{
-				foreach_reverse(ref s;stack)
-				if(auto r = cast(C)(s.container))
-				return r; 
-				return null; 
-			} 
-		+/
-		
-		private void append(T)(T c)
-		{
-			if(actContainer !is null)	actContainer.append(c); 
-			else	rootCells ~= c; 
-		} 
-		
-		public void imAppend(T)(T c)
-		{ append(c); } 
-		
-		.Container removeLastContainer()
-		{
-			//needed for temporary composable building
-			return actContainer 	? actContainer.removeLastContainer
-				: (cast(.Container)(rootCells.fetchBack)); 
-		} 
-		
-		//DrawCallback ////////////////////////
-		alias DrawCallback = void delegate(Drawing, .Container); 
-		
-		private DrawCallback[.Container] drawCallbacks; 
-		
-		void addDrawCallback(DrawCallback fun)
-		{
-			enforce(actContainer !is null); 
-			enforce(!actContainer.flags._hasDrawCallback, "Container already has a DrawCallback."); 
-			
-			actContainer.flags._hasDrawCallback = true; 
-			drawCallbacks[actContainer] = fun; 
-		} 
-		
-		private auto getDrawCallback(.Container cntr)
-		{
-			if(auto cb = cntr in drawCallbacks)
-			return *cb; 
-			else return null; 
-		} 
-		
-		//easy access
-		
-		@property
-		{
-			float fh()
-			{ return textStyle.fontHeight; } 
-			void fh(float v)
-			{ textStyle.fontHeight = cast(ubyte)(v.iround); } 
-		} 
-		
-		auto subCells()
-		{ return actContainer.subCells; } 
-		auto subCells(T : .Cell)()
-		{ return actContainer.subCells.map!(c => cast(T)c).filter!(c => c !is null); } 
-		auto subContainers()
-		{ return actContainer.subContainers; } 
-		
-		//container delegates
-		//void opDispatch(string name, T...)(T args) { mixin("containerStack[$-1]." ~ name)(args); }
-		
-		private auto ContainerProp(string name)
-		=> q{
-			@property auto #()
-			{ return actContainer.#; } 
-			@property auto #(typeof(actContainer.#) val)
-			{ actContainer.# = val; return val; } 
-		}
-		.replace("#", name); 
-		
-		private auto ContainerRef(string name)
-		=> q{
-			ref auto #()
-			{ return actContainer.#; }; 
-		}.replace("#", name); 
-		
-		mixin(
-			[
-				"innerWidth", "outerWidth", "innerHeight", "outerHeight", 
-				"innerSize", "outerSize", "innerPos", "outerPos", "pos", 
-				"width", "height"
-			].map!ContainerProp.join ~
-			["flags", "flex", "margin", "border", "padding", "bkColor"].map!ContainerRef.join
-		); 
-		
 		//Parameter structs ///////////////////////////////////
 		//deprecated struct id      { uint val;  /*private*/ enum M = q{ auto id_ = file.xxh(line)^baseId;                          static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
-		immutable prepareId = q{auto id_ = combine(actId, srcId!(srcModule, srcLine)(args)); }; 
+		deprecated immutable prepareId = q{auto id_ = combine(actId, srcId!(_M_, _L_)(args)); }; 
 		
 		/*
 			struct enable 
@@ -7202,20 +7016,7 @@ struct im
 			=> range(min, max, step, RangeType.circular); 
 			auto endlessRange (float min, float max, float step=1)
 			=> range(min, max, step, RangeType.endless); 
-		}
-		
-		static auto hitTest(.Container container, bool enabled=true)
-		{
-			assert(container !is null); 
-			auto res = hitTestManager.check(container.id); 
-			res.enabled = enabled; 
-			return res; 
-		} 
-		
-		auto hitTest(bool enabled=true)
-		{ return hitTest(actContainer, enabled); } 
-		
-		
+		}
 		struct ScrollInfo
 		{
 			char orientation; 
@@ -7382,40 +7183,378 @@ struct im
 				print("-".replicate(40), orientation.to!string.lc~"ScrollInfo dump"); 
 				infos.values.each!print; 
 			} 
-		} 
+		} 
 		
 		auto hScrollInfo = ScrollInfo('H'); 
 		auto vScrollInfo = ScrollInfo('V'); 
-		
-		/+
-			Todo: Play with disabled inlining of Composable functions: /+Code: pragma(inline, false)+/
-			It requires an ASM inspector first.
-			Also I can try put _incomingId on the `im` scope too, so the parameters can remain the same.
-		+/
-		
-		private
+		
+		version(/+$DIDE_REGION internal state+/all)
 		{
-			Id _incomingId; //This must be loaded from __MODULE__ and __LINE__ before Container creation.
+			Cell[] rootCells; //when containerStack is empty, this is the container
 			
-			enum Debug_incomingId 	= (常!(bool)(0)),
-			Log_incomingId 	= (常!(bool)(0)); 
-			
-			void setIncomingId(string srcModule, size_t srcLine)()
+			auto rootContainers(bool forceAll)
 			{
-				static if(Debug_incomingId) enforce(!_incomingId, "_incomingId already set."); 
-				_incomingId = srcId2(srcModule, srcLine); 
-			} 
-			
-			auto fetchIncomingId()
-			{
-				static if(Debug_incomingId) enforce(_incomingId, "_incomingId not set."); 
-				auto res = _incomingId; 
-				static if(Debug_incomingId) _incomingId = Id.init; 
-				static if(Log_incomingId) LOG(res); 
+				auto res = rootCells.map!((c)=>((cast(.Container)(c)))).filter!"a".array; 
+				if(forceAll)
+				enforce(rootCells.length == res.length, "FATAL ERROR: All of rootCells[] must be non null and a descendant of Container."); 
 				return res; 
 			} 
-		} 
+			
+			//double QPS=0, lastQPS=0, dt=0;
+			//Todo: ez qrvara megteveszto igy, jobb azonositokat kell kitalalni QPS helyett
+			
+			//Todo: ezt egy alias this-el egyszerusiteni. Jelenleg az im-ben is meg az im.StackEntry-ben is ugyanaz van redundansan deklaralva
+			.Container actContainer, lastContainer; //top of the containerStack for faster access
+			TextStyle textStyle;   alias style = textStyle; //Todo: style.opDispatch("fontHeight=0.5x")
+			string theme; //for now it's a str, later it will be much more complex
+			//valid values: "", "tool"
+			
+			@property
+			{
+				Id actId()
+				=> ((actContainer)?(actContainer.id):(Id.init)); 
+				
+				bool enabled()
+				=> ((actContainer)?(actContainer.flags.enabled):(true/+empty root is always enabled+/)); 
+				bool enabled(bool e)
+				{ if(actContainer) actContainer.flags.enabled = e; return e; } 
+			} 
+			
+			auto lastCell(T:Cell=Cell)()
+			{
+				Cell cell; 
+				if(actContainer && actContainer.subCells.length)
+				cell = actContainer.subCells[$-1]; 
+				return cast(T)cell; 
+			} 
+			
+			private struct StackEntry
+			{ .Container container; TextStyle textStyle; string theme; } 
+			private StackEntry[] stack; 
+			
+			//Note: build* functions are only callable from update()
+			
+			//Build an array of cells using a temporary container
+			Cell[] build(string _M_=__MODULE__, size_t _L_=__LINE__,A...)(in A args)
+			{
+				Container!(.Container, _M_, _L_)(args); 
+				return removeLastContainer.subCells; 
+			} 
+			
+			auto buildContainer(T : .Container, string _M_=__MODULE__, size_t _L_=__LINE__, A...)(in A args)
+			{
+				Container!(T, srcModule, srcLine)(args); 
+				return cast(T)removeLastContainer; 
+			} 
+			
+			auto buildRow   (string _M_=__MODULE__, size_t _L_=__LINE__, A...)(in A args)
+			{ return buildContainer!(.Row   , srcModule, srcLine)(args); } 
+			auto buildColumn(string _M_=__MODULE__, size_t _L_=__LINE__, A...)(in A args)
+			{ return buildContainer!(.Column, srcModule, srcLine)(args); } 
+			
+			void reset()
+			{
+				//statck reset
+				textStyle = tsNormal; 
+				theme = ""; 
+				
+				rootCells = []; 
+				stack = [StackEntry(null, textStyle, theme)]; 
+				actContainer = null; 
+				_incomingId = Id.init; 
+				
+				drawCallbacks.clear; 
+			} 
+			
+			private void push(T : .Container)(T c, in Id newId)
+			{
+				//Todo: ezt a newId-t ki kell valahogy valtani. im.id-t kell inkabb modositani.
+				c.id = newId; 
+				stack ~= StackEntry(c, textStyle, theme); 
+				
+				//actContainer is the top of the stack or null
+				actContainer = c; 
+			} 
+			
+			public void imPush(T : .Container)(T c, in Id newId) { push(c, newId); } 
+			
+			private void pop()
+			{
+				enforce(stack.length>1); //stack[0] is always null and it is never popped.
+				
+				//restore	the last textStyle & theme. Changes inside a subHierarchy doesn't count.
+				textStyle = stack.back.textStyle; 
+				theme = stack.back.theme; 
+				
+				stack.popBack; 
+				
+				//save actContainer here.
+				lastContainer = actContainer; 
+				
+				//actContainer is the top of the stack or null
+				actContainer = stack.empty ? null : stack.back.container; 
+				//Todo: the first stack container is always 0.
+			} 
+			
+			public void imPop() { pop; } 
+			
+			void dump()
+			{
+				writeln("---- IM dump --------------------------------"); 
+				foreach(cell; rootCells) cell.dump; 
+				writeln("---- End of IM dump -------------------------"); 
+			} 
+			
+			/+
+				270804: removed. It was only used in Chapter, this and also the stack artray must go.
+				In the future, stact will be replaced with the actual stack.
+				
+				private auto find(C:.Container)()
+				{
+					foreach_reverse(ref s;stack)
+					if(auto r = cast(C)(s.container))
+					return r; 
+					return null; 
+				} 
+			+/
+			
+			private void append(T)(T c)
+			{
+				if(actContainer !is null)	actContainer.append(c); 
+				else	rootCells ~= c; 
+			} 
+			
+			public void imAppend(T)(T c)
+			{ append(c); } 
+			
+			.Container removeLastContainer()
+			{
+				//needed for temporary composable building
+				return actContainer 	? actContainer.removeLastContainer
+					: (cast(.Container)(rootCells.fetchBack)); 
+			} 
+			
+			//DrawCallback ////////////////////////
+			alias DrawCallback = void delegate(Drawing, .Container); 
+			
+			private DrawCallback[.Container] drawCallbacks; 
+			
+			void addDrawCallback(DrawCallback fun)
+			{
+				enforce(actContainer !is null); 
+				enforce(!actContainer.flags._hasDrawCallback, "Container already has a DrawCallback."); 
+				
+				actContainer.flags._hasDrawCallback = true; 
+				drawCallbacks[actContainer] = fun; 
+			} 
+			
+			private auto getDrawCallback(.Container cntr)
+			{
+				if(auto cb = cntr in drawCallbacks)
+				return *cb; 
+				else return null; 
+			} 
+			
+			//easy access
+			
+			@property
+			{
+				float fh()
+				{ return textStyle.fontHeight; } 
+				void fh(float v)
+				{ textStyle.fontHeight = cast(ubyte)(v.iround); } 
+			} 
+			
+			auto subCells()
+			{ return actContainer.subCells; } 
+			auto subCells(T : .Cell)()
+			{ return actContainer.subCells.map!(c => cast(T)c).filter!(c => c !is null); } 
+			auto subContainers()
+			{ return actContainer.subContainers; } 
+			
+			//container delegates
+			//void opDispatch(string name, T...)(T args) { mixin("containerStack[$-1]." ~ name)(args); }
+			
+			private auto ContainerProp(string name)
+			=> q{
+				@property auto #()
+				{ return actContainer.#; } 
+				@property auto #(typeof(actContainer.#) val)
+				{ actContainer.# = val; return val; } 
+			}
+			.replace("#", name); 
+			
+			private auto ContainerRef(string name)
+			=> q{
+				ref auto #()
+				{ return actContainer.#; }; 
+			}.replace("#", name); 
+			
+			mixin(
+				[
+					"innerWidth", "outerWidth", "innerHeight", "outerHeight", 
+					"innerSize", "outerSize", "innerPos", "outerPos", "pos", 
+					"width", "height"
+				].map!ContainerProp.join ~
+				["flags", "flex", "margin", "border", "padding", "bkColor"].map!ContainerRef.join
+			); 
+			
+			/+
+				Todo: Play with disabled inlining of Composable functions: /+Code: pragma(inline, false)+/
+				It requires an ASM inspector first.
+				Also I can try put _incomingId on the `im` scope too, so the parameters can remain the same.
+			+/
+			
+			private
+			{
+				/+Todo: 260812 I think the first parameter of _container is enough. This is just overcomplication.+/
+				
+				Id _incomingId; //This must be loaded from __MODULE__ and __LINE__ before Container creation.
+				
+				enum Debug_incomingId 	= (常!(bool)(0)),
+				Log_incomingId 	= (常!(bool)(0)); 
+				
+				/+
+					AI: /+User: One traditional Chinese Unicode character that represents the English word: id?+/
+					/+
+						Assistant: /+
+							Para: 它 (tā) — meaning "it" — is the traditional Chinese Unicode character that literally corresponds
+							to the Latin word /+Italic: id+/ (the pronoun "it"). In psychology, /+Italic: id+/ is conventionally rendered as /+Bold: 本我+/
+							(two characters), but if a single character is required, /+Bold: 它+/ is the closest direct translation.
+						+/
+						
+						/+Note: Usage(prompt_hit: 128, prompt_miss: 204, completion: 1419, HUF: 0.26, price: 200%)+/
+					+/
+				+/
+				
+				void setIncomingId(string srcModule, size_t srcLine)()
+				{
+					static if(Debug_incomingId) enforce(!_incomingId, "_incomingId already set."); 
+					_incomingId = Id(srcModule, srcLine); 
+				} 
+				
+				auto fetchIncomingId()
+				{
+					static if(Debug_incomingId) enforce(_incomingId, "_incomingId not set."); 
+					auto res = _incomingId; 
+					static if(Debug_incomingId) _incomingId = Id.init; 
+					static if(Log_incomingId) LOG(res); 
+					return res; 
+				} 
+			} 
+		}
+		
 		
+	}
+	version(/+$DIDE_REGION+/all)
+	{
+		private struct Scripting
+		{
+			static: 
+			enum StdPropertyDefs = 
+			(表([
+				[q{isG!"id"},q{/+already handled+/}],
+				[q{isT!PanelPosition},q{panelPosition = a; }],
+				[],
+				[q{//Properties (set only once at creation)
+				}],
+				[q{isT!YAlign},q{flags.yAlign = a; }],
+				[q{isT!HAlign},q{flags.hAlign = a; }],
+				[q{isT!VAlign},q{flags.vAlign = a; }],
+				[q{isG!"padding" || isT!Padding},q{padding = a; }],
+				[q{isG!"border" || isT!Border},q{border = a; }],
+				[q{isG!"margin" || isT!Margin},q{margin = a; }],
+				[q{isG!"flex"},q{flex = a; }],
+				[q{isG!"enabled"},q{enabled = a; }],
+			])),
+			
+			
+			StdCompositionDefs = 
+			(表([
+				[q{//Composition updates (can be changed any time)
+				}],
+				[q{isT!TextStyle},q{textStyle = a; }],
+				[q{isG!"style"},q{textStyle.modify(a); }],
+				[q{isG!"syntax" || isT!SyntaxKind},q{
+					textStyle.applySyntax(a.to!SyntaxKind); 
+					bkColor = textStyle.bkColor; 
+				}],
+				[q{isG!"theme"},q{theme = a; }],
+				[q{isG!"fontColor"},q{style.fontColor = a; }],
+				[q{isG!"bkColor" || isT!RGB},q{style.bkColor = bkColor = a; }],
+				[q{isG!"bold"},q{style.bold = a; }],
+				[q{isG!"italic"},q{style.italic = a; }],
+				[q{isG!"underline"},q{style.underline = a; }],
+				[],
+				[q{//Emitters
+				}],
+				[q{isSomeString!T},q{Text(a); }],
+				[q{is(T : Cell)},q{im.append(cast()a); }],
+				[q{is(T : const(Cell)[])},q{im.append(cast(Cell[])a); }],
+				[q{__traits(compiles, a())},q{a(); }],
+				[],
+				[q{/+
+					Todo: Read about undefined behaior when casting away consts.
+					In the parameters, const is maybe more efficient if the compiler 
+					does not analyze variable usage patterns.
+					ASM viewer needed.
+					/+Link: https://www.jmdavisprog.com/articles/why-const-sucks.html+/
+				+/}],
+			])); 
+			string CreateCustomContainer()
+			=> iq{
+				auto _id = combine(actId, fetchIncomingId); 
+				static foreach(a; args) static if(isGenericArg!(typeof(cast()a), "id")) _id.appendIdx(a.value); 
+				
+				const parentEnabled = enabled; 
+				
+				auto _container = new CType; 
+				append(_container); push(_container, _id); scope(exit) pop; 
+				enabled = parentEnabled; //Inherit from parent
+				_container.bkColor = style.bkColor; //Inherit bkcolor from the current fontStyle.
+				
+				PanelPosition panelPosition; 
+			}.text; 
+			
+			string CustomComponent_processProperties()
+			=> iq{
+				enum AllPropertyDefRows = CustomPropertyDefs.rows.array ~ Scripting.StdPropertyDefs.rows.array; 
+				static foreach(a; args)
+				{
+					{
+						alias T = typeof(cast()a); enum isT(Type) 	= is(T == Type),
+						isG(string Name) 	= isGenericArg!(T, Name); 
+						mixin(
+							AllPropertyDefRows.map!((r)=>(iq{static if($(r[0])) {$(r[1])}}.text))
+							.join(q{ else })
+						); 
+					}
+				}
+				
+				if(panelPosition) initializePanelPosition(_container, panelPosition, clientArea); 
+				scope(exit) if(panelPosition) finalizePanelPosition(_container, panelPosition, clientArea); 
+			}.text; 
+			
+			string CustomComponent_processComposition()
+			=> iq{
+				enum AllCompositionDefRows = CustomCompositionDefs.rows.array ~ Scripting.StdCompositionDefs.rows.array; 
+				static foreach(a; args)
+				{
+					{
+						alias T = typeof(cast()a); enum isT(Type) 	= is(T == Type),
+						isG(string Name) 	= isGenericArg!(T, Name); 
+						mixin(
+							chain(
+								AllPropertyDefRows.map!((r)=>(iq{static if($(r[0])) {}}.text)),
+								AllCompositionDefRows.map!((r)=>(iq{static if($(r[0])) {$(r[1])}}.text))
+							)
+							.join(q{ else })
+							~q{else static assert(0, "Unsupported type: "~T.stringof); }
+						); 
+					}
+				}
+			}.text; 
+		} 
 		
 		private void _Container(CType, Args...)(in Args args)
 		{
@@ -7444,171 +7583,140 @@ struct im
 			
 			version(/+$DIDE_REGION Return custom results+/all)
 			{ return; }
-		} 
-		
-		void Container(CType=.Container, string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args)
+		} 
+		void Container(CType=.Container, string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
 		{
-			setIncomingId!(srcModule, srcLine)(); 
+			setIncomingId!(_M_, _L_)(); 
 			return _Container!(CType)(args); 
 		} 
 		
-		
-		
-		void Row(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args)
+		void Row(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
 		{
-			setIncomingId!(srcModule, srcLine)(); 
+			setIncomingId!(_M_, _L_)(); 
 			return _Container!(.Row)(args); 
 		} 
-		void Column(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args)
+		
+		void Column(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
 		{
-			setIncomingId!(srcModule, srcLine)(); 
+			setIncomingId!(_M_, _L_)(); 
 			return _Container!(.Column)(args); 
 		} 
 		
-		void Panel(CType = .Column, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(in T args)
+		void Flex(float value = 1)
+		{ Row(((value).名!q{flex})); } 
+		
+		void Text(Args...)(in Args args)
 		{
-			enforce(actContainer is null, "Panel() must be on root level"); 
-			setIncomingId!(srcModule, srcLine)(); 
-			_Container!(CType)
-			(
-				{
-					padding = "3"; border = "6 normal silver"; 
-					with(border) inset = true, style = BorderStyle.fullFilletOut, borderFirst = true; 
-					flags.noBackground = true; 
-				}
-				, args
-			); 
-		} 
-		
-		/// It is used to put cached cells or subcells into the imgui.
-		void CellRef(Cell cell)
-		{ if(cell) Container({ actContainer.append(cell); }); } 
-		
-		void CellRef(Cell[] cells)
-		{ if(cells.length) Container({ actContainer.append(cells); }); } 
-		
-		//popup state
-		struct PopupState
-		{
-			Cell cell; //the popup itself
-			Cell parent; //the initiator of the popup
+			//Todo: not multiline yet
 			
-			HAlign hAlign; 
-			VAlign vAlign; 
-			
-			void reset()
-			{
-				hAlign = HAlign.left; 
-				vAlign = VAlign.bottom; 
-				cell = null; 
-				parent = null; 
-			} 
-			
-			void doAlign()
-			{
-				//must be called after measure
-				/*
-					if(cell && parent){
-						switch(hAlign){
-							case HAlign.right: cell.outerPos.x = parent.outerRight-cell.outerWidth; break;
-							default: cell.outerPos.x = parent.outerPos.x;
-						}
-						switch(vAlign){
-							case VAlign.top: cell.outerY = parent.outerBottom-cell.outerHeight; break;
-							default: cell.outerY = parent.outerY; break;
-						}
-					}
-				*/
-				
-				if(cell)
-				{
-					if(parent)
-					{
-						auto bnd = .Container._savedComboBounds; 
-						cell.outerPos = vec2(bnd.left+2, bnd.bottom-2); 
-					}
-				}
-			} 
-		} 
-		PopupState popupState; 
-		
-		private void Popup(Cell parent, void delegate() contents)
-		{
-			//Popup for combobox only ////////////////////////////////////
 			/+
-				Todo: this check is not working because of the IM gui. 
-				When ComboBox1 is pulled down and the user clicks on ComboBox2
+				multiline behaviour:
+					parent is Row: if multiline -> make a column around it
+					parent is column: multiline is ok. Multiple row emit
+					actContainer is null: root level gets a lot of rows
+					
+					Text is always making one line, even in a container. Use \n for multiple rows
 			+/
-			//commented out intentionally: enforce(popupState.cell is null, "im.Popup() already called.");
 			
-			auto oldLen = actContainer.subCells.length; 
-			contents(); 
-			auto extraLen = actContainer.subCells.length-oldLen; 
+			if(Args.length>1 &&(actContainer is null || (cast(.Column)(actContainer)) !is null))
+			{/*implicit row*/Row({ Text(args); }); return; }
 			
-			if(extraLen==0)
-			return; 
-			if(extraLen>1)
-			raise("Popup must contain only one Cell"); 
+			bool restoreTextStyle = false; 
+			TextStyle oldTextStyle; 
+			void saveTextStyle() { if(restoreTextStyle.chkSet) oldTextStyle = textStyle; } 
+			scope(exit) if(restoreTextStyle) textStyle = oldTextStyle; 
 			
-			auto popup = actContainer.removeLast; 
-			append(popup); 
+			void emitStr(string s)
+			{
+				if(.Column col = (cast(.Column)(actContainer)))
+				{
+					//implicit Rows for Column
+					Row(
+						{
+							/+before 260812: Text(s); +/
+							actContainer.appendMarkupLine(s, textStyle); 
+							//Difference: the new version can alter the style
+						}
+					); 
+				}
+				else if(.Row row = (cast(.Row)(actContainer)))
+				{ row.appendMarkupLine(s, textStyle); }
+				else
+				{ actContainer.appendMarkupLine(s, textStyle); }
+			} 
 			
-			popupState.cell = popup; 
-			popupState.parent = parent; 
+			static foreach(a; args)
+			{
+				{
+					alias T = typeof(cast()a); 
+					enum isT(Type) 	= is(T == Type),
+					isG(string Name) 	= isGenericArg!(T, Name); 
+					
+					/+
+						static if(isG!"flex")	{ Flex(a); }
+						else static if(isT!TextStyle)	{ saveTextStyle; textStyle = a; }
+						else static if(isT!RGB)	{ saveTextStyle; textStyle.fontColor = a; }
+						else static if(isT!SyntaxKind)	{ saveTextStyle; textStyle.applySyntax(a); }
+						else static if(__traits(compiles, a()))	{ a(); }
+						else	{ emitStr(a.text); /+general case+/}
+					+/
+					
+					mixin((
+						(表([
+							[q{isG!"flex"},q{Flex(a); }],
+							[q{isT!TextStyle},q{saveTextStyle; textStyle = a; }],
+							[q{isG!"style"},q{saveTextStyle; textStyle.modify(a); }],
+							[q{
+								isG!"fontColor" || isT!RGB
+								
+							},q{saveTextStyle; textStyle.fontColor = a; }],
+							[q{isG!"bkColor"},q{saveTextStyle; style.bkColor = a; }],
+							[q{isG!"syntax" || isT!SyntaxKind},q{saveTextStyle; textStyle.applySyntax(a); }],
+							[q{isG!"bold"},q{saveTextStyle; style.bold = a; }],
+							[q{isG!"italic"},q{saveTextStyle; style.italic = a; }],
+							[q{isG!"underline"},q{saveTextStyle; style.underline = a; }],
+							[q{__traits(compiles, a())},q{a(); }],
+							[q{true},q{emitStr(a.text); /+general case+/}],
+						]))
+					) .GEN!q{
+						rows.map!((r)=>(iq{static if($(r[0])) {$(r[1])}}.text))
+						.join(q{ else })
+					}); 
+				}
+			}
 		} 
+		
+		
+		
 		
 		
 		
-		void Flex(float value = 1)
-		{ Row({ flex = value; }); } 
+		string symbolStr(string def)
+		{ return tag(`symbol `~def); }  void Symbol(string def)
+		{ Text(symbolStr(def)); } 
 		
-		string symbol(string def)
-		{ return tag(`symbol `~def); } 
-		void Symbol(string def)
-		{ Text(symbol(def)); } 
-		
-		void Img(string def)
-		{ Img(File(def)); } 
-		
-		void Img(File f)
-		{
-			//Text(tag(`img ` ~ f.fullName.optionallyQuotedFileName));
-			//Todo: Markup thing is broken with complicated filenames. Quoted filename not works: range error.
-			
-			version(VulkanUI) {
-				bitmaps[f]; /+
-					Todo: In vulkan there is no delayed refresh of images.
-					All this have to be solved! 
-					26.02.03 It is temporarily fixed.
-				+/
-			}
-			else { bitmaps(f); }
-			
-			append(new .Img(f)); 
-		} 
-		
-		string bold	  (string s)	
+		string boldStr(string s)	
 		=> tag("style bold=1"	  )~s~tag("style bold=0"	  ); 
-		string italic		(string s)
+		string italicStr(string s)
 		=> tag("style italic=1"	  )~s~tag("style italic=0"	  ); 
-		string underline(string s)
+		string underlineStr(string s)
 		=> tag("style underline=1")~s~tag("style underline=0"); 
-		string strikeout(string s)
+		string strikeoutStr(string s)
 		=> tag("style strikeout=1")~s~tag("style strikeout=0"); 
 		
-		string progressSpinner(int style=1)
+		string progressSpinnerStr(int progressStyle=0)
 		{
 			int t(int n)
 			{ return ((QPS.value(second)*n*1.5).ifloor)%n; } 
 			auto ch(int i)
 			{ return [cast(dchar)i].to!string; } 
 			
-			switch(style)
+			switch(progressStyle)
 			{
-				case 0: return ch(0x25f4+3-t(4)); //circle 90deg lines
-				case 1: return ch(0x25d0+3-[0, 2, 1, 3][t(4)]); //circle 90deg lines
-				case 2: return ch(0x1f550+t(12)); //clock
-				default: return "..."; 
+				case 0: 	return ch(0x25f4+3-t(4)); 	//◴ circle 90deg lines
+				case 1: 	return ch(0x25d0+3-[0, 2, 1, 3][t(4)]); 	//◐ circle 180deg filled
+				case 2: 	return ch(0x1f550+t(12)); 	//🕐 clock
+				default: 	return "..."; 
 			}
 		} 
 		
@@ -7617,95 +7725,18 @@ struct im
 			Row(
 				{
 					style.fontColor = mix(style.bkColor, style.fontColor, .66f); 
-					Text(" "~progressSpinner(progressStyle)~" "); 
+					Text(" "~progressSpinnerStr(progressStyle)~" "); 
 				}
 			); 
-		} 
-		
-		//Todo: flex N is fucked up. Treats N as 1 always.
-		//Todo: flex() function cant work because of flex property.
-		//string flex(string markup){ return tag(["flex", markup].join(" ")); }
-		//string flex(float value){ return flex(value.text); } //kinda lame to do it with texts
-		
-		//Text /////////////////////////////////
-		void Text(/*string srcModule=__MODULE__, size_t srcLine=__LINE__,*/ T...)(T args)
-		{
-			//Todo: not multiline yet
-			
-			//multiline behaviour:
-			//parent is Row: if multiline -> make a column around it
-			//parent is column: multiline is ok. Multiple row emit
-			//actContainer is null: root level gets a lot of rows
-			
-			//Text is always making one line, even in a container. Use \n for multiple rows
-			if(args.length>1 &&(actContainer is null || (cast(.Column)(actContainer)) !is null))
-			{
-				//implicit row
-				Row({ Text/*!(file, line)*/(args); }); 
-				return; 
-			}
-			
-			bool restoreTextStyle = false; 
-			TextStyle oldTextStyle; 
-			static foreach(a; args)
-			{
-				{
-					alias t = Unqual!(typeof(a)); 
-					
-					static if(is(t == _FlexValue))
-					{
-						//nasty workaround for flex() and flex property
-						append(new FlexRow("", style)); 
-					}
-					else static if(is(t == TextStyle))
-					{
-						if(chkSet(restoreTextStyle))
-						oldTextStyle = textStyle; 
-						textStyle = a; 
-					}
-					else static if(is(t == RGB))
-					{ textStyle.fontColor = a; }
-					else static if(is(t == SyntaxKind))
-					{ textStyle.applySyntax(a); }
-					else static if(__traits(compiles, a()))
-					{ a(); }
-					else
-					{
-						//general case, handles as string
-						auto s = a.text; 
-						if(.Column col = (cast(.Column)(actContainer)))
-						{
-							Row({ Text(s); }); //implicit Rows for Column
-						}
-						else if(.Row row = (cast(.Row)(actContainer)))
-						{ row.appendMarkupLine(s, textStyle); }
-						else
-						{ actContainer.appendMarkupLine(s, textStyle); }
-					}
-				}
-			}
-			
-			if(restoreTextStyle)
-			textStyle = oldTextStyle; 
-			
-			/*
-					auto r = cast(.Row)actContainer;
-				if(r) r.appendMarkupLine(text, textStyle);
-				 else Row({ Text(text); });
-			*/
 		} 
 		
 		void TAB()
 		{ Text("\t"); } 	void NL()
 		{ Text("\n"); } 
 		
-		void Comment(/*string srcModule=__MODULE__, size_t srcLine=__LINE__, */T...)(T args)
-		{
-			//It seems a good idea, as once I wanted to type Comment(.. instead of Text(tsComment...
-			Text/*!(file, line)*/(tsComment, args); 
-		} 
+		void Comment(Args...)(in Args args)
+		{ Text(tsComment, args); } 
 		
-		//Bullet ///////////////////////////////////
 		void Bullet()
 		{
 			Row({ outerWidth = fh*2; Flex; Text(tag("char 0x2022")); Flex; }); 
@@ -7716,18 +7747,37 @@ struct im
 		} 
 		
 		void Bullet(void delegate() contents)
-		{
-			Row(
-				{
-					Bullet; 
-					if(contents)
-					contents(); 
-				}
-			); 
-		} 	void Bullet(string text)
+		{ Row({ Bullet; if(contents) contents(); }); } 
+		
+		void Bullet(string text)
 		{ Bullet({ Text(text); }); } 
-		
-		//Spacer //////////////////////////
+		
+		void Img(File f)
+		{
+			//Text(tag(`img ` ~ f.fullName.optionallyQuotedFileName));
+			//Todo: Markup thing is broken with complicated filenames. Quoted filename not works: range error.
+			//Todo: The Id is not specifiable.
+			//Todo: This should be a fully customizable container. Img is in fact a container.
+			
+			version(VulkanUI) {
+				bitmaps[f]; 
+				/+
+					Todo: 260812 This is not necessary, inside Img there is a cached bitmaps[f] call.
+					But for safety I'm not commenting it out.
+				+/
+			}
+			else { bitmaps(f); }
+			/+
+				Todo: In vulkan there is no delayed refresh of images.
+				All this have to be solved! 
+				26.02.03 It is temporarily fixed.
+			+/
+			
+			im.append(new .Img(f)); 
+		} 
+		
+		void Img(string def)
+		{ Img(File(def)); } 
 		private void SpacerRow(Args...)(float size, in Args args)
 		{
 			const vert = (cast(.Row)(actContainer)) !is null; 
@@ -7768,7 +7818,22 @@ struct im
 		void HLine()
 		{ Row({ innerHeight = 1; bkColor = mix(clWinBackground, clWinText, .25f); }); } 
 		
-		void Grp(alias Cntr=Column, string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)
+		void Panel(CType = .Column, string _M_=__MODULE__, size_t _L_=__LINE__, T...)(in T args)
+		{
+			enforce(actContainer is null, "Panel() must be on root level"); 
+			setIncomingId!(_M_, _L_)(); 
+			_Container!(CType)
+			(
+				{
+					padding = "3"; border = "6 normal silver"; 
+					with(border) inset = true, style = BorderStyle.fullFilletOut, borderFirst = true; 
+					flags.noBackground = true; 
+				}
+				, args
+			); 
+		} 
+		
+		void Grp(alias Cntr=Column, string _M_=__MODULE__, size_t _L_=__LINE__, A...)
 			(void delegate() fun, in A args)
 		{
 			Cntr(
@@ -7779,7 +7844,7 @@ struct im
 			); 
 		} 
 		
-		void Grp(alias Cntr=Column, string srcModule=__MODULE__, size_t srcLine=__LINE__, T, A...)
+		void Grp(alias Cntr=Column, string _M_=__MODULE__, size_t _L_=__LINE__, T, A...)
 			(T title, void delegate() fun, in A args)
 		{
 			Container!GrpContainer
@@ -7790,7 +7855,7 @@ struct im
 					lastContainer.measure; 
 					const hh = lastContainer.outerHeight; 
 					
-					Grp!(Cntr, srcModule, srcLine)
+					Grp!(Cntr, _M_, _L_)
 					(
 						{
 							margin.top += (hh*(3/8.0f)).iround; 
@@ -7803,135 +7868,164 @@ struct im
 				}
 			); 
 		} 
-		
-		
-		
-		//apply Btn and Edit style////////////////////////////////////
-		
-		void applyBtnBorder(in RGB bColor = clWinBtn)
+		
+		version(/+$DIDE_REGION Styling+/all)
 		{
-			//Todo: use it for edit as well
-			margin	= Margin(2, 2, 2, 2); 
-			border	= Border(2, BorderStyle.normal, bColor); 
-			padding	= Padding(2, 2, 2, 2); 
-			if(theme == "tool")
+			void applyBtnBorder(in RGB bColor = clWinBtn)
 			{
-				border.width    = 1; 
-				border.inset = true; 
-				margin .top = margin .bottom = 0; 
-				padding.top = padding.bottom = 0; 
-			}
-		} 
-		
-		void applyLinkStyle(bool enabled, bool focused, bool captured, float hover)
+				//Todo: use it for edit as well
+				margin	= Margin(2, 2, 2, 2); 
+				border	= Border(2, BorderStyle.normal, bColor); 
+				padding	= Padding(2, 2, 2, 2); 
+				if(theme == "tool")
+				{
+					border.width    = 1; 
+					border.inset = true; 
+					margin .top = margin .bottom = 0; 
+					padding.top = padding.bottom = 0; 
+				}
+			} 
+			
+			void applyLinkStyle(bool enabled, bool focused, bool captured, float hover)
+			{
+				style = tsNormal; 
+				
+				float highlight = 0; 
+				if(!enabled)
+				{ style.fontColor = clWinBtnDisabledText; }else
+				{
+					highlight = max(hover*0.66f, captured); 
+					style.fontColor = mix(clWinText, clAccent, highlight); 
+				}
+				
+				style.underline = highlight > 0.5f; 
+				
+				//Todo: handle focused
+			} 
+			
+			void applyBtnStyle(
+				bool isWhite, bool enabled, bool focused, 
+				bool selected, bool captured, float hover
+			)
+			{
+				const oldFh = style.fontHeight; 
+				style = tsBtn; 
+				style.fontHeight = oldFh; 
+				
+				auto bColor = mix(style.bkColor, clWinBtnHoverBorder, hover); 
+				
+				applyBtnBorder(bColor); 
+				
+				flags.selected = selected; 
+				/+
+					Todo: nem itt van a helye. minden containernek kezelnie kell a selected 
+					generic parametert, 	a focused mar kozpontositva van. 
+					Az enabledet is meg kell igy csinalni.
+				+/
+				
+				if(!enabled)
+				{
+					style.fontColor	= clWinBtnDisabledText; 
+					style.bkColor 	= mix(style.bkColor, clWinBackground, .66f); 
+					border.color	= style.bkColor; 
+				}
+				else if(captured)
+				{
+					border.style	  = BorderStyle.none; 
+					style.bkColor	  = clWinBtnPressed; 
+				}
+				
+				if(isWhite)
+				{
+					if(captured)
+					style.bkColor = mix(clWinBackground, clWinBtnPressed, .5f); 
+					else style.bkColor = clWinBackground; 
+				}
+				
+				if(theme == "tool")
+				{
+					//every appearance is lighter on a toolBtn
+					style.bkColor   = mix(style.bkColor, tsNormal.bkColor, .5f); 
+					if(captured && enabled)
+					border.width = 0; //this if() makes the edge squareish
+				}
+				
+				if(selected)
+				{
+					style.bkColor	= mix(style.bkColor, clAccent, .5f); 
+					border.color	= mix(border.color , clAccent, .5f); 
+				}
+				
+				bkColor = style.bkColor; 
+				//Todo: update the backgroundColor of the container. Should be automatic, but how?...
+				//Todo: handle focused
+			} 
+			
+			void applyEditStyle(bool enabled, bool focused, float hover)
+			{
+				style   = tsNormal; 
+				
+				auto bColor = focused	? clAccent : !enabled
+					? mix(clWinBtn, style.bkColor, 0.5f)
+					: mix(clWinBtn, clWinBtnHoverBorder, hover); 
+				
+				applyBtnBorder(bColor); 
+				
+				if(!enabled)
+				{ style.fontColor = mix(style.fontColor, style.bkColor, 0.5f); }
+				
+				bkColor = style.bkColor; 
+			} 
+		}
+		auto Static(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(in T0 value, T args)
 		{
-			style = tsNormal; 
-			
-			float highlight = 0; 
-			if(!enabled)
-			{ style.fontColor = clWinBtnDisabledText; }else
+			static if(is(T0 : Property))
 			{
-				highlight = max(hover*0.66f, captured); 
-				style.fontColor = mix(clWinText, clAccent, highlight); 
+				auto p = cast(Property)value; 
+				Static!(_M_, _L_)(p.asText, hint(p.hint), args); 
 			}
-			
-			style.underline = highlight > 0.5f; 
-			
-			//Todo: handle focused
-		} 
-		
-		void applyBtnStyle(
-			bool isWhite, bool enabled, bool focused, 
-			bool selected, bool captured, float hover
-		)
-		{
-			const oldFh = style.fontHeight; 
-			style = tsBtn; 
-			style.fontHeight = oldFh; 
-			
-			auto bColor = mix(style.bkColor, clWinBtnHoverBorder, hover); 
-			
-			applyBtnBorder(bColor); 
-			
-			flags.selected = selected; 
-			/+
-				Todo: nem itt van a helye. minden containernek kezelnie kell a selected 
-				generic parametert, 	a focused mar kozpontositva van. 
-				Az enabledet is meg kell igy csinalni.
-			+/
-			
-			if(!enabled)
+			else
 			{
-				style.fontColor	= clWinBtnDisabledText; 
-				style.bkColor 	= mix(style.bkColor, clWinBackground, .66f); 
-				border.color	= style.bkColor; 
+				Row!(_M_, _L_)
+				(
+					{
+						mixin(prepareId); 
+						actContainer.id = id_; 
+						auto hit = hitTest(enabled); 
+						
+						mixin(hintHandler); 
+						applyEditStyle(true, false, 0); //Todo: Enabled in static???
+						style = tsNormal; 
+						
+						border.color = mix(border.color, style.bkColor, .5f); 
+						
+						static if(std.traits.isNumeric!T0)
+						flags.hAlign = HAlign.right; 
+						else flags.hAlign = HAlign.left; 
+						
+						static if(__traits(compiles, value()))
+						value(); 
+						else Text(value.text); 
+						
+						static foreach(a; args)
+						static if(__traits(compiles, a()))
+						a(); 
+						
+						//set minimal height for the control if empty
+						if(actContainer.subCells.empty && innerHeight<=0)
+						innerHeight = fh; 
+					}
+				); 
 			}
-			else if(captured)
-			{
-				border.style	  = BorderStyle.none; 
-				style.bkColor	  = clWinBtnPressed; 
-			}
-			
-			if(isWhite)
-			{
-				if(captured)
-				style.bkColor = mix(clWinBackground, clWinBtnPressed, .5f); 
-				else style.bkColor = clWinBackground; 
-			}
-			
-			if(theme == "tool")
-			{
-				//every appearance is lighter on a toolBtn
-				style.bkColor   = mix(style.bkColor, tsNormal.bkColor, .5f); 
-				if(captured && enabled)
-				border.width = 0; //this if() makes the edge squareish
-			}
-			
-			if(selected)
-			{
-				style.bkColor	= mix(style.bkColor, clAccent, .5f); 
-				border.color	= mix(border.color , clAccent, .5f); 
-			}
-			
-			bkColor = style.bkColor; 
-			//Todo: update the backgroundColor of the container. Should be automatic, but how?...
-			//Todo: handle focused
-		} 
-		
-		void applyEditStyle(bool enabled, bool focused, float hover)
-		{
-			style   = tsNormal; 
-			
-			auto bColor = focused	? clAccent : !enabled
-				? mix(clWinBtn, style.bkColor, 0.5f)
-				: mix(clWinBtn, clWinBtnHoverBorder, hover); 
-			
-			applyBtnBorder(bColor); 
-			
-			if(!enabled)
-			{ style.fontColor = mix(style.fontColor, style.bkColor, 0.5f); }
-			
-			bkColor = style.bkColor; 
-		} 
-	}
-	version(/+$DIDE_REGION+/all)
-	{
-		
-		struct EditResult
-		{
-			HitInfo hit; 
-			bool changed, focused; 
-			alias changed this; 
-		} 
-		
-		auto Edit(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(ref T0 value, T args)
+		} 
+		auto Edit(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(ref T0 value, T args)
 		{
 			NOTIMPL("Doube precision View2D bug: Clicking at any position seeks only to the beginning os text."); 
 			
 			static if(is(T0==Path))
-			return EditPath!(srcModule, srcLine)(value, args); //Todo: not good! There will be 2 returns!!!
+			return EditPath!(_M_, _L_)(value, args); //Todo: not good! There will be 2 returns!!!
 			static if(is(T0==File))
-			return EditFile!(srcModule, srcLine)(value, args); //Todo: not good! There will be 2 returns!!!
+			return EditFile!(_M_, _L_)(value, args); //Todo: not good! There will be 2 returns!!!
 			
 			enum IsNum = std.traits.isNumeric!T0; 
 			
@@ -7939,6 +8033,12 @@ struct im
 			static if(IsNum)
 			mixin(range.M); 
 			
+			static struct EditResult
+			{
+				HitInfo hit; 
+				bool changed, focused; 
+				alias changed this; 
+			} 
 			EditResult res; 
 			
 			void value2editor()
@@ -8119,7 +8219,7 @@ struct im
 			return res; //a hit testet vissza kene adni im.valtozoban
 		} 
 		alias EditFile = EditFileOrPath, EditPath = EditFileOrPath; 
-		auto EditFileOrPath(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, Args...)
+		auto EditFileOrPath(string _M_=__MODULE__, size_t _L_=__LINE__, T, Args...)
 			(ref T act, in Args args)
 			if (is(T == Path) || is(T == File))
 		{
@@ -8130,7 +8230,7 @@ struct im
 			} Res res; 
 			
 			
-			Row!(srcModule, srcLine)
+			Row!(_M_, _L_)
 			(
 				args,
 				{
@@ -8188,7 +8288,7 @@ struct im
 						if(res.changed)
 						{
 							//Todo: These buttons ain't work with mouse. Only Enter/Esc works.
-							if(Btn(symbol("Accept"), ((res.valid).名!q{enabled})))
+							if(Btn(symbolStr("Accept"), ((res.valid).名!q{enabled})))
 							{
 								act = *edited; 
 								res.editing = false; 
@@ -8196,7 +8296,7 @@ struct im
 								res.mustRefresh = true; 
 								focusedState.reset; 
 							}
-							if(Btn(symbol("Cancel")))
+							if(Btn(symbolStr("Cancel")))
 							{
 								*edited = act; 
 								res.editing = false; 
@@ -8209,7 +8309,7 @@ struct im
 					{
 						static if(is(T == Path))
 						{
-							if(res.valid && Btn(symbol("Refresh")))
+							if(res.valid && Btn(symbolStr("Refresh")))
 							{ res.mustRefresh = true; }
 						}
 					}
@@ -8219,58 +8319,16 @@ struct im
 			return res; 
 		} 
 		
-		
-		
-		auto Static(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(in T0 value, T args)
-		{
-			static if(is(T0 : Property))
-			{
-				auto p = cast(Property)value; 
-				Static!(srcModule, srcLine)(p.asText, hint(p.hint),args); 
-			}else
-			{
-				Row(
-					{
-						mixin(prepareId); 
-						actContainer.id = id_; 
-						auto hit = hitTest(enabled); 
-						
-						mixin(hintHandler); 
-						applyEditStyle(true, false, 0); //Todo: Enabled in static???
-						style = tsNormal; 
-						
-						border.color = mix(border.color, style.bkColor, .5f); 
-						
-						static if(std.traits.isNumeric!T0)
-						flags.hAlign = HAlign.right; 
-						else flags.hAlign = HAlign.left; 
-						
-						static if(__traits(compiles, value()))
-						value(); 
-						else Text(value.text); 
-						
-						static foreach(a; args)
-						static if(__traits(compiles, a()))
-						a(); 
-						
-						//set minimal height for the control if empty
-						if(actContainer.subCells.empty && innerHeight<=0)
-						innerHeight = fh; 
-					}
-				); 
-			}
-		} 
-		
-		auto IncBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, int sign=1, T0, T...)
+		auto IncBtn(string _M_=__MODULE__, size_t _L_=__LINE__, int sign=1, T0, T...)
 			(ref T0 value, T args)
 			if(sign!=0 && isNumeric!T0)
 		{
 			mixin(range.M); 
 			
-			auto capt = symbol(`Calculator` ~ ((sign>0)?(`Addition`):(`Subtract`))); 
+			auto capt = symbolStr(`Calculator` ~ ((sign>0)?(`Addition`):(`Subtract`))); 
 			enum isInt = isIntegral!T0; 
 			
-			auto hit = Btn!(srcModule, srcLine)(capt, args, ((sign).名!q{id}), ((true).名!q{focusOnPress})); 
+			auto hit = Btn!(_M_, _L_)(capt, args, ((sign).名!q{id}), ((true).名!q{focusOnPress})); 
 			//2 id's can pass because of the static foreach
 			
 			bool chg; 
@@ -8290,18 +8348,18 @@ struct im
 			return chg; 
 		} 
 		
-		auto DecBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(ref T0 value, T args)
-		{ return IncBtn!(srcModule, srcLine, -1)(value, args); } 
+		auto DecBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(ref T0 value, T args)
+		{ return IncBtn!(_M_, _L_, -1)(value, args); } 
 		
-		auto IncDecBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(ref T0 value, T args)
+		auto IncDecBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(ref T0 value, T args)
 		{
 			bool res; 
 			Row(
 				{
 					flags.btnRowLines = true; 
-					auto r1 = DecBtn!(srcModule, srcLine)(value, args); 
+					auto r1 = DecBtn!(_M_, _L_)(value, args); 
 					lastCell.margin.right = 0; 
-					auto r2 = IncBtn!(srcModule, srcLine)(value, args); 
+					auto r2 = IncBtn!(_M_, _L_)(value, args); 
 					lastCell.margin.left = 0; 
 					res = r1 || r2; 
 				}
@@ -8309,22 +8367,22 @@ struct im
 			return res; 
 		} 
 		
-		auto IncDec(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(ref T0 value, T args)
+		auto IncDec(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(ref T0 value, T args)
 		{
 			auto oldValue = value; 
 			
-			Edit!(srcModule, srcLine)(value, { width = 2*fh; }, args); 
+			Edit!(_M_, _L_)(value, { width = 2*fh; }, args); 
 			//Todo: na itt total nem vilagos, hogy az args hova megy, meg mi a result
 			
 			IncDecBtn(value, args); 
 			return oldValue != value; 
 		} 
 		
-		auto WhiteBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(T0 text, T args)
-		{ return Btn!(srcModule, srcLine, true, T0, T)(text, args); } 
+		auto WhiteBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(T0 text, T args)
+		{ return Btn!(_M_, _L_, true, T0, T)(text, args); } 
 		
 		version(/+$DIDE_REGION+/all) {
-			auto Btn0(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)
+			auto Btn0(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)
 				if(isSomeString!T0 || __traits(compiles, text()) )
 			{
 				mixin(prepareId, selected.M); 
@@ -8367,12 +8425,12 @@ struct im
 				//KeyCombo in click mode.
 				static foreach(a; args)
 				static if(is(typeof(a) == KeyCombo))
-				if(mainWindow.canProcessUserInput && a.pressed)
+				if(canProcessUserInput && a.pressed)
 				hit.clicked = true; 
 				
 				return hit; 
 			} 
-			auto Btn1(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isWhite=false, Args...)(in Args args)
+			auto Btn1(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, Args...)(in Args args)
 			{
 				
 				CustomContainer!
@@ -8424,16 +8482,16 @@ struct im
 					//After composition, finalization
 					q{}
 				)
-				(srcId2(srcModule, srcLine), args); 
+				(Id(_M_, _L_), args); 
 				
 				HitInfo hit;  //Todo: hit
 				//Todo: keycombo
 				
 				return hit; 
 			} 
-			HitInfo Btn(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isWhite=false, Args...)(in Args args)
+			HitInfo Btn(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, Args...)(in Args args)
 			{
-				setIncomingId!(srcModule, srcLine)(); 
+				setIncomingId!(_M_, _L_)(); 
 				return _Btn!(isWhite)(args); 
 			} 
 			
@@ -8442,7 +8500,8 @@ struct im
 				version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
 				{
 					alias CType = .Row; 
-					mixin(Scripting.CreateCustomContainer); //it leaves the `_container`, `_id` variables on this scope
+					mixin(Scripting.CreateCustomContainer); 
+					//it leaves the `_container`, `_id` variables on this scope
 				}
 				
 				version(/+$DIDE_REGION Local variable declarations+/all)
@@ -8468,14 +8527,8 @@ struct im
 				
 				version(/+$DIDE_REGION Do custom behavior+/all)
 				{
-					hit = hitTest(enabled); 
-					
-					if(hintRec.markup.length && hit.hover)
-					{
-						hintRec.owner = _container; 
-						hintRec.bounds = hit.hitBounds; 
-						addHint(hintRec); 
-					}
+					hit = hitTest(_container, enabled); 
+					handleHint(_container, hintRec, hit); 
 					
 					bool focused = focusUpdate
 					(
@@ -8494,11 +8547,11 @@ struct im
 				
 				version(/+$DIDE_REGION Handle the recursive composition+/all)
 				{
+					void handleKey(KeyCombo key)
+					{ if(canProcessUserInput && key.pressed) hit.clicked = true; } 
+					
 					enum CustomCompositionDefs = 
-					(表([[q{/+
-						nothing to do here for Btn, 
-						it is mixed in with an empty table to handle standart composition state updates.
-					+/}],])); 
+					(表([[q{isT!KeyCombo || isG!"key"},q{handleKey(KeyCombo(cast()a)); }],])); 
 					mixin(Scripting.CustomComponent_processComposition); 
 				}
 				
@@ -8511,109 +8564,15 @@ struct im
 			} 
 			
 			version(/+$DIDE_REGION+/all) {
-				struct Scripting
-				{
-					static: 
-					enum StdPropertyDefs = 
-					(表([
-						[q{isG!"id"},q{/+already handled+/}],
-						[q{isT!PanelPosition},q{panelPosition = a; }],
-						[],
-						[q{//Properties (set only once at creation)
-						}],
-						[q{isT!YAlign},q{flags.yAlign = a; }],
-						[q{isT!HAlign},q{flags.hAlign = a; }],
-						[q{isT!VAlign},q{flags.vAlign = a; }],
-						[q{isG!"padding" || isT!Padding},q{padding = a; }],
-						[q{isG!"border" || isT!Border},q{border = a; }],
-						[q{isG!"margin" || isT!Margin},q{margin = a; }],
-						[q{isG!"flex"},q{flex = a; }],
-						[q{isG!"enabled"},q{enabled = a; }],
-					])),
-					
-					StdCompositionDefs = 
-					(表([
-						[q{//Composition updates (can be changed any time)
-						}],
-						[q{isT!TextStyle},q{textStyle = a; }],
-						[q{isG!"style"},q{textStyle.modify(a); }],
-						[q{isG!"syntax" || isT!SyntaxKind},q{
-							textStyle.applySyntax(a.to!SyntaxKind); 
-							bkColor = textStyle.bkColor; 
-						}],
-						[q{isG!"theme"},q{theme = a; }],
-						[q{isG!"fontColor"},q{style.fontColor = a; }],
-						[q{isG!"bold"},q{style.bold = a; }],
-						[q{isG!"italic"},q{style.italic = a; }],
-						[q{isG!"bkColor" || isT!RGB},q{style.bkColor = bkColor = a; }],
-						[],
-						[q{//Emitters
-						}],
-						[q{isFunctionPointer!a || isDelegate!a},q{a(); }],
-						[q{isSomeString!T},q{Text(a); }],
-					])); 
-					string CreateCustomContainer()
-					=> iq{
-						auto _id = combine(actId, fetchIncomingId); 
-						static foreach(a; args) static if(isGenericArg!(typeof(cast()a), "id")) _id.appendIdx(a.value); 
-						
-						const parentEnabled = enabled; 
-						
-						auto _container = new CType; 
-						append(_container); push(_container, _id); scope(exit) pop; 
-						enabled = parentEnabled; //Inherit from parent
-						_container.bkColor = style.bkColor; //Inherit bkcolor from the current fontStyle.
-						
-						PanelPosition panelPosition; 
-					}.text; 
-					
-					string CustomComponent_processProperties()
-					=> iq{
-						enum AllPropertyDefRows = CustomPropertyDefs.rows.array ~ Scripting.StdPropertyDefs.rows.array; 
-						static foreach(a; args)
-						{
-							{
-								alias T = typeof(cast()a); enum isT(Type) 	= is(T == Type),
-								isG(string Name) 	= isGenericArg!(T, Name); 
-								mixin(
-									AllPropertyDefRows.map!((r)=>(iq{static if($(r[0])) {$(r[1])}}.text))
-									.join(q{ else })
-								); 
-							}
-						}
-						
-						if(panelPosition) initializePanelPosition(_container, panelPosition, clientArea); 
-						scope(exit) if(panelPosition) finalizePanelPosition(_container, panelPosition, clientArea); 
-					}.text; 
-					
-					string CustomComponent_processComposition()
-					=> iq{
-						enum AllCompositionDefRows = CustomCompositionDefs.rows.array ~ Scripting.StdCompositionDefs.rows.array; 
-						static foreach(a; args)
-						{
-							{
-								alias T = typeof(cast()a); enum isT(Type) 	= is(T == Type),
-								isG(string Name) 	= isGenericArg!(T, Name); 
-								mixin(
-									chain(
-										AllPropertyDefRows.map!((r)=>(iq{static if($(r[0])) {}}.text)),
-										AllCompositionDefRows.map!((r)=>(iq{static if($(r[0])) {$(r[1])}}.text))
-									)
-									.join(q{ else })
-									~q{else static assert(0, "Unsupported type: "~T.stringof); }
-								); 
-							}
-						}
-					}.text; 
-				} 
+				
 				
 			}
 		}
 		//BtnRow //////////////////////////////////
 		
-		auto BtnRow(Cntr = .Row, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(void delegate() fun, in T args)
+		auto BtnRow(Cntr = .Row, string _M_=__MODULE__, size_t _L_=__LINE__, T...)(void delegate() fun, in T args)
 		{
-			Container!(Cntr, srcModule, srcLine)(
+			Container!(Cntr, _M_, _L_)(
 				{
 					flags.btnRowLines = true; 
 					
@@ -8642,11 +8601,11 @@ struct im
 			); 
 		} 
 		
-		auto BtnRow(Cntr = .Row, string srcModule=__MODULE__, size_t srcLine=__LINE__, T...)(ref int idx, in string[] captions, in T args)
+		auto BtnRow(Cntr = .Row, string _M_=__MODULE__, size_t _L_=__LINE__, T...)(ref int idx, in string[] captions, in T args)
 		{
 			auto last = idx; 
 			
-			BtnRow!(Cntr, srcModule, srcLine)(
+			BtnRow!(Cntr, _M_, _L_)(
 				{
 					foreach(i0, capt; captions)
 					{
@@ -8660,28 +8619,28 @@ struct im
 			return last != idx; 
 		} 
 		
-		auto BtnRow(Cntr = .Row, string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)(ref A value, in A[] items, in Args args)
+		auto BtnRow(Cntr = .Row, string _M_=__MODULE__, size_t _L_=__LINE__, A, Args...)(ref A value, in A[] items, in Args args)
 		{
 			auto idx = cast(int) items.countUntil(value); //Todo: it's a copy from ListBox. Refactor needed
-			auto res = BtnRow!(Cntr, srcModule, srcLine)(idx, items, args); 
+			auto res = BtnRow!(Cntr, _M_, _L_)(idx, items, args); 
 			if(res)
 			value = items[idx]; 
 			return res; 
 		} 
 		
 		//Todo: (enum, enum[]) is ambiguous!!! only (enum) works on its the full members.
-		auto BtnRow(Cntr = .Row, string srcModule=__MODULE__, size_t srcLine=__LINE__, E, Args...)(ref E e, in Args args)
+		auto BtnRow(Cntr = .Row, string _M_=__MODULE__, size_t _L_=__LINE__, E, Args...)(ref E e, in Args args)
 		if(is(E==enum))
 		{
 			string s = e.text; 
-			auto res = BtnRow!(Cntr, srcModule, srcLine)(s, EnumMemberNames!E, args); 
+			auto res = BtnRow!(Cntr, _M_, _L_)(s, EnumMemberNames!E, args); 
 			if(res)
 			ignoreExceptions({ e = s.to!E; }); 
 			return res; 
 		} 
 		
 		
-		bool TabsHeader(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, I, A...)(T[] items, ref I idx, A args)
+		bool TabsHeader(string _M_=__MODULE__, size_t _L_=__LINE__, T, I, A...)(T[] items, ref I idx, A args)
 			if(isIntegral!I)
 		{
 			static customDraw(Drawing dr, .Container cntr)
@@ -8733,7 +8692,7 @@ struct im
 			} 
 			
 			bool clicked; 
-			Row!(srcModule, srcLine)
+			Row!(_M_, _L_)
 			(
 				{
 					foreach(i; 0..items.length)
@@ -8767,9 +8726,9 @@ struct im
 			return clicked; 
 		} 
 		
-		void TabsPage(string srcModule=__MODULE__, size_t srcLine=__LINE__, A...)(A args)
+		void TabsPage(string _M_=__MODULE__, size_t _L_=__LINE__, A...)(A args)
 		{
-			Column!(srcModule, srcLine)
+			Column!(_M_, _L_)
 			(
 				{
 					bool materialStyle = true; 
@@ -8786,7 +8745,7 @@ struct im
 		
 		void Tabs(
 			alias mapTitle = "a.title", alias mapUI = "a.UI()", R, I, 
-			string srcModule=__MODULE__, size_t srcLine=__LINE__, A...
+			string _M_=__MODULE__, size_t _L_=__LINE__, A...
 		)(R r, ref I idx, A args)
 		{
 			mixin(prepareId); 
@@ -8815,8 +8774,8 @@ struct im
 			//Todo: includeAll is broken when title is a callable 
 			
 			
-			TabsHeader!(srcModule, srcLine)(titles, idx); 
-			TabsPage!(srcModule, srcLine)
+			TabsHeader!(_M_, _L_)(titles, idx); 
+			TabsPage!(_M_, _L_)
 			(
 				{
 					if(idx>=0 && idx<len)
@@ -8834,7 +8793,7 @@ struct im
 			); 
 		} 
 		
-		auto Link(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(T0 text, T args)
+		auto Link(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(T0 text, T args)
 			if(isSomeString!T0 || __traits(compiles, text()) )
 		{
 			mixin(prepareId); 
@@ -8885,20 +8844,20 @@ struct im
 			//KeyCombo in click mode.
 			static foreach(a; args)
 			static if(is(typeof(a) == KeyCombo))
-			if(mainWindow && a.pressed)
+			if(canProcessUserInput && a.pressed)
 			hit.clicked = true; 
 			
 			return hit; 
 		} 
 		
-		auto ToolBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(T0 text, T args)
+		auto ToolBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(T0 text, T args)
 		{
 			 //shorthand for tool theme
 			auto old = theme; theme = "tool"; scope(exit) theme = old; 
-			return Btn!(srcModule, srcLine)(text, args); 
+			return Btn!(_M_, _L_)(text, args); 
 		} 
 		
-		auto OldListItem(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, T...)(T0 text, T args)
+		auto OldListItem(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(T0 text, T args)
 			if(isSomeString!T0 || __traits(compiles, text()) )
 		{
 			mixin(prepareId, enable.M, selected.M); 
@@ -8949,7 +8908,7 @@ struct im
 		
 		
 		//ChkBox //////////////////////////////
-		auto ChkBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, string chkBoxStyle="chk", C, T...)(ref bool state, C caption, T args)
+		auto ChkBox(string _M_=__MODULE__, size_t _L_=__LINE__, string chkBoxStyle="chk", C, T...)(ref bool state, C caption, T args)
 		{
 			mixin(prepareId, selected.M); 
 			
@@ -8995,20 +8954,20 @@ struct im
 			return hit; 
 		} 
 		
-		auto ChkBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, string chkBoxStyle="chk", T...)(Property prop, string caption, T args)
+		auto ChkBox(string _M_=__MODULE__, size_t _L_=__LINE__, string chkBoxStyle="chk", T...)(Property prop, string caption, T args)
 		{
 			auto bp = cast(BoolProperty)prop; 
 			enforce(bp !is null); 
 			auto last = bp.act; 
-			auto res = ChkBox!(srcModule, srcLine)(bp.act, caption.empty ? prop.caption : caption, genericId(prop.name), hint(prop.hint), args); 
+			auto res = ChkBox!(_M_, _L_)(bp.act, caption.empty ? prop.caption : caption, genericId(prop.name), hint(prop.hint), args); 
 			bp.uiChanged |= last != bp.act; 
 			return res; 
 		} 
 		
-		auto RadioBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, C, T...)(ref bool state, C caption, T args)
-		{ return ChkBox!(srcModule, srcLine, "radio")(state, caption, args); } 
+		auto RadioBtn(string _M_=__MODULE__, size_t _L_=__LINE__, C, T...)(ref bool state, C caption, T args)
+		{ return ChkBox!(_M_, _L_, "radio")(state, caption, args); } 
 		
-		auto Led(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, Ta...)(T param, Ta args)
+		auto Led(string _M_=__MODULE__, size_t _L_=__LINE__, T, Ta...)(T param, Ta args)
 		{
 			mixin(prepareId); 
 			auto hit = hitTestManager.check(id_); 
@@ -9051,9 +9010,9 @@ struct im
 			*/
 		} 
 		
-		auto LedBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, Args...)(void delegate() ledFun, T caption, in Args args)
+		auto LedBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T, Args...)(void delegate() ledFun, T caption, in Args args)
 		{
-			return Btn!(srcModule, srcLine)(
+			return Btn!(_M_, _L_)(
 				{
 					flags.hAlign = HAlign.left; 
 					ledFun(); 
@@ -9067,9 +9026,9 @@ struct im
 			); 
 		} 
 		
-		auto LedBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, Args...)(bool ledState, RGB ledColor, T caption, in Args args)
+		auto LedBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T, Args...)(bool ledState, RGB ledColor, T caption, in Args args)
 		{
-			return LedBtn!(srcModule, srcLine)(
+			return LedBtn!(_M_, _L_)(
 				{
 					if(ledColor!=clBlack)
 					{ flags.hAlign = HAlign.left; Led(ledState, ledColor); }
@@ -9078,11 +9037,11 @@ struct im
 		} 
 		
 		
-		auto ListBoxItem(string srcModule=__MODULE__, size_t srcLine=__LINE__, C, Args...)
+		auto ListBoxItem(string _M_=__MODULE__, size_t _L_=__LINE__, C, Args...)
 			(ref bool isSelected, C s, in Args args)
 		{
 			HitInfo hit; 
-			Row!(srcModule, srcLine)
+			Row!(_M_, _L_)
 			(
 				{
 					hit = hitTest(enabled); 
@@ -9116,7 +9075,7 @@ struct im
 			alias changed this; 
 		} 
 		
-		auto ListBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)
+		auto ListBox(string _M_=__MODULE__, size_t _L_=__LINE__, A, Args...)
 			(ref int idx, in A[] items, in Args args)
 		{
 			mixin(prepareId); //Todo: enabled, tool theme
@@ -9164,24 +9123,24 @@ struct im
 			return ListBoxResult(hit, changed); 
 		} 
 		
-		auto ListBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)
+		auto ListBox(string _M_=__MODULE__, size_t _L_=__LINE__, A, Args...)
 			(ref A value, A[] items, Args args)
 		{
 			auto idx = cast(int) items.countUntil(value); 
 			//Opt: slow search. iterates items twice: 1. in this, 2. in the main ListBox funct
 			
-			auto res = ListBox!(srcModule, srcLine)(idx, items, args); 
+			auto res = ListBox!(_M_, _L_)(idx, items, args); 
 			if(res)
 			value = items[idx]; 
 			return res; 
 		} 
 		
-		auto ListBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, E, Args...)
+		auto ListBox(string _M_=__MODULE__, size_t _L_=__LINE__, E, Args...)
 			(ref E e, Args args)
 			if(is(E==enum))
 		{
 			auto s = e.text; 
-			auto res = ListBox!(srcModule, srcLine)(s, getEnumMembers!E, args); 
+			auto res = ListBox!(_M_, _L_)(s, getEnumMembers!E, args); 
 			if(res)
 			ignoreExceptions({ e = s.to!E; }); 
 			return res; 
@@ -9191,14 +9150,14 @@ struct im
 			Todo: the parameters of all the ListBox-es, ComboBoxes must be refactored. 
 			It's a lot of copy paste and yet it's far from full accessible functionality.
 		+/
-		static void ScrollListBox(T, U, string srcModule=__MODULE__ , size_t srcLine=__LINE__)
+		static void ScrollListBox(T, U, string _M_=__MODULE__ , size_t _L_=__LINE__)
 			(ref T focusedItem, U items, void delegate(in T) cellFun, int pageSize, ref int topIndex)
 			if(isInputRange!U && is(ElementType!U == T))
 		{
 			auto scrollMax = max(0, items.walkLength.to!int-pageSize); 
 			topIndex = topIndex.clamp(0, scrollMax); 
 			auto view = items.drop(topIndex).take(pageSize).array; 
-			Row!(srcModule, srcLine)(
+			Row!(_M_, _L_)(
 				{
 					ListBox(focusedItem, view, cellFun); 
 					if(1 || scrollMax)
@@ -9211,7 +9170,76 @@ struct im
 			); 
 		} 
 		
-		auto PopupBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, T0, Args...)(T0 text, Args args)
+		struct PopupState
+		{
+			Cell cell; //the popup itself
+			Cell parent; //the initiator of the popup
+			
+			HAlign hAlign; 
+			VAlign vAlign; 
+			
+			void reset()
+			{
+				hAlign = HAlign.left; 
+				vAlign = VAlign.bottom; 
+				cell = null; 
+				parent = null; 
+			} 
+			
+			void doAlign()
+			{
+				//must be called after measure
+				/*
+					if(cell && parent){
+						switch(hAlign){
+							case HAlign.right: cell.outerPos.x = parent.outerRight-cell.outerWidth; break;
+							default: cell.outerPos.x = parent.outerPos.x;
+						}
+						switch(vAlign){
+							case VAlign.top: cell.outerY = parent.outerBottom-cell.outerHeight; break;
+							default: cell.outerY = parent.outerY; break;
+						}
+					}
+				*/
+				
+				if(cell)
+				{
+					if(parent)
+					{
+						auto bnd = .Container._savedComboBounds; 
+						cell.outerPos = vec2(bnd.left+2, bnd.bottom-2); 
+					}
+				}
+			} 
+		} 
+		PopupState popupState; 
+		
+		private void Popup(Cell parent, void delegate() contents)
+		{
+			//Popup for combobox only ////////////////////////////////////
+			/+
+				Todo: this check is not working because of the IM gui. 
+				When ComboBox1 is pulled down and the user clicks on ComboBox2
+			+/
+			//commented out intentionally: enforce(popupState.cell is null, "im.Popup() already called.");
+			
+			auto oldLen = actContainer.subCells.length; 
+			contents(); 
+			auto extraLen = actContainer.subCells.length-oldLen; 
+			
+			if(extraLen==0)
+			return; 
+			if(extraLen>1)
+			raise("Popup must contain only one Cell"); 
+			
+			auto popup = actContainer.removeLast; 
+			append(popup); 
+			
+			popupState.cell = popup; 
+			popupState.parent = parent; 
+		} 
+		
+		auto PopupBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T0, Args...)(T0 text, Args args)
 			if((isSomeString!T0 || __traits(compiles, text())) && Args.length>=1 && __traits(compiles, args[$-1]()) )
 		{
 			Cell btn; 
@@ -9285,7 +9313,7 @@ struct im
 			}
 		} 
 		
-		auto ComboBox_idx(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)(ref int idx, in A[] items, Args args)
+		auto ComboBox_idx(string _M_=__MODULE__, size_t _L_=__LINE__, A, Args...)(ref int idx, in A[] items, Args args)
 		{
 			 //ComboBox ////////////////////////////////
 			//Todo: enabled
@@ -9295,7 +9323,7 @@ struct im
 			enum translated = anySatisfy!(isTranslator, Args); 
 			
 			Cell btn; 
-			auto hit = WhiteBtn!(srcModule, srcLine)
+			auto hit = WhiteBtn!(_M_, _L_)
 				(
 				{
 					btn = actContainer; 
@@ -9318,7 +9346,7 @@ struct im
 					}
 					
 					Flex; 
-					Row({ flags.clickable = false; Text(" ", symbol("ChevronDown"), " "); }); 
+					Row({ flags.clickable = false; Text(" ", symbolStr("ChevronDown"), " "); }); 
 				}, args
 			); 
 			
@@ -9349,10 +9377,10 @@ struct im
 						{
 							static foreach(f; args)
 							static if(isTranslator!(typeof(f)))
-							res = ListBox!(srcModule, srcLine)(idx, items, genericId(1), &inheritComboWidth, f); 
+							res = ListBox!(_M_, _L_)(idx, items, genericId(1), &inheritComboWidth, f); 
 							 //Todo: this translator appending is a big mess
 						}else
-						{ res = ListBox!(srcModule, srcLine)(idx, items, genericId(1), &inheritComboWidth); }
+						{ res = ListBox!(_M_, _L_)(idx, items, genericId(1), &inheritComboWidth); }
 						
 						if(res.hit.hover && inputs.LMB.released)
 						{
@@ -9365,25 +9393,25 @@ struct im
 			return res; 
 		} 
 		
-		auto ComboBox_ref(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)(ref A value, in A[] items, Args args)
+		auto ComboBox_ref(string _M_=__MODULE__, size_t _L_=__LINE__, A, Args...)(ref A value, in A[] items, Args args)
 		{
 			auto idx = cast(int) items.countUntil(value); 
-			auto res = ComboBox_idx!(srcModule, srcLine)(idx, items, args); 
+			auto res = ComboBox_idx!(_M_, _L_)(idx, items, args); 
 			if(res)
 			value = items[idx]; 
 			return res; 
 		} 
 		
-		auto ComboBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)(ref int idx, in A[] items, Args args)
-		{ return ComboBox_idx!(srcModule, srcLine, A, Args)(idx, items, args); } 
+		auto ComboBox(string _M_=__MODULE__, size_t _L_=__LINE__, A, Args...)(ref int idx, in A[] items, Args args)
+		{ return ComboBox_idx!(_M_, _L_, A, Args)(idx, items, args); } 
 		
-		auto ComboBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, A, Args...)(ref A value, in A[] items, Args args)
-		{ return ComboBox_ref!(srcModule, srcLine, A, Args)(value, items, args); } 
+		auto ComboBox(string _M_=__MODULE__, size_t _L_=__LINE__, A, Args...)(ref A value, in A[] items, Args args)
+		{ return ComboBox_ref!(_M_, _L_, A, Args)(value, items, args); } 
 		
-		auto ComboBox(string srcModule=__MODULE__, size_t srcLine=__LINE__, E, T...)(ref E e, T args) if(is(E==enum))
+		auto ComboBox(string _M_=__MODULE__, size_t _L_=__LINE__, E, T...)(ref E e, T args) if(is(E==enum))
 		{
 			auto s = e.text; 
-			auto res = ComboBox!(srcModule, srcLine)(s, EnumMemberNames!E, args); 
+			auto res = ComboBox!(_M_, _L_)(s, EnumMemberNames!E, args); 
 			if(res)
 			ignoreExceptions({ e = s.to!E; }); 
 			return res; 
@@ -9745,7 +9773,7 @@ struct im
 					
 					//res.focused = focused;
 					
-					if(focused && mainWindow.canProcessUserInput)
+					if(focused && canProcessUserInput)
 					userModified |= sliderState.handleKeyboard(nPos, range_, 8); 
 					
 					bkColor = ts.bkColor; 
@@ -9975,7 +10003,7 @@ struct im
 				} 
 			} 
 			
-			auto Slider(string srcModule=__MODULE__, size_t srcLine=__LINE__, V, T...)(ref V value, T args)
+			auto Slider(string _M_=__MODULE__, size_t _L_=__LINE__, V, T...)(ref V value, T args)
 				if(isFloatingPoint!V || isIntegral!V)
 			{
 				mixin(prepareId, selected.M, range.M);  //Todo: selected???
@@ -10189,7 +10217,7 @@ struct im
 					} 
 				} 
 				
-				auto HRuler_smooth(string srcModule=__MODULE__, size_t srcLine=__LINE__, T, Args...)
+				auto HRuler_smooth(string _M_=__MODULE__, size_t _L_=__LINE__, T, Args...)
 					(
 					const T tMin, const T tMax, ref T t0, ref T t1,
 					Args args /+optional: /+Structured: &t0_smooth, &t1_smooth+/+/
@@ -10423,7 +10451,7 @@ struct im
 					
 					ref rss = dateTimeRulerScrollState; 
 					
-					if(focused && mainWindow.canProcessUserInput)
+					if(focused && canProcessUserInput)
 					{
 						//mouse and kbd handling on the top half as a scrollbar slider
 						{
@@ -10605,11 +10633,11 @@ struct im
 				} 
 			} 
 			
-			auto Node(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(ref bool state, void delegate() title, void delegate() contents, Args args)
+			auto Node(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(ref bool state, void delegate() title, void delegate() contents, Args args)
 			{
 				 //Node ////////////////////////////
 				HitInfo hit; 
-				Column!(srcModule, srcLine)(
+				Column!(_M_, _L_)(
 					{
 						border.width = 1; //Todo: ossze kene tudni kombinalni a szomszedos node-ok bordereit.
 						border.color = mix(style.bkColor, style.fontColor, state ? .1f : 0); 
@@ -10639,8 +10667,8 @@ struct im
 				return hit; 
 			} 
 			
-			auto Node(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(ref bool state, string title, void delegate() contents, Args args)
-			{ return Node!(srcModule, srcLine)(state, { Text(title); }, contents, args); } 
+			auto Node(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(ref bool state, string title, void delegate() contents, Args args)
+			{ return Node!(_M_, _L_)(state, { Text(title); }, contents, args); } 
 			
 			/// A node header that usually connects to a server, can have an error message and a state of refreshing. It can has a refresh button too
 			void RefreshableNodeHeader(THeader)(THeader header, string error, bool refreshing, void delegate() onRefresh)
@@ -10687,13 +10715,13 @@ struct im
 								}
 							); 
 							auto cntr = removeLastContainer; 
-							cells = cntr.subCells;  //Note: this retirns the last char or a whole error string produced by text markup processor.
+							cells = cntr.subCells;  //Note: this returns the last char or a whole error string produced by text markup processor.
 							return cells; 
 						},
-						(ref Cell[] c){ cells = c; }
+						((ref Cell[] c){ cells = c; })
 					); 
 					
-					CellRef(cells); 
+					Container(cells); //Must create a new container because of the different outerPos when used multiple times.
 				}
 			} 
 			
@@ -10708,7 +10736,7 @@ struct im
 			
 				.Document actDocument; 
 			
-				void Document(string srcModule=__MODULE__, size_t srcLine=__LINE__)(string title, void delegate() contents = null)
+				void Document(string _M_=__MODULE__, size_t _L_=__LINE__)(string title, void delegate() contents = null)
 			{
 				auto doc = new .Document; 
 				
@@ -10717,7 +10745,7 @@ struct im
 				
 				doc.title = title; 
 				doc.lastChapterLevel = 0; 
-				append(doc); push(doc, srcId!(srcModule, srcLine)); scope(exit) { pop; actDocument = null; }
+				append(doc); push(doc, srcId!(_M_, _L_)); scope(exit) { pop; actDocument = null; }
 				
 				if(!title.empty)
 				{
@@ -10728,8 +10756,8 @@ struct im
 				contents(); 
 			} 
 			
-				void Document(string srcModule=__MODULE__, size_t srcLine=__LINE__)(void delegate() contents = null)
-			{ Document!(srcModule, srcLine)("", contents); } 
+				void Document(string _M_=__MODULE__, size_t _L_=__LINE__)(void delegate() contents = null)
+			{ Document!(_M_, _L_)("", contents); } 
 			
 				//Chapter /////////////////////////
 				void Chapter(string title, void delegate() contents = null)

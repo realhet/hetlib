@@ -2220,6 +2220,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		T value; 
 		
+		this(T a) { value = a; } 
+		this(in string srcModule, in size_t srcLine) { this = srcId2(srcModule, srcLine); } 
+		
 		bool opCast(B : bool)() const { return value != T.init; } 
 		
 		/*
@@ -2241,9 +2244,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		=> SrcId(cast(SrcId.T)hashOf(srcLine, hashOf(srcModule))); 
 		
 		//Note: string hash is 32 bit only, so the proper way to combine line and module is hash(line, hash(module))
-		auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args)
+		auto srcId(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
 		{
-			auto id = SrcId(cast(SrcId.T)hashOf(srcLine, hashOf(srcModule))); 
+			auto id = SrcId(cast(SrcId.T)hashOf(_L_, hashOf(_M_))); 
 			//Note: direkt van 2 hashOf, mert a hashOf(srcModule, x), az csak 32 bites!!!!
 			mixin(appendGenericIds("id")); 
 			return id; 
@@ -2260,9 +2263,9 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		SrcId srcId2(string srcModule, size_t srcLine)
 		=> SrcId(srcLocationStr2(srcModule, srcLine)); 
 		
-		auto srcId(string srcModule=__MODULE__, size_t srcLine=__LINE__, Args...)(in Args args)
+		auto srcId(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
 		{
-			auto id = SrcId(srcLocationStr!(srcModule, srcLine)); 
+			auto id = SrcId(srcLocationStr!(_M_, _L_)); 
 			//.d is included to make sourceModule detection easier
 			mixin(appendGenericIds("id")); 
 			return id; 
@@ -3331,15 +3334,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A3AB59F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A3FC59F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A47359F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A4C459F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1A51D59F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1A59259F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1A56E59F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1A5E359F156A1})); 
 						+/
 					+/
 				+/

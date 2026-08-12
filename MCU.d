@@ -393,7 +393,7 @@ struct ConnectorInfo
 //A clickable button with the connector type. Clicking shows a ConnectorPanel.
 
 //ConnectorBtn //////////////////////////////////////////////////
-void ConnectorBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isWhite=false, T...)(string conn, string[string] pinColorMap, T args)
+void ConnectorBtn(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, T...)(string conn, string[string] pinColorMap, T args)
 {
 	with(im)
 	{
@@ -419,7 +419,8 @@ void ConnectorBtn(string srcModule=__MODULE__, size_t srcLine=__LINE__, bool isW
 		IMData* imData; 
 		
 		if(
-			Btn!(srcModule, srcLine, isWhite)(
+			Btn!(_M_, _L_, isWhite)
+			(
 				{
 					
 					if(!ci.valid)
@@ -582,14 +583,14 @@ class ArduinoNanoProject
 								{
 									flex = 1; 
 									if(identifier!="")
-									{ Text(bold(label), "  "); }
+									{ Text(boldStr(label), "  "); }
 									if(description.isWild("*WARNING:*"))
 									{
 										Text(wild[0]); 
 										const blink = QPS.value(second).fract<.5; 
 										style.bkColor = blink ? clRed : clWhite; 
 										style.fontColor = !blink ? clRed : clWhite; 
-										Text("\u26A0 ", bold(wild[1])); 
+										Text("\u26A0 ", boldStr(wild[1])); 
 									}else
 									{
 										if(description!="")
@@ -634,7 +635,7 @@ class ArduinoNanoProject
 					{
 						flags.yAlign = YAlign.baseline; 
 						ColorRow(color); 
-						fh = 22; 	  Text("  ", bold(name)); 
+						fh = 22; 	  Text("  ", boldStr(name)); 
 						fh = 3; 	  Text("\n "); 
 						fh = 18; 
 						foreach(const wire; wires)

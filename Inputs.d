@@ -311,9 +311,9 @@ version(/+$DIDE_REGION+/all)
 		bool valid(size_t n)
 		{ return entries(n) !is null; } 
 		bool valid()
-		{ return !keys.empty && iota(keys.length).map!(i => valid(i)).all; } 
+		{ return !keys.empty && iota(keys.length).map!((i)=>(valid(i))).all; } 
 		
-		int keyModifierMask() const
+		int keyModifierMask()
 		{ return keys.keyModifierMask; } 
 		
 		bool pressed()
