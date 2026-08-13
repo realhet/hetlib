@@ -713,7 +713,7 @@ version(/+$DIDE_REGION+/all)
 	
 	string unTag(string s)
 	{
-		 //converts tag characters to their visual symbols
+		//converts tag characters to their visual symbols
 		string res; 
 		res.reserve(s.length); 
 		
@@ -724,7 +724,6 @@ version(/+$DIDE_REGION+/all)
 			case '\u00B6': res ~= tag("char 0xB6"); break; 
 			default: res ~= ch; 
 		}
-		
 		
 		return res; 
 	} 
@@ -1879,9 +1878,6 @@ version(/+$DIDE_REGION+/all)
 }
 version(/+$DIDE_REGION+/all)
 {
-	
-	//TextPos ///////////////////////////////////////////////////
-	
 	/*
 		Text editing.
 		
@@ -1899,9 +1895,7 @@ version(/+$DIDE_REGION+/all)
 		
 	*/
 	
-	
 	/// TextPos marks a specific place inside a text.
-	
 	struct TextPos
 	{
 		enum Type
@@ -1963,26 +1957,26 @@ version(/+$DIDE_REGION+/all)
 			return Unqual!(typeof(this)).stringof ~ "(" ~ s ~ ")"; 
 		} 
 	} 
+	
 	/// a linearly selected range of text.
 	struct TextRange
 	{ TextPos st, en; } 
 	
 	struct EditCmd
 	{
-		 //EditCmd ////////////////////////////////////////
-		private enum _intParamDefault = int.min+1,
-								 _pointParamDefault = vec2(-1e30, -1e30); 
+		private enum _intParamDefault 	= int.min+1,
+		_pointParamDefault 	= vec2(-1e30, -1e30); 
 		
 		enum Cmd
 		{
-			//caret commands              //parameters
-			nop,
-			cInsert,	        //text to insert
-			cDelete, cDeleteBack,	        //number of glyphs to delete. Default 1
-			cLeft, cRight,	        //number of repetitions. Default 1
-			cUp, cDown,
-			cHome, cEnd,
-			cMouse                        //caret goes to mouse
+			/+caret commands+/	//parameters
+			nop,	
+			cInsert,	//text to insert
+			cDelete, cDeleteBack, 	//number of glyphs to delete. Default 1
+			cLeft, cRight,	//number of repetitions. Default 1
+			cUp, cDown,	
+			cHome, cEnd,	
+			cMouse	//caret goes to mouse
 		} 
 		alias cmd this; 
 		
@@ -2084,7 +2078,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			with(colLine)
 			return lc2idx(y, x); 
-		} 
+		} 
 		
 		private ivec2 xy2lc(in vec2 point)
 		{
@@ -2142,7 +2136,7 @@ version(/+$DIDE_REGION+/all)
 			column = wl.selectNearestGap(x); 
 			
 			return ivec2(column, line); 
-		} 
+		} 
 		
 		private int xy2idx(in vec2 point)
 		{ return lc2idx(xy2lc(point)); } 
@@ -2164,7 +2158,7 @@ version(/+$DIDE_REGION+/all)
 			
 			
 			return ivec2(wrappedLines.back.cellCount, wrappedLineCount); //The cell after the last.
-		} 
+		} 
 		
 		TextPos toIdx(in TextPos tp)
 		{
@@ -2269,7 +2263,9 @@ version(/+$DIDE_REGION+/all)
 				return; 
 				auto c = toXY(caret); 
 				
-				caret = toIdx(TextPos(vec2(c.point.x, c.point.y + c.height*.5 + c.height*delta), 0)); //Todo: it only works for the same fontHeight and  monospaced stuff
+				caret = toIdx(TextPos(vec2(c.point.x, c.point.y + c.height*.5 + c.height*delta), 0)); 
+				//Todo: it only works for the same fontHeight and  monospaced stuff
+				
 				caretRestrict; 
 			} 
 			
@@ -2289,7 +2285,7 @@ version(/+$DIDE_REGION+/all)
 				
 				caret = TextPos(cIdx); 
 				caretRestrict; //failsafe
-			} 
+			} 
 			
 			void modify(int idx, int delLen, string ins)
 			{
@@ -2311,7 +2307,8 @@ version(/+$DIDE_REGION+/all)
 				if(delLen<=0 && ins=="")
 				return; //exit if nothing happens
 				
-				auto insLen = countMarkupLineCells(ins); //cellcount can be adjusted by this, but the wrappedLines is ruined now.
+				auto insLen = countMarkupLineCells(ins); 
+				//cellcount can be adjusted by this, but the wrappedLines is ruined now.
 				
 				//adjust the caret
 				caretAdjust(caret, idx, delLen, insLen); 
@@ -2344,17 +2341,17 @@ version(/+$DIDE_REGION+/all)
 			with(eCmd)
 			final switch(cmd)
 			{
-				case Cmd.nop: break; 
-				case Cmd.cInsert					: 	caretRestrict; modify(toIdx(caret).idx, 0, strParam); break; 
-				case Cmd.cDelete					: 	deleteAtCaret(false); break; 
-				case Cmd.cDeleteBack		: deleteAtCaret(true ); break; 
-				case Cmd.cLeft	: caretMoveRel(-intParam(1)); break; 
-				case Cmd.cRight	: caretMoveRel(intParam(1)); break; 
-				case Cmd.cUp		: 	caretMoveVert(-intParam(1)); break; 
-				case Cmd.cDown		: 	caretMoveVert(intParam(1)); break; 
-				case Cmd.cHome		: 	caretMoveAbs(0); break; 
-				case Cmd.cEnd			: 	caretMoveAbs(cellCount); break; 
-				case Cmd.cMouse		: 	caret = toIdx(TextPos(pointParam, 0)); break; 
+				case Cmd.nop: 		break; 
+				case Cmd.cInsert: 	caretRestrict; modify(toIdx(caret).idx, 0, strParam); 	break; 
+				case Cmd.cDelete: 	deleteAtCaret(false); 	break; 
+				case Cmd.cDeleteBack: 	deleteAtCaret(true ); 	break; 
+				case Cmd.cLeft: 	caretMoveRel(-intParam(1)); 	break; 
+				case Cmd.cRight: 	caretMoveRel(intParam(1)); 	break; 
+				case Cmd.cUp: 	caretMoveVert(-intParam(1)); 	break; 
+				case Cmd.cDown: 	caretMoveVert(intParam(1)); 	break; 
+				case Cmd.cHome: 	caretMoveAbs(0); 	break; 
+				case Cmd.cEnd: 	caretMoveAbs(cellCount); 	break; 
+				case Cmd.cMouse: 	caret = toIdx(TextPos(pointParam, 0)); 	break; 
 				//Todo: cMouse pontatlan.
 				//Todo: minden cursor valtozaskor a caret legyen teljesen fekete
 			}
@@ -2395,6 +2392,43 @@ version(/+$DIDE_REGION+/all)
 				
 				dr.vLine(c.point.x, c.point.y, c.point.y+c.height); 
 			}
+		} 
+		
+		void handleKeyboardInput(ref string inputChars, in bool acceptEditorKeys, in vec2 localMouse)
+		{
+			string unprocessed; 
+			with(EditCmd)
+			{
+				foreach(ch; inputChars.byDchar)
+				{
+					if(((ch>=32) || (acceptEditorKeys && ch.among(9, 10))))
+					{ cmdQueue ~= EditCmd(cInsert, [ch].to!string); }
+					else
+					{ unprocessed ~= ch; }
+				}
+				
+				mixin((
+					(表([
+						[q{ KeyCombo("LMB").hold},q{cmdQueue ~= EditCmd(cMouse, localMouse); }],
+						[q{ KeyCombo("Backspace").typed},q{cmdQueue ~= EditCmd(cDeleteBack); }],
+						[q{ KeyCombo("Del").typed},q{cmdQueue ~= EditCmd(cDelete); }],
+						[q{ KeyCombo("Left").typed},q{cmdQueue ~= EditCmd(cLeft); }],
+						[q{ KeyCombo("Right").typed},q{cmdQueue ~= EditCmd(cRight); }],
+						[q{ KeyCombo("Home").typed},q{cmdQueue ~= EditCmd(cHome); }],
+						[q{ KeyCombo("End").typed},q{cmdQueue ~= EditCmd(cEnd); }],
+						[q{ KeyCombo("Up").typed},q{cmdQueue ~= EditCmd(cUp); }],
+						[q{ KeyCombo("Down").typed},q{cmdQueue ~= EditCmd(cDown); }],
+						[q{ KeyCombo("Ctrl+V Shift+Ins").typed},q{cmdQueue ~= EditCmd(cInsert, clipboard.text); }],
+					]))
+				) .GEN!q{mixin(求map(q{r},q{rows},q{iq{if($(r[0])) {$(r[1])}}.text})).join}); 
+				
+				/+
+					Todo: When the edit is focused, don't let the view to zoom home. 
+					Problem: Editor has a priority here, but the view is checked first.
+				+/
+			}
+			
+			inputChars = unprocessed; 
 		} 
 	} 
 	
@@ -3369,6 +3403,9 @@ version(/+$DIDE_REGION+/all)
 		
 		void adoptSubCells()
 		{ subCells.each!((c)=>(c.setParent(this))); } 
+		
+		final bool empty() const
+		=> subCells.empty; 
 		
 		final void append(Cell c)
 		{ appendCell(c); } 
@@ -6495,11 +6532,12 @@ struct im
 			
 			struct HitInfo
 			{
-				SrcId id; 
+				Id id; 
 				bool enabled = true; 
 				bool hover, captured, clicked, pressed, released; 
 				float hover_smooth, captured_smooth; 
 				bounds2 hitBounds; //this is in ui coordinates. Problematic with zoomable and GUI views.
+				vec2 localPos; //relative to outerPos
 				
 				@property bool down() const
 				{ return captured && enabled; } 
@@ -6520,7 +6558,7 @@ struct im
 				
 				struct HitTestRec
 				{
-					SrcId id; 	//in the	next frame this must be the isSame
+					Id id; 	//in the	next frame this must be the isSame
 					bounds2 hitBounds; 	/+
 						absolute bounds on the drawing where the hit test was made, 
 						later must be combined with View's transformation
@@ -6532,7 +6570,7 @@ struct im
 				//act frame
 				HitTestRec[] hitStack, lastHitStack; 
 				
-				float[SrcId] smoothHover; 
+				float[Id] smoothHover; 
 				private void updateSmoothHover(ref HitTestRec[] actHitStack)
 				{
 					enum upSpeed = 0.5f, downSpeed = 0.25f; 
@@ -6543,7 +6581,7 @@ struct im
 					smoothHover[id] = mix(smoothHover.get(id, 0), 1, upSpeed); 
 					
 					//lower (and remove) hover values
-					SrcId[] toRemove; 
+					Id[] toRemove; 
 					foreach(id, ref value; smoothHover)
 					{
 						if(!hoveredIds.canFind(id))
@@ -6558,7 +6596,7 @@ struct im
 					smoothHover.remove(h); 
 				} 
 				
-				SrcId capturedId, clickedId, pressedId, releasedId; 
+				Id capturedId, clickedId, pressedId, releasedId; 
 				private void updateMouseCapture(ref HitTestRec[] hits)
 				{
 					//const topClickableId = hits.get(hits.length-1).id;
@@ -6567,7 +6605,7 @@ struct im
 					//if LMB was just pressed, then it will be the captured control
 					//if LMB released, and the captured id is also hovered, the it is clicked.
 					
-					clickedId = pressedId = releasedId = SrcId.init; 
+					clickedId = pressedId = releasedId = Id.init; 
 					//normally it's 0 all the time, except that one frame it's clicked.
 					
 					with(mainWindow)
@@ -6586,7 +6624,7 @@ struct im
 								if(topId==capturedId)
 								clickedId = capturedId; 
 							}
-							capturedId = SrcId.init; 
+							capturedId = Id.init; 
 						}
 					}
 				} 
@@ -6600,7 +6638,7 @@ struct im
 					updateMouseCapture(lastHitStack); 
 				} 
 				
-				void addHitRect(in SrcId id, in bounds2 hitBounds, in vec2 localPos, in bool clickable)
+				void addHitRect(in Id id, in bounds2 hitBounds, in vec2 localPos, in bool clickable)
 				{
 					//must be called from each cell that needs mouse hit test
 					static if(addHitRectAsserts)
@@ -6611,24 +6649,25 @@ struct im
 					hitStack ~= HitTestRec(id, hitBounds, localPos, clickable); 
 				} 
 				
-				auto check(in SrcId id)
+				auto check(in Id id)
 				{
 					HitInfo h; 
-					h.id = id; 
-					if(id==SrcId.init)
-					return h; 	
-					h.hover		=	lastHitStack.map!"a.id".canFind(id); 
-					h.pressed		=	pressedId ==id; 
-					h.released		= releasedId==id; 
-					h.clicked	  = clickedId ==id; 
-					
-					h.captured	  = h.pressed || capturedId==id && h.hover; 
-					//Todo: architectural bug: captured is delayed by 1 frame according to repeated
-					
-					h.hover_smooth	  = smoothHover.get(id, 0); 
-					h.captured_smooth	  = max(h.hover_smooth, h.captured); 
-					h.hitBounds	  = lastHitStack.get(lastHitStack.map!"a.id".countUntil(id)).hitBounds; 
+					if(id)
+					{
+						const idx = lastHitStack.map!"a.id".countUntil(id); 
+						h.id 	= id,
+							h.hover	= lastHitStack.map!"a.id".canFind(id),
+							h.pressed	= pressedId ==id,
+							h.released	= releasedId==id,
+							h.clicked	= clickedId ==id,
+							h.captured	= h.pressed || capturedId==id && h.hover,
+							h.hover_smooth	= smoothHover.get(id, 0),
+							h.captured_smooth 	= max(h.hover_smooth, h.captured),
+							h.hitBounds	= lastHitStack.get(idx).hitBounds,
+							h.localPos	= lastHitStack.get(idx).localPos; 
+					}
 					return h; 
+					//Todo: architectural bug: captured is delayed by 1 frame according to repeated
 				} 
 				
 				version(/+$DIDE_REGION+/none) {
@@ -7364,7 +7403,7 @@ struct im
 	}
 	version(/+$DIDE_REGION+/all)
 	{
-		private struct Scripting
+		struct Scripting
 		{
 			static: 
 			enum StdPropertyDefs = 
@@ -7384,7 +7423,6 @@ struct im
 				[q{isG!"enabled"},q{enabled = a; }],
 			])),
 			
-			
 			StdCompositionDefs = 
 			(表([
 				[q{//Composition updates (can be changed any time)
@@ -7893,50 +7931,233 @@ struct im
 				bkColor = style.bkColor; 
 			} 
 		}
-		auto Static(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(in T0 value, T args)
-		{
-			static if(is(T0 : Property))
+		version(/+$DIDE_REGION+/all) {
+			auto Static_old(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(in T0 value, T args)
 			{
-				auto p = cast(Property)value; 
-				Static!(_M_, _L_)(p.asText, hint(p.hint), args); 
-			}
-			else
+				static if(is(T0 : Property))
+				{
+					auto p = cast(Property)value; 
+					Static!(_M_, _L_)(p.asText, hint(p.hint), args); 
+				}
+				else
+				{
+					Row!(_M_, _L_)
+					(
+						{
+							mixin(prepareId); 
+							actContainer.id = id_; 
+							auto hit = hitTest(enabled); 
+							
+							mixin(hintHandler); 
+							applyEditStyle(true, false, 0); 
+							style = tsNormal; 
+							
+							border.color = mix(border.color, style.bkColor, .5f); 
+							
+							static if(std.traits.isNumeric!T0)
+							flags.hAlign = HAlign.right; 
+							else flags.hAlign = HAlign.left; 
+							
+							static if(__traits(compiles, value()))
+							value(); 
+							else Text(value.text); 
+							
+							static foreach(a; args)
+							static if(__traits(compiles, a()))
+							a(); 
+							
+							//set minimal height for the control if empty
+							if(actContainer.subCells.empty && innerHeight<=0)
+							innerHeight = fh; 
+						}
+					); 
+				}
+			} 
+			
+			HitInfo Static(string _M_=__MODULE__, size_t _L_=__LINE__, V, Args...)(in V value, in Args args)
 			{
-				Row!(_M_, _L_)
-				(
+				setIncomingId!(_M_, _L_)(); 
+				static if(is(V : Property))
+				return _Static(value.asText, hint(value.hint), args); 
+				else
+				return _Static(value, args); 
+			} 
+			
+			private HitInfo _Static(V, Args...)(in V value, in Args args)
+			{
+				version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
+				{
+					alias CType = .Row; 
+					mixin(Scripting.CreateCustomContainer); 
+					//it leaves the `_container`, `_id` variables on this scope
+				}
+				
+				version(/+$DIDE_REGION Local variable declarations+/all)
+				{
+					HitInfo hit; 
+					HintRec hintRec; 
+					
+					applyEditStyle(true, false, 0); 
+					flags.hAlign = ((isNumeric!V)?(HAlign.right) :(HAlign.left)); 
+				}
+				
+				version(/+$DIDE_REGION Load all properties+/all)
+				{
+					enum CustomPropertyDefs = 
+					(表([[q{isT!HintRec},q{hintRec = cast()a; }],])); 
+					mixin(Scripting.CustomComponent_processProperties); 
+				}
+				
+				version(/+$DIDE_REGION Do custom behavior+/all)
+				{
+					hit = hitTest(_container, enabled); 
+					handleHint(_container, hintRec, hit); 
+					
+					static if(__traits(compiles, value()))	value(); 
+					else { _container.appendMarkupLine(value.text, style); }
+				}
+				
+				version(/+$DIDE_REGION Handle the recursive composition+/all)
+				{
+					enum CustomCompositionDefs = (表([[],])); 
+					mixin(Scripting.CustomComponent_processComposition); 
+				}
+				
+				version(/+$DIDE_REGION Return custom results+/all)
+				{
+					//set minimal height for the control if empty
+					if(_container.empty && _container.innerHeight<=0)
+					_container.innerHeight = fh; 
+					
+					return hit; 
+				}
+			} 
+		}
+		version(/+$DIDE_REGION+/all) {
+			auto Btn0(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)
+				if(isSomeString!T0 || __traits(compiles, text()) )
+			{
+				mixin(prepareId, selected.M); 
+				
+				bool focusOnPress = false; 
+				mixin(processGenericArgs(q{static if(N=="focusOnPress")	focusOnPress = a; })); 
+				
+				const isToolBtn = theme=="tool"; 
+				
+				HitInfo hit; 
+				
+				Row(
 					{
-						mixin(prepareId); 
 						actContainer.id = id_; 
-						auto hit = hitTest(enabled); 
-						
+						hit = hitTest(enabled); 
 						mixin(hintHandler); 
-						applyEditStyle(true, false, 0); //Todo: Enabled in static???
-						style = tsNormal; 
 						
-						border.color = mix(border.color, style.bkColor, .5f); 
+						bool focused = focusUpdate
+						(
+							actContainer, id_,
+							enabled, ((focusOnPress)?(hit.pressed) :(hit.clicked)), inputs.Esc.pressed,  //enabled, enter, exit
+							/*onEnter	*/ {},
+							/*onFocus	*/ {},
+							/*onExit	*/ {}
+						); 
 						
-						static if(std.traits.isNumeric!T0)
-						flags.hAlign = HAlign.right; 
-						else flags.hAlign = HAlign.left; 
+						//flags.wordWrap = false;
+						flags.hAlign = HAlign.center; 
 						
-						static if(__traits(compiles, value()))
-						value(); 
-						else Text(value.text); 
+						applyBtnStyle(isWhite, enabled, focused, _selected, hit.captured, hit.hover_smooth); 
 						
-						static foreach(a; args)
+						static if(isSomeString!T0)
+						Text(text); 
+						else text();  static foreach(a; args)
 						static if(__traits(compiles, a()))
 						a(); 
-						
-						//set minimal height for the control if empty
-						if(actContainer.subCells.empty && innerHeight<=0)
-						innerHeight = fh; 
 					}
 				); 
-			}
-		} 
-		auto Edit(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(ref T0 value, T args)
+				
+				//KeyCombo in click mode.
+				static foreach(a; args)
+				static if(is(typeof(a) == KeyCombo))
+				if(canProcessUserInput && a.pressed)
+				hit.clicked = true; 
+				
+				return hit; 
+			} 
+			HitInfo Btn(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, Args...)(in Args args)
+			{
+				setIncomingId!(_M_, _L_)(); 
+				return _Btn!(isWhite)(args); 
+			} 
+			
+			private HitInfo _Btn(bool isWhite=false, Args...)(in Args args)
+			{
+				version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
+				{
+					alias CType = .Row; 
+					mixin(Scripting.CreateCustomContainer); 
+					//it leaves the `_container`, `_id` variables on this scope
+				}
+				
+				version(/+$DIDE_REGION Local variable declarations+/all)
+				{
+					bool focusOnPress, _selected; 
+					HitInfo hit; 
+					HintRec hintRec; 
+					
+					//flags.wordWrap = false;
+					flags.hAlign = HAlign.center; 
+				}
+				
+				version(/+$DIDE_REGION Load all properties+/all)
+				{
+					enum CustomPropertyDefs = 
+					(表([
+						[q{isG!"focusOnPress"},q{focusOnPress = a; }],
+						[q{isG!"selected"},q{_selected = a; }],
+						[q{isT!selected},q{_selected = a.val; }],
+						[q{isT!HintRec},q{hintRec = cast()a; }],
+						[q{isT!ValueRange},q{/+Todo: Just let it pass for IncBtn!!!+/}],
+					])); 
+					mixin(Scripting.CustomComponent_processProperties); 
+				}
+				
+				version(/+$DIDE_REGION Do custom behavior+/all)
+				{
+					hit = hitTest(_container, enabled); 
+					handleHint(_container, hintRec, hit); 
+					
+					bool focused = focusUpdate
+					(
+						_container, _id,
+						enabled, ((focusOnPress)?(hit.pressed) :(hit.clicked)), inputs.Esc.pressed,  //enabled, enter, exit
+						/*onEnter	*/ {},
+						/*onFocus	*/ {},
+						/*onExit	*/ {}
+					); 
+					
+					applyBtnStyle(isWhite, enabled, focused, _selected, hit.captured, hit.hover_smooth); 
+				}
+				
+				version(/+$DIDE_REGION Handle the recursive composition+/all)
+				{
+					void handleKey(KeyCombo key)
+					{ if(canProcessUserInput && key.pressed) hit.clicked = true; } 
+					
+					enum CustomCompositionDefs = 
+					(表([[q{isT!KeyCombo || isG!"key"},q{handleKey(KeyCombo(cast()a)); }],])); 
+					mixin(Scripting.CustomComponent_processComposition); 
+				}
+				
+				version(/+$DIDE_REGION Return custom results+/all)
+				{ return hit; }
+			} 
+		}
+		
+		auto Edit_old(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(ref T0 value, T args)
 		{
-			NOTIMPL("Doube precision View2D bug: Clicking at any position seeks only to the beginning os text."); 
+			/+
+				Solved 260813:
+				NOTIMPL("Doube precision View2D bug: Clicking at any position seeks only to the beginning os text."); 
+			+/
 			
 			static if(is(T0==Path))
 			return EditPath!(_M_, _L_)(value, args); //Todo: not good! There will be 2 returns!!!
@@ -7992,8 +8213,6 @@ struct im
 					auto row = cast(.Row)actContainer; 
 					
 					hit = hitTest(enabled); 
-					auto localMouse = targetView.mousePos - hit.hitBounds.topLeft - row.topLeftGapSize; 
-					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
 					mixin(hintHandler); 
 					
@@ -8009,11 +8228,18 @@ struct im
 					
 					//const focusEnter = getGenericArg!(args, bool, "focusEnter");
 					
-					//Note: This would be the implementation with a struct: static foreach(a; args) static if(is(typeof(a) == ManualFocus)) manualFocus = a.value;
+					/+
+						Note: This would be the implementation with a struct: 
+						static foreach(a; args) static if(is(typeof(a) == ManualFocus)) manualFocus = a.value;
+					+/
 					//The downside is that the struct litters the namespace with simple names.
-					//220820: this is too specific. Use the ManualFocus parameter instead. static foreach(a; args) static if(is(typeof(a) == KeyCombo)) if(a.pressed) manualFocus = true;
+					/+
+						220820: this is too specific. Use the ManualFocus parameter instead. 
+							static foreach(a; args) static if(is(typeof(a) == KeyCombo)) if(a.pressed) manualFocus = true;
+					+/
 					
-					const focused = focusUpdate(
+					const focused = focusUpdate
+						(
 						actContainer, id_,
 						enabled,
 						hit.pressed || focusEnter, //enter
@@ -8031,71 +8257,33 @@ struct im
 						/*onExit	*/ {}
 					); 
 					res.focused = focused; 
-					
-					//text editor functionality
-					if(focused)
-					{
-						//get the modified string
-						//if(strModified) editor2value; //only when changed?
-						editor2value; //Todo: when to write back? always / only when change/exit?
-						
-						textEditorState.row = row; 
-						textEditorState.strModified = false; //ready for next modifications
-						
-						//fetch and queue input
-						string unprocessed; 
-						import het.win: mainWindow; 
-						with(textEditorState)
-						with(EditCmd)
-						{
-							foreach(ch; mainWindow.inputChars.unTag.byDchar)
-							{
-								if(((ch>=32) || (ch.among(9, 10) && flags.acceptEditorKeys)))
-								{ cmdQueue ~= EditCmd(cInsert, [ch].to!string); }
-								else
-								{ unprocessed ~= ch; }
-							}
-							
-							{
-								if(KeyCombo("LMB"	).hold)
-								cmdQueue ~= EditCmd(cMouse, localMouse	); 
-								if(KeyCombo("Backspace"	).typed)
-								cmdQueue ~= EditCmd(cDeleteBack	); 
-								if(KeyCombo("Del"	).typed)
-								cmdQueue ~= EditCmd(cDelete	); 
-								if(KeyCombo("Left"	).typed)
-								cmdQueue ~= EditCmd(cLeft	); 
-								if(KeyCombo("Right"	).typed)
-								cmdQueue ~= EditCmd(cRight	); 
-								if(KeyCombo("Home"	).typed)
-								cmdQueue ~= EditCmd(cHome	); 
-								//Todo: When the edit is focused, don't let the view to zoom home. Problem: Editor has a priority here, but the view is checked first.
-								if(KeyCombo("End"	).typed)
-								cmdQueue ~= EditCmd(cEnd	); 
-								if(KeyCombo("Up"	).typed)
-								cmdQueue ~= EditCmd(cUp	); 
-								if(KeyCombo("Down"	).typed)
-								cmdQueue ~= EditCmd(cDown	); 
-								
-								if(KeyCombo("Ctrl+V Shift+Ins").typed)
-								{
-									cmdQueue ~= EditCmd(cInsert, clipboard.text); 
-									//LDC 1.28: with(het.inputs){ clipboard } <- het.inputs has opDispatch(), anc it tried to search 'clipboard' in that.
-								}
-							}
-							//Todo: A KeyCombo az ambiguous... nem jo, ha control is meg az input beli is ugyanolyan nevu.
-							
-						}
-						
-						
-						mainWindow.inputChars = unprocessed; 
-					}
-					
+					
 					static if(std.traits.isNumeric!T0)
 					flags.hAlign = HAlign.right; 
 					else flags.hAlign = HAlign.left; 
 					
 					applyEditStyle(enabled, focused, hit.hover_smooth); 
+					
+					//text editor functionality
+					if(focused)
+					{
+						editor2value; //Todo: when to write back? always / only when change/exit?
+						
+						textEditorState.row = row; 
+						textEditorState.strModified = false; //ready for next modifications
+						
+						const localMouse = hit.hover ? 
+							vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
+						//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
+						
+						((0x39A0BEB16D5C4).檢(hit.toJson)); 
+						
+						
+						((0x39A48EB16D5C4).檢(localMouse)); 
+						
+						
+						textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
+					}
 					
 					if(focused)
 					flags.dontHideSpaces = true; 
@@ -8109,30 +8297,197 @@ struct im
 					//put the text out
 					if(focused)
 					{
-						if(wasConvertError)
-						textStyle.fontColor = clRed; 
+						if(wasConvertError) textStyle.fontColor = clRed; 
 						row.appendMarkupLine(textEditorState.str, textStyle, textEditorState.cellStrOfs); 
-					}else
-					{ row.appendMarkupLine(value.text         , textStyle); }
+					}
+					else { row.appendMarkupLine(value.text         , textStyle); }
 					
 					//get default fontheight for the editor after the (possibly empty) string was displayed
-					auto defaultFontHeight = style.fontHeight; 
+					const fh = style.fontHeight; 
 					
 					//set editor's defaultFontHeight for the caret when the string is empty
 					if(focused)
-					textEditorState.defaultFontHeight = defaultFontHeight; 
+					textEditorState.defaultFontHeight = fh; 
 					
 					//set minimal height for the control
-					if(row.subCells.empty)
-					{
-						if(innerHeight<style.fontHeight)
-						innerHeight = style.fontHeight; //Todo: Container.minInnerSize
-					}
-					
+					if(row.empty && row.innerHeight<=0)
+					{ row.innerHeight = fh; }
 				}
 			); 
 			
 			return res; //a hit testet vissza kene adni im.valtozoban
+		} 
+		auto Edit(string _M_=__MODULE__, size_t _L_=__LINE__, V, Args...)(ref V value, in Args args)
+		{
+			static if(is(T0==Path))
+			return EditPath!(_M_, _L_)(value, args); 
+			else static if(is(T0==File))
+			return EditFile!(_M_, _L_)(value, args); 
+			else
+			{
+				setIncomingId!(_M_, _L_)(); 
+				return _Edit(value, args); 
+			}
+		} 
+		
+		private auto _Edit(V, Args...)(ref V value, in Args args)
+		{
+			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
+			{
+				alias CType = .Row; 
+				mixin(Scripting.CreateCustomContainer); 
+				//it leaves the `_container`, `_id` variables on this scope
+			}
+			
+			version(/+$DIDE_REGION Local variable declarations+/all)
+			{
+				auto _row = cast(.Row)_container; 
+				
+				static struct EditResult {
+					HitInfo hit; 
+					bool changed, focused; 
+					alias changed this; 
+				} 
+				EditResult res; 
+				HintRec hintRec; 
+				RANGE range; 
+				bool focusEnter; 
+				
+				version(/+$DIDE_REGION Editor data transfer+/all)
+				{
+					void value2editor()
+					{ textEditorState.str = value.text; } 
+					
+					bool wasConvertError; //editor2value messaging back with this
+					
+					void editor2value()
+					{
+						try
+						{
+							auto newValue = textEditorState.str.to!V; 
+							
+							static if(isNumeric!V)
+							{
+								auto clamped = range.clamp(newValue); 
+								wasConvertError = clamped != newValue; 
+								newValue = clamped; 
+							}
+							
+							res.changed = newValue != value; 
+							value = newValue; 
+						}
+						catch(Exception)
+						{ wasConvertError = true; }
+					} 
+				}
+				
+				
+				
+				flags.hAlign = ((isNumeric!V)?(HAlign.right) :(HAlign.left)); 
+				flags.clipSubCells = true; 
+			}
+			
+			version(/+$DIDE_REGION Load all properties+/all)
+			{
+				enum CustomPropertyDefs = 
+				(表([
+					[q{isT!HintRec},q{hintRec = cast()a; }],
+					[q{isT!RANGE},q{range = a; }],
+					[q{isG!"focusEnter"},q{focusEnter = a; }],
+				])); 
+				mixin(Scripting.CustomComponent_processProperties); 
+			}
+			
+			version(/+$DIDE_REGION Do custom behavior+/all)
+			{
+				res.hit = hitTest(_container, enabled); 
+				handleHint(_container, hintRec, res.hit); 
+				
+				//const focusEnter = getGenericArg!(args, bool, "focusEnter");
+				
+				/+
+					Note: This would be the implementation with a struct: 
+							static foreach(a; args) static if(is(typeof(a) == ManualFocus)) manualFocus = a.value;
+				+/
+				//The downside is that the struct litters the namespace with simple names.
+				/+
+					220820: this is too specific. Use the ManualFocus parameter instead. 
+						static foreach(a; args) static if(is(typeof(a) == KeyCombo)) if(a.pressed) manualFocus = true;
+				+/
+				
+				res.focused = focusUpdate
+					(
+					_container, _id,
+					enabled,
+					res.hit.pressed || focusEnter, //enter
+					inputs["Esc"].pressed,  //exit
+					/*onEnter*/ {
+						value2editor; 
+						
+						//must override the previous value from another edit
+						//Todo: this must be rewritten with imStorage bounds.
+						textEditorState.cmdQueue ~= EditCmd(EditCmd.cEnd); 
+						
+						/+
+							for keyboard entry: 
+							textEditorState.cmdQueue ~= EditCmd(EditCmd.cEnd);
+						+/
+					},
+					/*onFocus*/ {/*_EditHandleInput(value, textEditorState.str, chg);*/},
+					/*onExit*/ {}
+				); 
+				applyEditStyle(enabled, res.focused, res.hit.hover_smooth); 
+				
+				version(/+$DIDE_REGION Text editor functionality 1+/all)
+				{
+					if(res.focused)
+					{
+						editor2value; //Todo: when to write back? always / only when change/exit?
+						
+						textEditorState.row = _row; 
+						textEditorState.strModified = false; //ready for next modifications
+						
+						const localMouse = res.hit.hover ? res.hit.localPos : vec2(0); 
+						
+						textEditorState.handleKeyboardInput
+							(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
+					}
+					
+					if(res.focused)
+					flags.dontHideSpaces = true; 
+				}
+			}
+			
+			version(/+$DIDE_REGION Handle the recursive composition+/all)
+			{
+				enum CustomCompositionDefs = (表([[],])); 
+				mixin(Scripting.CustomComponent_processComposition); 
+			}
+			
+			version(/+$DIDE_REGION Text editor functionality 2+/all)
+			{
+				//put the text out
+				if(res.focused)
+				{
+					if(wasConvertError) textStyle.fontColor = clRed; 
+					_row.appendMarkupLine(textEditorState.str, textStyle, textEditorState.cellStrOfs); 
+				}
+				else { _row.appendMarkupLine(value.text, textStyle); }
+				
+				//get default fontheight for the editor after the (possibly empty) string was displayed
+				const fh = style.fontHeight; 
+				
+				//set editor's defaultFontHeight for the caret when the string is empty
+				if(res.focused)
+				textEditorState.defaultFontHeight = fh; 
+				
+				//set minimal height for the control
+				if(_row.empty && _row.innerHeight<=0)
+				{ _row.innerHeight = fh; }
+			}
+			
+			version(/+$DIDE_REGION Return custom results+/all)
+			{ return res; }
 		} 
 		alias EditFile = EditFileOrPath, EditPath = EditFileOrPath; 
 		auto EditFileOrPath(string _M_=__MODULE__, size_t _L_=__LINE__, T, Args...)
@@ -8298,54 +8653,6 @@ struct im
 		{ return Btn!(_M_, _L_, true, T0, T)(text, args); } 
 		
 		version(/+$DIDE_REGION+/all) {
-			auto Btn0(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)
-				if(isSomeString!T0 || __traits(compiles, text()) )
-			{
-				mixin(prepareId, selected.M); 
-				
-				bool focusOnPress = false; 
-				mixin(processGenericArgs(q{static if(N=="focusOnPress")	focusOnPress = a; })); 
-				
-				const isToolBtn = theme=="tool"; 
-				
-				HitInfo hit; 
-				
-				Row(
-					{
-						actContainer.id = id_; 
-						hit = hitTest(enabled); 
-						mixin(hintHandler); 
-						
-						bool focused = focusUpdate
-						(
-							actContainer, id_,
-							enabled, ((focusOnPress)?(hit.pressed) :(hit.clicked)), inputs.Esc.pressed,  //enabled, enter, exit
-							/*onEnter	*/ {},
-							/*onFocus	*/ {},
-							/*onExit	*/ {}
-						); 
-						
-						//flags.wordWrap = false;
-						flags.hAlign = HAlign.center; 
-						
-						applyBtnStyle(isWhite, enabled, focused, _selected, hit.captured, hit.hover_smooth); 
-						
-						static if(isSomeString!T0)
-						Text(text); 
-						else text();  static foreach(a; args)
-						static if(__traits(compiles, a()))
-						a(); 
-					}
-				); 
-				
-				//KeyCombo in click mode.
-				static foreach(a; args)
-				static if(is(typeof(a) == KeyCombo))
-				if(canProcessUserInput && a.pressed)
-				hit.clicked = true; 
-				
-				return hit; 
-			} 
 			auto Btn1(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, Args...)(in Args args)
 			{
 				
@@ -8405,79 +8712,7 @@ struct im
 				
 				return hit; 
 			} 
-			HitInfo Btn(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, Args...)(in Args args)
-			{
-				setIncomingId!(_M_, _L_)(); 
-				return _Btn!(isWhite)(args); 
-			} 
 			
-			private HitInfo _Btn(bool isWhite=false, Args...)(in Args args)
-			{
-				version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
-				{
-					alias CType = .Row; 
-					mixin(Scripting.CreateCustomContainer); 
-					//it leaves the `_container`, `_id` variables on this scope
-				}
-				
-				version(/+$DIDE_REGION Local variable declarations+/all)
-				{
-					bool focusOnPress, _selected; 
-					const isToolBtn = theme=="tool"; 
-					HitInfo hit; 
-					HintRec hintRec; 
-				}
-				
-				version(/+$DIDE_REGION Load all properties+/all)
-				{
-					enum CustomPropertyDefs = 
-					(表([
-						[q{isG!"focusOnPress"},q{focusOnPress = a; }],
-						[q{isG!"selected"},q{_selected = a; }],
-						[q{isT!selected},q{_selected = a.val; }],
-						[q{isT!HintRec},q{hintRec = cast()a; }],
-						[q{isT!ValueRange},q{/+Todo: Just let it pass for IncBtn!!!+/}],
-					])); 
-					mixin(Scripting.CustomComponent_processProperties); 
-				}
-				
-				version(/+$DIDE_REGION Do custom behavior+/all)
-				{
-					hit = hitTest(_container, enabled); 
-					handleHint(_container, hintRec, hit); 
-					
-					bool focused = focusUpdate
-					(
-						_container, _id,
-						enabled, ((focusOnPress)?(hit.pressed) :(hit.clicked)), inputs.Esc.pressed,  //enabled, enter, exit
-						/*onEnter	*/ {},
-						/*onFocus	*/ {},
-						/*onExit	*/ {}
-					); 
-					
-					//flags.wordWrap = false;
-					flags.hAlign = HAlign.center; 
-					
-					applyBtnStyle(isWhite, enabled, focused, _selected, hit.captured, hit.hover_smooth); 
-				}
-				
-				version(/+$DIDE_REGION Handle the recursive composition+/all)
-				{
-					void handleKey(KeyCombo key)
-					{ if(canProcessUserInput && key.pressed) hit.clicked = true; } 
-					
-					enum CustomCompositionDefs = 
-					(表([[q{isT!KeyCombo || isG!"key"},q{handleKey(KeyCombo(cast()a)); }],])); 
-					mixin(Scripting.CustomComponent_processComposition); 
-				}
-				
-				version(/+$DIDE_REGION Return custom results+/all)
-				{
-					//Todo: keycombo
-					
-					return hit; 
-				}
-			} 
 		}
 		//BtnRow //////////////////////////////////
 		
