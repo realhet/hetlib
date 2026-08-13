@@ -7932,48 +7932,6 @@ struct im
 			} 
 		}
 		version(/+$DIDE_REGION+/all) {
-			auto Static_old(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(in T0 value, T args)
-			{
-				static if(is(T0 : Property))
-				{
-					auto p = cast(Property)value; 
-					Static!(_M_, _L_)(p.asText, hint(p.hint), args); 
-				}
-				else
-				{
-					Row!(_M_, _L_)
-					(
-						{
-							mixin(prepareId); 
-							actContainer.id = id_; 
-							auto hit = hitTest(enabled); 
-							
-							mixin(hintHandler); 
-							applyEditStyle(true, false, 0); 
-							style = tsNormal; 
-							
-							border.color = mix(border.color, style.bkColor, .5f); 
-							
-							static if(std.traits.isNumeric!T0)
-							flags.hAlign = HAlign.right; 
-							else flags.hAlign = HAlign.left; 
-							
-							static if(__traits(compiles, value()))
-							value(); 
-							else Text(value.text); 
-							
-							static foreach(a; args)
-							static if(__traits(compiles, a()))
-							a(); 
-							
-							//set minimal height for the control if empty
-							if(actContainer.subCells.empty && innerHeight<=0)
-							innerHeight = fh; 
-						}
-					); 
-				}
-			} 
-			
 			HitInfo Static(string _M_=__MODULE__, size_t _L_=__LINE__, V, Args...)(in V value, in Args args)
 			{
 				setIncomingId!(_M_, _L_)(); 
@@ -8034,54 +7992,7 @@ struct im
 			} 
 		}
 		version(/+$DIDE_REGION+/all) {
-			auto Btn0(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)
-				if(isSomeString!T0 || __traits(compiles, text()) )
-			{
-				mixin(prepareId, selected.M); 
-				
-				bool focusOnPress = false; 
-				mixin(processGenericArgs(q{static if(N=="focusOnPress")	focusOnPress = a; })); 
-				
-				const isToolBtn = theme=="tool"; 
-				
-				HitInfo hit; 
-				
-				Row(
-					{
-						actContainer.id = id_; 
-						hit = hitTest(enabled); 
-						mixin(hintHandler); 
-						
-						bool focused = focusUpdate
-						(
-							actContainer, id_,
-							enabled, ((focusOnPress)?(hit.pressed) :(hit.clicked)), inputs.Esc.pressed,  //enabled, enter, exit
-							/*onEnter	*/ {},
-							/*onFocus	*/ {},
-							/*onExit	*/ {}
-						); 
-						
-						//flags.wordWrap = false;
-						flags.hAlign = HAlign.center; 
-						
-						applyBtnStyle(isWhite, enabled, focused, _selected, hit.captured, hit.hover_smooth); 
-						
-						static if(isSomeString!T0)
-						Text(text); 
-						else text();  static foreach(a; args)
-						static if(__traits(compiles, a()))
-						a(); 
-					}
-				); 
-				
-				//KeyCombo in click mode.
-				static foreach(a; args)
-				static if(is(typeof(a) == KeyCombo))
-				if(canProcessUserInput && a.pressed)
-				hit.clicked = true; 
-				
-				return hit; 
-			} 
+			
 			HitInfo Btn(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, Args...)(in Args args)
 			{
 				setIncomingId!(_M_, _L_)(); 
@@ -8152,171 +8063,7 @@ struct im
 			} 
 		}
 		
-		auto Edit_old(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(ref T0 value, T args)
-		{
-			/+
-				Solved 260813:
-				NOTIMPL("Doube precision View2D bug: Clicking at any position seeks only to the beginning os text."); 
-			+/
-			
-			static if(is(T0==Path))
-			return EditPath!(_M_, _L_)(value, args); //Todo: not good! There will be 2 returns!!!
-			static if(is(T0==File))
-			return EditFile!(_M_, _L_)(value, args); //Todo: not good! There will be 2 returns!!!
-			
-			enum IsNum = std.traits.isNumeric!T0; 
-			
-			mixin(prepareId); 
-			static if(IsNum)
-			mixin(range_M); 
-			
-			static struct EditResult
-			{
-				HitInfo hit; 
-				bool changed, focused; 
-				alias changed this; 
-			} 
-			EditResult res; 
-			
-			void value2editor()
-			{ textEditorState.str = value.text; } 
-			
-			bool wasConvertError; //editor2value messaging back with this
-			
-			void editor2value()
-			{
-				try
-				{
-					auto newValue = textEditorState.str.to!T0;  //Todo: range clamp
-					
-					static if(IsNum)
-					{
-						auto clamped = _range.clamp(newValue); 
-						wasConvertError = clamped != newValue; 
-						newValue = clamped; 
-					}
-					
-					res.changed = newValue != value; 
-					value = newValue; 
-				}catch(Exception)
-				{ wasConvertError = true; }
-			} 
-			
-			Row(
-				{
-					actContainer.id = id_; 
-					
-					auto ref hit()
-					{ return res.hit; } 
-					
-					flags.clipSubCells = true; 
-					auto row = cast(.Row)actContainer; 
-					
-					hit = hitTest(enabled); 
-					
-					mixin(hintHandler); 
-					
-					bool focusEnter; 
-					mixin(
-						processGenericArgs(
-							q{
-								static if(N=="focusEnter")
-								focusEnter = a; 
-							}
-						)
-					); 
-					
-					//const focusEnter = getGenericArg!(args, bool, "focusEnter");
-					
-					/+
-						Note: This would be the implementation with a struct: 
-						static foreach(a; args) static if(is(typeof(a) == ManualFocus)) manualFocus = a.value;
-					+/
-					//The downside is that the struct litters the namespace with simple names.
-					/+
-						220820: this is too specific. Use the ManualFocus parameter instead. 
-							static foreach(a; args) static if(is(typeof(a) == KeyCombo)) if(a.pressed) manualFocus = true;
-					+/
-					
-					const focused = focusUpdate
-						(
-						actContainer, id_,
-						enabled,
-						hit.pressed || focusEnter, //enter
-						inputs["Esc"].pressed,  //exit
-						/*onEnter*/ {
-							value2editor; 
-							
-							//must override the previous value from another edit
-							//Todo: this must be rewritten with imStorage bounds.
-							textEditorState.cmdQueue ~= EditCmd(EditCmd.cEnd); 
-							
-							//for keyboard entry: textEditorState.cmdQueue ~= EditCmd(EditCmd.cEnd);
-						},
-						/*onFocus	*/ {/*_EditHandleInput(value, textEditorState.str, chg);*/},
-						/*onExit	*/ {}
-					); 
-					res.focused = focused; 
-					
-					static if(std.traits.isNumeric!T0)
-					flags.hAlign = HAlign.right; 
-					else flags.hAlign = HAlign.left; 
-					
-					applyEditStyle(enabled, focused, hit.hover_smooth); 
-					
-					//text editor functionality
-					if(focused)
-					{
-						editor2value; //Todo: when to write back? always / only when change/exit?
-						
-						textEditorState.row = row; 
-						textEditorState.strModified = false; //ready for next modifications
-						
-						const localMouse = hit.hover ? 
-							vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
-						//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
-						
-						((0x39A41EB16D5C4).檢(hit.toJson)); 
-						
-						
-						((0x39A7EEB16D5C4).檢(localMouse)); 
-						
-						
-						textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
-					}
-					
-					if(focused)
-					flags.dontHideSpaces = true; 
-					
-					
-					//execute the delegate funct parameters
-					static foreach(a; args)
-					static if(__traits(compiles, a()))
-					{ a(); }
-					
-					//put the text out
-					if(focused)
-					{
-						if(wasConvertError) textStyle.fontColor = clRed; 
-						row.appendMarkupLine(textEditorState.str, textStyle, textEditorState.cellStrOfs); 
-					}
-					else { row.appendMarkupLine(value.text         , textStyle); }
-					
-					//get default fontheight for the editor after the (possibly empty) string was displayed
-					const fh = style.fontHeight; 
-					
-					//set editor's defaultFontHeight for the caret when the string is empty
-					if(focused)
-					textEditorState.defaultFontHeight = fh; 
-					
-					//set minimal height for the control
-					if(row.empty && row.innerHeight<=0)
-					{ row.innerHeight = fh; }
-				}
-			); 
-			
-			return res; //a hit testet vissza kene adni im.valtozoban
-		} 
+		
 		auto Edit(string _M_=__MODULE__, size_t _L_=__LINE__, V, Args...)(ref V value, in Args args)
 		{
 			static if(is(T0==Path))
@@ -8360,6 +8107,8 @@ struct im
 					
 					bool wasConvertError; //editor2value messaging back with this
 					
+					enum ARGS = Args.stringof; 
+					
 					void editor2value()
 					{
 						try
@@ -8368,7 +8117,12 @@ struct im
 							
 							static if(isNumeric!V)
 							{
+								((0x387F9EB16D5C4).檢(ARGS)); 
+								((0x38822EB16D5C4).檢(newValue)); 
+								((0x3884FEB16D5C4).檢(range.toJson)); 
 								auto clamped = range.clamp(newValue); 
+								((0x388B0EB16D5C4).檢(clamped)); 
+								
 								wasConvertError = clamped != newValue; 
 								newValue = clamped; 
 							}
@@ -8505,7 +8259,7 @@ struct im
 			(
 				args,
 				{
-					auto edited = &ImStorage!T.access(actContainer.id); /+doto: use ref!+/
+					ref edited = ImStorage!T.access(actContainer.id); 
 					
 					auto normalize(in T p) => p.normalized; 
 					auto validate(in T p) => p.exists; 
@@ -8521,9 +8275,9 @@ struct im
 							{
 								res.editing = true; 
 								
-								auto normalizedValue = normalize(*edited); 
+								auto normalizedValue = normalize(edited); 
 								res.valid = validate(normalizedValue); 
-								res.changed = act != *edited; 
+								res.changed = act != edited; 
 								
 								void colorize(RGB cl)
 								{
@@ -8533,7 +8287,7 @@ struct im
 								
 								if(!res.valid)	colorize(clRed); 
 								else if(res.changed)	colorize(clGreen); 
-								if(inputs.Esc.pressed) *edited = act; 
+								if(inputs.Esc.pressed) edited = act; 
 								if(
 									inputs.Enter.pressed 
 									&& res.valid
@@ -8547,7 +8301,7 @@ struct im
 							}
 							else
 							{
-								*edited = act; 
+								edited = act; 
 								res.valid = validate(act); 
 								if(!res.valid) { style.fontColor = clRed; }
 							}
@@ -8561,7 +8315,7 @@ struct im
 							//Todo: These buttons ain't work with mouse. Only Enter/Esc works.
 							if(Btn(symbolStr("Accept"), ((res.valid).名!q{enabled})))
 							{
-								act = *edited; 
+								act = edited; 
 								res.editing = false; 
 								res.valid = validate(act); 
 								res.mustRefresh = true; 
@@ -8569,7 +8323,7 @@ struct im
 							}
 							if(Btn(symbolStr("Cancel")))
 							{
-								*edited = act; 
+								edited = act; 
 								res.editing = false; 
 								res.valid = validate(act); 
 								focusedState.reset; 
@@ -11753,4 +11507,262 @@ version(/+$DIDE_REGION Dead code+/none)
 			
 		} 
 	}
+}
+version(/+$DIDE_REGION Dead code 260813+/all)
+{
+	auto Static_old(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(in T0 value, T args)
+	{
+		static if(is(T0 : Property))
+		{
+			auto p = cast(Property)value; 
+			Static!(_M_, _L_)(p.asText, hint(p.hint), args); 
+		}
+		else
+		{
+			Row!(_M_, _L_)
+			(
+				{
+					mixin(prepareId); 
+					actContainer.id = id_; 
+					auto hit = hitTest(enabled); 
+					
+					mixin(hintHandler); 
+					applyEditStyle(true, false, 0); 
+					style = tsNormal; 
+					
+					border.color = mix(border.color, style.bkColor, .5f); 
+					
+					static if(std.traits.isNumeric!T0)
+					flags.hAlign = HAlign.right; 
+					else flags.hAlign = HAlign.left; 
+					
+					static if(__traits(compiles, value()))
+					value(); 
+					else Text(value.text); 
+					
+					static foreach(a; args)
+					static if(__traits(compiles, a()))
+					a(); 
+					
+					//set minimal height for the control if empty
+					if(actContainer.subCells.empty && innerHeight<=0)
+					innerHeight = fh; 
+				}
+			); 
+		}
+	} 
+	
+	auto Btn0(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)
+		if(isSomeString!T0 || __traits(compiles, text()) )
+	{
+		mixin(prepareId, selected.M); 
+		
+		bool focusOnPress = false; 
+		mixin(processGenericArgs(q{static if(N=="focusOnPress")	focusOnPress = a; })); 
+		
+		const isToolBtn = theme=="tool"; 
+		
+		HitInfo hit; 
+		
+		Row(
+			{
+				actContainer.id = id_; 
+				hit = hitTest(enabled); 
+				mixin(hintHandler); 
+				
+				bool focused = focusUpdate
+				(
+					actContainer, id_,
+					enabled, ((focusOnPress)?(hit.pressed) :(hit.clicked)), inputs.Esc.pressed,  //enabled, enter, exit
+					/*onEnter	*/ {},
+					/*onFocus	*/ {},
+					/*onExit	*/ {}
+				); 
+				
+				//flags.wordWrap = false;
+				flags.hAlign = HAlign.center; 
+				
+				applyBtnStyle(isWhite, enabled, focused, _selected, hit.captured, hit.hover_smooth); 
+				
+				static if(isSomeString!T0)
+				Text(text); 
+				else text();  static foreach(a; args)
+				static if(__traits(compiles, a()))
+				a(); 
+			}
+		); 
+		
+		//KeyCombo in click mode.
+		static foreach(a; args)
+		static if(is(typeof(a) == KeyCombo))
+		if(canProcessUserInput && a.pressed)
+		hit.clicked = true; 
+		
+		return hit; 
+	} 
+	auto Edit_old(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(ref T0 value, T args)
+	{
+		/+
+			Solved 260813:
+			NOTIMPL("Doube precision View2D bug: Clicking at any position seeks only to the beginning os text."); 
+		+/
+		
+		static if(is(T0==Path))
+		return EditPath!(_M_, _L_)(value, args); //Todo: not good! There will be 2 returns!!!
+		static if(is(T0==File))
+		return EditFile!(_M_, _L_)(value, args); //Todo: not good! There will be 2 returns!!!
+		
+		enum IsNum = std.traits.isNumeric!T0; 
+		
+		mixin(prepareId); 
+		static if(IsNum)
+		mixin(range_M); 
+		
+		static struct EditResult
+		{
+			HitInfo hit; 
+			bool changed, focused; 
+			alias changed this; 
+		} 
+		EditResult res; 
+		
+		void value2editor()
+		{ textEditorState.str = value.text; } 
+		
+		bool wasConvertError; //editor2value messaging back with this
+		
+		void editor2value()
+		{
+			try
+			{
+				auto newValue = textEditorState.str.to!T0;  //Todo: range clamp
+				
+				static if(IsNum)
+				{
+					auto clamped = _range.clamp(newValue); 
+					wasConvertError = clamped != newValue; 
+					newValue = clamped; 
+				}
+				
+				res.changed = newValue != value; 
+				value = newValue; 
+			}catch(Exception)
+			{ wasConvertError = true; }
+		} 
+		
+		Row(
+			{
+				actContainer.id = id_; 
+				
+				auto ref hit()
+				{ return res.hit; } 
+				
+				flags.clipSubCells = true; 
+				auto row = cast(.Row)actContainer; 
+				
+				hit = hitTest(enabled); 
+				
+				mixin(hintHandler); 
+				
+				bool focusEnter; 
+				mixin(
+					processGenericArgs(
+						q{
+							static if(N=="focusEnter")
+							focusEnter = a; 
+						}
+					)
+				); 
+				
+				//const focusEnter = getGenericArg!(args, bool, "focusEnter");
+				
+				/+
+					Note: This would be the implementation with a struct: 
+					static foreach(a; args) static if(is(typeof(a) == ManualFocus)) manualFocus = a.value;
+				+/
+				//The downside is that the struct litters the namespace with simple names.
+				/+
+					220820: this is too specific. Use the ManualFocus parameter instead. 
+						static foreach(a; args) static if(is(typeof(a) == KeyCombo)) if(a.pressed) manualFocus = true;
+				+/
+				
+				const focused = focusUpdate
+					(
+					actContainer, id_,
+					enabled,
+					hit.pressed || focusEnter, //enter
+					inputs["Esc"].pressed,  //exit
+					/*onEnter*/ {
+						value2editor; 
+						
+						//must override the previous value from another edit
+						//Todo: this must be rewritten with imStorage bounds.
+						textEditorState.cmdQueue ~= EditCmd(EditCmd.cEnd); 
+						
+						//for keyboard entry: textEditorState.cmdQueue ~= EditCmd(EditCmd.cEnd);
+					},
+					/*onFocus	*/ {/*_EditHandleInput(value, textEditorState.str, chg);*/},
+					/*onExit	*/ {}
+				); 
+				res.focused = focused; 
+				
+				static if(std.traits.isNumeric!T0)
+				flags.hAlign = HAlign.right; 
+				else flags.hAlign = HAlign.left; 
+				
+				applyEditStyle(enabled, focused, hit.hover_smooth); 
+				
+				//text editor functionality
+				if(focused)
+				{
+					editor2value; //Todo: when to write back? always / only when change/exit?
+					
+					textEditorState.row = row; 
+					textEditorState.strModified = false; //ready for next modifications
+					
+					const localMouse = hit.hover ? 
+						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
+					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
+					
+					((0x51D03EB16D5C4).檢(hit.toJson)); 
+					
+					
+					((0x51D3DEB16D5C4).檢(localMouse)); 
+					
+					
+					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
+				}
+				
+				if(focused)
+				flags.dontHideSpaces = true; 
+				
+				
+				//execute the delegate funct parameters
+				static foreach(a; args)
+				static if(__traits(compiles, a()))
+				{ a(); }
+				
+				//put the text out
+				if(focused)
+				{
+					if(wasConvertError) textStyle.fontColor = clRed; 
+					row.appendMarkupLine(textEditorState.str, textStyle, textEditorState.cellStrOfs); 
+				}
+				else { row.appendMarkupLine(value.text         , textStyle); }
+				
+				//get default fontheight for the editor after the (possibly empty) string was displayed
+				const fh = style.fontHeight; 
+				
+				//set editor's defaultFontHeight for the caret when the string is empty
+				if(focused)
+				textEditorState.defaultFontHeight = fh; 
+				
+				//set minimal height for the control
+				if(row.empty && row.innerHeight<=0)
+				{ row.innerHeight = fh; }
+			}
+		); 
+		
+		return res; //a hit testet vissza kene adni im.valtozoban
+	} 
 }
