@@ -3404,8 +3404,8 @@ version(/+$DIDE_REGION+/all)
 		void adoptSubCells()
 		{ subCells.each!((c)=>(c.setParent(this))); } 
 		
-		final bool empty() const
-		=> subCells.empty; 
+		bool empty() const
+		=> subCells.empty /+not final, because CodeColumn is more complex than this+/; 
 		
 		final void append(Cell c)
 		{ appendCell(c); } 
@@ -8276,10 +8276,10 @@ struct im
 							vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 						//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 						
-						((0x39A0BEB16D5C4).檢(hit.toJson)); 
+						((0x39A41EB16D5C4).檢(hit.toJson)); 
 						
 						
-						((0x39A48EB16D5C4).檢(localMouse)); 
+						((0x39A7EEB16D5C4).檢(localMouse)); 
 						
 						
 						textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 

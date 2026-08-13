@@ -287,6 +287,9 @@ version(/+$DIDE_REGION+/all)
 		//Todo: Ctrl+KU is sequential!
 		string[] keys; 
 		
+		this(KeyComboEntry src)
+		{ keys = src.keys.dup; } 
+		
 		this(string s)
 		{
 			enum plusMark = "@PLUS@"; 
@@ -330,6 +333,15 @@ version(/+$DIDE_REGION+/all)
 	struct KeyCombo
 	{
 		KeyComboEntry[] combos; 
+		
+		this(KeyCombo src)
+		{
+			combos = src.combos.map!KeyComboEntry.array; 
+			/+
+				Opt: This deep copy is slow. 
+				The full keycombo should be stored on static 32 or 64 bits.
+			+/
+		} 
 		
 		this(string s)
 		{
