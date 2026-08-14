@@ -7403,59 +7403,68 @@ struct im
 	}
 	version(/+$DIDE_REGION+/all)
 	{
-		struct Scripting
+		enum StdPropertyDefs = 
+		(表([
+			[q{isG!"id"},q{/+already handled+/}],
+			[q{//q{isT!PanelPosition}q{panelPosition = a; }
+			}],
+			[],
+			[q{//Properties (set only once at creation)
+			}],
+			[q{isT!YAlign},q{flags.yAlign = a; }],
+			[q{isT!HAlign},q{flags.hAlign = a; }],
+			[q{isT!VAlign},q{flags.vAlign = a; }],
+			[q{isG!"padding" || isT!Padding},q{padding = a; }],
+			[q{isG!"border" || isT!Border},q{border = a; }],
+			[q{isG!"margin" || isT!Margin},q{margin = a; }],
+			[q{isG!"flex"},q{flex = a; }],
+			[q{isG!"enabled"},q{enabled = a; }],
+		])),
+		
+		StdCompositionDefs = 
+		(表([
+			[q{//Composition updates (can be changed any time)
+			}],
+			[q{isT!TextStyle},q{textStyle = a; }],
+			[q{isG!"style"},q{textStyle.modify(a); }],
+			[q{isG!"syntax" || isT!SyntaxKind},q{
+				textStyle.applySyntax(a.to!SyntaxKind); 
+				bkColor = textStyle.bkColor; 
+			}],
+			[q{isG!"theme"},q{theme = a; }],
+			[q{isG!"fontColor"},q{style.fontColor = a; }],
+			[q{isG!"bkColor" || isT!RGB},q{style.bkColor = bkColor = a; }],
+			[q{isG!"bold"},q{style.bold = a; }],
+			[q{isG!"italic"},q{style.italic = a; }],
+			[q{isG!"underline"},q{style.underline = a; }],
+			[],
+			[q{//Emitters
+			}],
+			[q{isSomeString!T},q{Text(a); }],
+			[q{is(T : Cell)},q{im.append(cast()a); }],
+			[q{is(T : const(Cell)[])},q{im.append(cast(Cell[])a); }],
+			[q{__traits(compiles, a())},q{a(); }],
+			[],
+			[q{/+
+				Todo: Read about undefined behaior when casting away consts.
+				In the parameters, const is maybe more efficient if the compiler 
+				does not analyze variable usage patterns.
+				ASM viewer needed.
+				/+Link: https://www.jmdavisprog.com/articles/why-const-sucks.html+/
+			+/}],
+		])); 
+		
+		template ContainerScript(string optionsStr)
 		{
-			static: 
-			enum StdPropertyDefs = 
-			(表([
-				[q{isG!"id"},q{/+already handled+/}],
-				[q{isT!PanelPosition},q{panelPosition = a; }],
-				[],
-				[q{//Properties (set only once at creation)
-				}],
-				[q{isT!YAlign},q{flags.yAlign = a; }],
-				[q{isT!HAlign},q{flags.hAlign = a; }],
-				[q{isT!VAlign},q{flags.vAlign = a; }],
-				[q{isG!"padding" || isT!Padding},q{padding = a; }],
-				[q{isG!"border" || isT!Border},q{border = a; }],
-				[q{isG!"margin" || isT!Margin},q{margin = a; }],
-				[q{isG!"flex"},q{flex = a; }],
-				[q{isG!"enabled"},q{enabled = a; }],
-			])),
-			
-			StdCompositionDefs = 
-			(表([
-				[q{//Composition updates (can be changed any time)
-				}],
-				[q{isT!TextStyle},q{textStyle = a; }],
-				[q{isG!"style"},q{textStyle.modify(a); }],
-				[q{isG!"syntax" || isT!SyntaxKind},q{
-					textStyle.applySyntax(a.to!SyntaxKind); 
-					bkColor = textStyle.bkColor; 
-				}],
-				[q{isG!"theme"},q{theme = a; }],
-				[q{isG!"fontColor"},q{style.fontColor = a; }],
-				[q{isG!"bkColor" || isT!RGB},q{style.bkColor = bkColor = a; }],
-				[q{isG!"bold"},q{style.bold = a; }],
-				[q{isG!"italic"},q{style.italic = a; }],
-				[q{isG!"underline"},q{style.underline = a; }],
-				[],
-				[q{//Emitters
-				}],
-				[q{isSomeString!T},q{Text(a); }],
-				[q{is(T : Cell)},q{im.append(cast()a); }],
-				[q{is(T : const(Cell)[])},q{im.append(cast(Cell[])a); }],
-				[q{__traits(compiles, a())},q{a(); }],
-				[],
-				[q{/+
-					Todo: Read about undefined behaior when casting away consts.
-					In the parameters, const is maybe more efficient if the compiler 
-					does not analyze variable usage patterns.
-					ASM viewer needed.
-					/+Link: https://www.jmdavisprog.com/articles/why-const-sucks.html+/
-				+/}],
-			])); 
-			string CreateCustomContainer()
+			enum ThisStr = "ContainerScript!(`"~optionsStr~"`)"; 
+			enum Option { selected, focused, hint, panelPosition } 
+			
+			enum options = optionsStr.split(' ').map!(to!Option).array; 
+			
+			string OPT(string optionStr)(string sTrue, string sFalse="")
+			{ return ' ' ~ ((options.canFind(optionStr.to!Option))?(sTrue):(sFalse)) ~ ' '; } 
+			
+			string Create()
 			=> iq{
 				auto _id = combine(actId, fetchIncomingId); 
 				static foreach(a; args) static if(isGenericArg!(typeof(cast()a), "id")) _id.appendIdx(a.value); 
@@ -7467,12 +7476,20 @@ struct im
 				enabled = parentEnabled; //Inherit from parent
 				_container.bkColor = style.bkColor; //Inherit bkcolor from the current fontStyle.
 				
-				PanelPosition panelPosition; 
+				$(
+					OPT!"panelPosition"
+					(q{PanelPosition panelPosition; })
+				)
 			}.text; 
 			
-			string CustomComponent_processProperties()
+			string ProcessProperties()
 			=> iq{
-				enum AllPropertyDefRows = CustomPropertyDefs.rows.array ~ Scripting.StdPropertyDefs.rows.array; 
+				enum AllPropertyDefRows = CustomPropertyDefs.rows.array 
+				$(
+					OPT!"panelPosition"
+					(q{~(表([[q{isT!PanelPosition},q{panelPosition = a; }],])).rows.array})
+				)
+				~ StdPropertyDefs.rows.array; 
 				static foreach(a; args)
 				{
 					{
@@ -7485,13 +7502,20 @@ struct im
 					}
 				}
 				
-				if(panelPosition) initializePanelPosition(_container, panelPosition, clientArea); 
-				scope(exit) if(panelPosition) finalizePanelPosition(_container, panelPosition, clientArea); 
+				$(
+					OPT!"panelPosition"
+					(
+						q{
+							if(panelPosition) initializePanelPosition(_container, panelPosition, clientArea); 
+							scope(exit) if(panelPosition) finalizePanelPosition(_container, panelPosition, clientArea); 
+						}
+					)
+				)
 			}.text; 
 			
-			string CustomComponent_processComposition()
+			string ProcessComposition()
 			=> iq{
-				enum AllCompositionDefRows = CustomCompositionDefs.rows.array ~ Scripting.StdCompositionDefs.rows.array; 
+				enum AllCompositionDefRows = CustomCompositionDefs.rows.array ~ StdCompositionDefs.rows.array; 
 				static foreach(a; args)
 				{
 					{
@@ -7514,7 +7538,8 @@ struct im
 		{
 			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
 			{
-				mixin(Scripting.CreateCustomContainer); //it leaves the `_container`, `_id` variables on this scope
+				alias SCR = ContainerScript!"panelPosition"; 
+				mixin(SCR.Create); //it leaves the `_container`, `_id` variables on this scope
 			}
 			
 			version(/+$DIDE_REGION Local variable declarations+/all)
@@ -7523,7 +7548,7 @@ struct im
 			version(/+$DIDE_REGION Load all properties+/all)
 			{
 				enum CustomPropertyDefs = (表([[],])); 
-				mixin(Scripting.CustomComponent_processProperties); 
+				mixin(SCR.ProcessProperties); 
 			}
 			
 			version(/+$DIDE_REGION Do custom behavior+/all)
@@ -7532,7 +7557,7 @@ struct im
 			version(/+$DIDE_REGION Handle the recursive composition+/all)
 			{
 				enum CustomCompositionDefs = (表([[],])); 
-				mixin(Scripting.CustomComponent_processComposition); 
+				mixin(SCR.ProcessComposition); 
 			}
 			
 			version(/+$DIDE_REGION Return custom results+/all)
@@ -7945,9 +7970,8 @@ struct im
 			{
 				version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
 				{
-					alias CType = .Row; 
-					mixin(Scripting.CreateCustomContainer); 
-					//it leaves the `_container`, `_id` variables on this scope
+					alias SCR = ContainerScript!"", CType = .Row; 
+					mixin(SCR.Create); 
 				}
 				
 				version(/+$DIDE_REGION Local variable declarations+/all)
@@ -7963,7 +7987,7 @@ struct im
 				{
 					enum CustomPropertyDefs = 
 					(表([[q{isT!HintRec},q{hintRec = cast()a; }],])); 
-					mixin(Scripting.CustomComponent_processProperties); 
+					mixin(SCR.ProcessProperties); 
 				}
 				
 				version(/+$DIDE_REGION Do custom behavior+/all)
@@ -7978,7 +8002,7 @@ struct im
 				version(/+$DIDE_REGION Handle the recursive composition+/all)
 				{
 					enum CustomCompositionDefs = (表([[],])); 
-					mixin(Scripting.CustomComponent_processComposition); 
+					mixin(SCR.ProcessComposition); 
 				}
 				
 				version(/+$DIDE_REGION Return custom results+/all)
@@ -7990,7 +8014,7 @@ struct im
 					return hit; 
 				}
 			} 
-		}
+		}
 		version(/+$DIDE_REGION+/all) {
 			
 			HitInfo Btn(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, Args...)(in Args args)
@@ -8003,9 +8027,8 @@ struct im
 			{
 				version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
 				{
-					alias CType = .Row; 
-					mixin(Scripting.CreateCustomContainer); 
-					//it leaves the `_container`, `_id` variables on this scope
+					alias SCR = ContainerScript!"", CType = .Row; 
+					mixin(SCR.Create); 
 				}
 				
 				version(/+$DIDE_REGION Local variable declarations+/all)
@@ -8028,7 +8051,7 @@ struct im
 						[q{isT!HintRec},q{hintRec = cast()a; }],
 						[q{isT!ValueRange},q{/+Todo: Just let it pass for IncBtn!!!+/}],
 					])); 
-					mixin(Scripting.CustomComponent_processProperties); 
+					mixin(SCR.ProcessProperties); 
 				}
 				
 				version(/+$DIDE_REGION Do custom behavior+/all)
@@ -8055,7 +8078,7 @@ struct im
 					
 					enum CustomCompositionDefs = 
 					(表([[q{isT!KeyCombo || isG!"key"},q{handleKey(KeyCombo(cast()a)); }],])); 
-					mixin(Scripting.CustomComponent_processComposition); 
+					mixin(SCR.ProcessComposition); 
 				}
 				
 				version(/+$DIDE_REGION Return custom results+/all)
@@ -8081,9 +8104,8 @@ struct im
 		{
 			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
 			{
-				alias CType = .Row; 
-				mixin(Scripting.CreateCustomContainer); 
-				//it leaves the `_container`, `_id` variables on this scope
+				alias SCR = ContainerScript!"", CType = .Row; 
+				mixin(SCR.Create); 
 			}
 			
 			version(/+$DIDE_REGION Local variable declarations+/all)
@@ -8117,12 +8139,7 @@ struct im
 							
 							static if(isNumeric!V)
 							{
-								((0x387F9EB16D5C4).檢(ARGS)); 
-								((0x38822EB16D5C4).檢(newValue)); 
-								((0x3884FEB16D5C4).檢(range.toJson)); 
 								auto clamped = range.clamp(newValue); 
-								((0x388B0EB16D5C4).檢(clamped)); 
-								
 								wasConvertError = clamped != newValue; 
 								newValue = clamped; 
 							}
@@ -8149,8 +8166,8 @@ struct im
 					[q{isT!RANGE},q{range = a; }],
 					[q{isG!"focusEnter"},q{focusEnter = a; }],
 				])); 
-				mixin(Scripting.CustomComponent_processProperties); 
-			}
+				mixin(SCR.ProcessProperties); 
+			}
 			
 			version(/+$DIDE_REGION Do custom behavior+/all)
 			{
@@ -8215,7 +8232,7 @@ struct im
 			version(/+$DIDE_REGION Handle the recursive composition+/all)
 			{
 				enum CustomCompositionDefs = (表([[],])); 
-				mixin(Scripting.CustomComponent_processComposition); 
+				mixin(SCR.ProcessComposition); 
 			}
 			
 			version(/+$DIDE_REGION Text editor functionality 2+/all)
@@ -8406,68 +8423,6 @@ struct im
 		auto WhiteBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(T0 text, T args)
 		{ return Btn!(_M_, _L_, true, T0, T)(text, args); } 
 		
-		version(/+$DIDE_REGION+/all) {
-			auto Btn1(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, Args...)(in Args args)
-			{
-				
-				CustomContainer!
-				(
-					.Row, 
-					
-					/+Local variable declarations+/
-					q{
-						bool focusOnPress, _selected; 
-						const isToolBtn = theme=="tool"; 
-						HitInfo hit; 
-					},
-					
-					//Property declarations
-					(表([
-						[q{isG!"focusOnPress"},q{focusOnPress = a; }],
-						[q{isG!"selected"},q{_selected = a; }],
-						[q{isT!selected},q{_selected = a.val; }],
-						[q{isT!HintRec},q{/+Todo: hintHandler+/}],
-						[q{isT!range},q{/+Todo: IncBtn!!!+/}],
-					])),
-					
-					//After properties, before composition
-					q{
-						hit = hitTest(enabled); 
-						//Todo: mixin(hintHandler); 
-						
-						bool focused = focusUpdate
-						(
-							actContainer, id_,
-							enabled, ((focusOnPress)?(hit.pressed) :(hit.clicked)), inputs.Esc.pressed,  //enabled, enter, exit
-							/*onEnter	*/ {},
-							/*onFocus	*/ {},
-							/*onExit	*/ {}
-						); 
-						
-						//flags.wordWrap = false;
-						flags.hAlign = HAlign.center; 
-						
-						applyBtnStyle(
-							false/+Todo: isWhite+/, enabled, focused, 
-							_selected, hit.captured, hit.hover_smooth
-						); 
-					}, 
-					
-					//Composition
-					(表([[],])), 
-					
-					//After composition, finalization
-					q{}
-				)
-				(Id(_M_, _L_), args); 
-				
-				HitInfo hit;  //Todo: hit
-				//Todo: keycombo
-				
-				return hit; 
-			} 
-			
-		}
 		//BtnRow //////////////////////////////////
 		
 		auto BtnRow(Cntr = .Row, string _M_=__MODULE__, size_t _L_=__LINE__, T...)(void delegate() fun, in T args)
@@ -11599,7 +11554,70 @@ version(/+$DIDE_REGION Dead code 260813+/all)
 		hit.clicked = true; 
 		
 		return hit; 
-	} 
+	} 
+	
+	version(/+$DIDE_REGION+/all) {
+		auto Btn1(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, Args...)(in Args args)
+		{
+			
+			CustomContainer!
+			(
+				.Row, 
+				
+				/+Local variable declarations+/
+				q{
+					bool focusOnPress, _selected; 
+					const isToolBtn = theme=="tool"; 
+					HitInfo hit; 
+				},
+				
+				//Property declarations
+				(表([
+					[q{isG!"focusOnPress"},q{focusOnPress = a; }],
+					[q{isG!"selected"},q{_selected = a; }],
+					[q{isT!selected},q{_selected = a.val; }],
+					[q{isT!HintRec},q{/+Todo: hintHandler+/}],
+					[q{isT!range},q{/+Todo: IncBtn!!!+/}],
+				])),
+				
+				//After properties, before composition
+				q{
+					hit = hitTest(enabled); 
+					//Todo: mixin(hintHandler); 
+					
+					bool focused = focusUpdate
+					(
+						actContainer, id_,
+						enabled, ((focusOnPress)?(hit.pressed) :(hit.clicked)), inputs.Esc.pressed,  //enabled, enter, exit
+						/*onEnter	*/ {},
+						/*onFocus	*/ {},
+						/*onExit	*/ {}
+					); 
+					
+					//flags.wordWrap = false;
+					flags.hAlign = HAlign.center; 
+					
+					applyBtnStyle(
+						false/+Todo: isWhite+/, enabled, focused, 
+						_selected, hit.captured, hit.hover_smooth
+					); 
+				}, 
+				
+				//Composition
+				(表([[],])), 
+				
+				//After composition, finalization
+				q{}
+			)
+			(Id(_M_, _L_), args); 
+			
+			HitInfo hit;  //Todo: hit
+			//Todo: keycombo
+			
+			return hit; 
+		} 
+		
+	}
 	auto Edit_old(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(ref T0 value, T args)
 	{
 		/+
@@ -11724,10 +11742,10 @@ version(/+$DIDE_REGION Dead code 260813+/all)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x51D03EB16D5C4).檢(hit.toJson)); 
+					((0x51CC9EB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x51D3DEB16D5C4).檢(localMouse)); 
+					((0x51D03EB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
