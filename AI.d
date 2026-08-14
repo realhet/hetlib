@@ -219,11 +219,15 @@ class AiChat
 				+/
 				(
 					/+deepseek-v4-flash+/
-					(
+					((now<DateTime(UTC, 2026, 8, 16)) ?(
 						cached_prompt_tokens	*0.0028*scale+
 						(prompt_tokens-cached_prompt_tokens)	*0.14*scale+
 						completion_tokens	*0.28*scale
-					)
+					) :(
+						cached_prompt_tokens	*0.007*scale+ /+2.5x+/
+						(prompt_tokens-cached_prompt_tokens)	*0.22*scale+  /+1.57x+/
+						completion_tokens	*0.66*scale   /+2.36x+/
+					))
 					/ 1e6/+1M tokens+/ * 316/+1 USD to HUF+/ 
 					/+Todo: more accurate usd to huf+/
 				)~

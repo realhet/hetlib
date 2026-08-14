@@ -728,7 +728,7 @@ class ArduinoNanoProject
 		with(im)
 		Row(
 			{
-				theme = "tool"; 
+				theme.isTool = true; 
 				margin = "2 4"; 
 				border = "2 normal gray"; 
 				padding = "4"; 

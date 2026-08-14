@@ -2901,15 +2901,12 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					const 	roundedBits = max(totalBits.nearest2NSize, 8),
 						defT = roundedBits.predSwitch(8, "ubyte", 16, "ushort", 32, "uint", 64, "ulong"); 
 					if(totalBits < roundedBits) res ~= format!q{uint,"_dummy",%s}(roundedBits - totalBits); 
-					return format!q{
+					return iq{
 						union  {
-							%s _default = %s; 
-							mixin(std.bitmanip.bitfields!(%s)); 
+							$(defT) _default = $(totalDef.format!"0x%X"); 
+							mixin(std.bitmanip.bitfields!($(res.join))); 
 						} 
-					}(
-						defT, totalDef.format!"0x%X", 
-						res.join
-					); 
+					}.text; 
 				}
 				else
 				{ return GEN_bitfields(rows.rows); }
@@ -3430,15 +3427,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1AEF259F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1AED759F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1AFBA59F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1AF9F59F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B06459F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B0D959F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B04959F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B0BE59F156A1})); 
 						+/
 					+/
 				+/

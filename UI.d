@@ -6076,7 +6076,7 @@ version(/+$DIDE_REGION+/all)
 					{
 						padding = "4"; 
 						border = "1 normal silver"; 
-						theme = "tool"; 
+						theme = Theme.tool; 
 						Text(boldStr("Resource Monitor")); 	Spacer; 
 						VirtualFileGraph; 	Spacer; 
 						BitmapCacheGraph; 	Spacer; 
@@ -6151,7 +6151,7 @@ version(/+$DIDE_REGION+/all)
 							foreach(idx, ref f; globalShaderParams.floats)
 							Row(
 								{
-									theme = "tool"; 
+									theme.setTool; 
 									Text(idx.format!"float%d\t"); 
 									Slider(f, linRange(0, 1), { width = 12*fh; }, genericId(idx)); 
 								}
@@ -6739,13 +6739,13 @@ struct im
 					if(!canFocus || exitFocusNow)
 					{
 						//not enabled anymore: exit focus
-						if(onExit)
-						onExit(); 
+						if(onExit) onExit(); 
 						focusedState.reset; 
 						
 						onFocusLost(id); 
 					}
-				}else
+				}
+				else
 				{
 					if(canFocus && enterFocusNow)
 					{
@@ -6753,20 +6753,19 @@ struct im
 						onFocusLost(focusedState.id); 
 						
 						focusedState.reset; 
-						focusedState.id = id;     //Todo: ez bugos, mert nem hivodik meg a focusExit, amikor ez elveszi a focust
+						focusedState.id = id; 
+						//Todo: ez bugos, mert nem hivodik meg a focusExit, amikor ez elveszi a focust
+						
 						focusedState.container = container; 
-						if(onEnter)
-						onEnter(); 
+						if(onEnter) onEnter(); 
 					}
 				}
 				
-				bool res = focusedState.id==id; 
-				if(res)
-				focusedState.container = container; 
+				const res = focusedState.id==id; 
+				if(res) focusedState.container = container; 
 				container.flags.focused = res; 
 				
-				if(res && onFocused)
-				onFocused(); 
+				if(res && onFocused) onFocused(); 
 				
 				return res; 
 			} 
@@ -6956,7 +6955,7 @@ struct im
 		
 		//Parameter structs ///////////////////////////////////
 		//deprecated struct id      { uint val;  /*private*/ enum M = q{ auto id_ = file.xxh(line)^baseId;                          static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
-		deprecated immutable prepareId = q{auto id_ = combine(actId, srcId!(_M_, _L_)(args)); }; 
+		deprecated immutable prepareId = q{auto id_ = combine(imId, srcId!(_M_, _L_)(args)); }; 
 		
 		/*
 			struct enable 
@@ -7158,17 +7157,43 @@ struct im
 			//Todo: ezt egy alias this-el egyszerusiteni. Jelenleg az im-ben is meg az im.StackEntry-ben is ugyanaz van redundansan deklaralva
 			.Container actContainer, lastContainer; //top of the containerStack for faster access
 			TextStyle textStyle;   alias style = textStyle; //Todo: style.opDispatch("fontHeight=0.5x")
-			string theme; //for now it's a str, later it will be much more complex
-			//valid values: "", "tool"
+			struct Theme
+			{
+				mixin((
+					(表([
+						[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+						[q{bool},q{1},q{"isTool"},q{},q{/+Smaller controls that exactly fit info a row of text.+/}],
+						[q{bool},q{1},q{"isWhite"},q{},q{/+Buttons are white, not grey.+/}],
+					]))
+				).調!(GEN_bitfields)); 
+				
+				void setTool() { isTool = true; } 	void noTool() { isTool = false; } 
+				void setWhite() { isWhite = true; } 	void noWhite() { isWhite = false; } 
+				void clear() { this = Theme.init; } 
+				
+				static immutable
+				{
+					Theme tool() { Theme t; t.setTool; return t; } 
+					Theme white() { Theme t; t.setWhite; return t; } 
+					Theme toolWhite() { Theme t; t.setTool; t.setWhite; return t; } 
+				} 
+			} 
+			
+			Theme theme; 
 			
 			@property
 			{
-				Id actId()
+				//must use `im` prefixes because these are dangerously common identifier names.
+				
+				Id imId()
 				=> ((actContainer)?(actContainer.id):(Id.init)); 
 				
-				bool enabled()
+				bool imFocused()
+				=> ((actContainer)?(actContainer.flags.focused):(false)); 
+				
+				bool imEnabled()
 				=> ((actContainer)?(actContainer.flags.enabled):(true/+empty root is always enabled+/)); 
-				bool enabled(bool e)
+				bool imEnabled(bool e)
 				{ if(actContainer) actContainer.flags.enabled = e; return e; } 
 			} 
 			
@@ -7181,7 +7206,7 @@ struct im
 			} 
 			
 			private struct StackEntry
-			{ .Container container; TextStyle textStyle; string theme; } 
+			{ .Container container; TextStyle textStyle; Theme theme; } 
 			private StackEntry[] stack; 
 			
 			
@@ -7189,7 +7214,7 @@ struct im
 			{
 				//statck reset
 				textStyle = tsNormal; 
-				theme = ""; 
+				theme.clear; 
 				
 				rootCells = []; 
 				stack = [StackEntry(null, textStyle, theme)]; 
@@ -7418,7 +7443,7 @@ struct im
 			[q{isG!"border" || isT!Border},q{border = a; }],
 			[q{isG!"margin" || isT!Margin},q{margin = a; }],
 			[q{isG!"flex"},q{flex = a; }],
-			[q{isG!"enabled"},q{enabled = a; }],
+			[q{isG!"enabled"},q{imEnabled = a; }],
 		])),
 		
 		StdCompositionDefs = 
@@ -7431,7 +7456,7 @@ struct im
 				textStyle.applySyntax(a.to!SyntaxKind); 
 				bkColor = textStyle.bkColor; 
 			}],
-			[q{isG!"theme"},q{theme = a; }],
+			[q{isT!Theme},q{theme = a; }],
 			[q{isG!"fontColor"},q{style.fontColor = a; }],
 			[q{isG!"bkColor" || isT!RGB},q{style.bkColor = bkColor = a; }],
 			[q{isG!"bold"},q{style.bold = a; }],
@@ -7466,14 +7491,14 @@ struct im
 			
 			string Create()
 			=> iq{
-				auto _id = combine(actId, fetchIncomingId); 
+				auto _id = combine(imId, fetchIncomingId); 
 				static foreach(a; args) static if(isGenericArg!(typeof(cast()a), "id")) _id.appendIdx(a.value); 
 				
-				const parentEnabled = enabled; 
+				const parentEnabled = imEnabled; 
 				
 				auto _container = new CType; 
 				append(_container); push(_container, _id); scope(exit) pop; 
-				enabled = parentEnabled; //Inherit from parent
+				imEnabled = parentEnabled; //Inherit from parent
 				_container.bkColor = style.bkColor; //Inherit bkcolor from the current fontStyle.
 				
 				$(
@@ -7856,7 +7881,7 @@ struct im
 				margin	= Margin(2, 2, 2, 2); 
 				border	= Border(2, BorderStyle.normal, bColor); 
 				padding	= Padding(2, 2, 2, 2); 
-				if(theme == "tool")
+				if(theme.isTool)
 				{
 					border.width    = 1; 
 					border.inset = true; 
@@ -7921,7 +7946,7 @@ struct im
 					else style.bkColor = clWinBackground; 
 				}
 				
-				if(theme == "tool")
+				if(theme.isTool)
 				{
 					//every appearance is lighter on a toolBtn
 					style.bkColor   = mix(style.bkColor, tsNormal.bkColor, .5f); 
@@ -7992,7 +8017,7 @@ struct im
 				
 				version(/+$DIDE_REGION Do custom behavior+/all)
 				{
-					hit = hitTest(_container, enabled); 
+					hit = hitTest(_container, imEnabled); 
 					handleHint(_container, hintRec, hit); 
 					
 					static if(__traits(compiles, value()))	value(); 
@@ -8056,19 +8081,19 @@ struct im
 				
 				version(/+$DIDE_REGION Do custom behavior+/all)
 				{
-					hit = hitTest(_container, enabled); 
+					hit = hitTest(_container, imEnabled); 
 					handleHint(_container, hintRec, hit); 
 					
 					bool focused = focusUpdate
 					(
 						_container, _id,
-						enabled, ((focusOnPress)?(hit.pressed) :(hit.clicked)), inputs.Esc.pressed,  //enabled, enter, exit
+						imEnabled, ((focusOnPress)?(hit.pressed) :(hit.clicked)), inputs.Esc.pressed,  //enabled, enter, exit
 						/*onEnter	*/ {},
 						/*onFocus	*/ {},
 						/*onExit	*/ {}
 					); 
 					
-					applyBtnStyle(isWhite, enabled, focused, _selected, hit.captured, hit.hover_smooth); 
+					applyBtnStyle(isWhite, imEnabled, focused, _selected, hit.captured, hit.hover_smooth); 
 				}
 				
 				version(/+$DIDE_REGION Handle the recursive composition+/all)
@@ -8171,7 +8196,7 @@ struct im
 			
 			version(/+$DIDE_REGION Do custom behavior+/all)
 			{
-				res.hit = hitTest(_container, enabled); 
+				res.hit = hitTest(_container, imEnabled); 
 				handleHint(_container, hintRec, res.hit); 
 				
 				//const focusEnter = getGenericArg!(args, bool, "focusEnter");
@@ -8189,7 +8214,7 @@ struct im
 				res.focused = focusUpdate
 					(
 					_container, _id,
-					enabled,
+					imEnabled,
 					res.hit.pressed || focusEnter, //enter
 					inputs["Esc"].pressed,  //exit
 					/*onEnter*/ {
@@ -8207,7 +8232,7 @@ struct im
 					/*onFocus*/ {/*_EditHandleInput(value, textEditorState.str, chg);*/},
 					/*onExit*/ {}
 				); 
-				applyEditStyle(enabled, res.focused, res.hit.hover_smooth); 
+				applyEditStyle(imEnabled, res.focused, res.hit.hover_smooth); 
 				
 				version(/+$DIDE_REGION Text editor functionality 1+/all)
 				{
@@ -8658,14 +8683,14 @@ struct im
 			Row(
 				{
 					actContainer.id = id_; 
-					hit = hitTest(enabled); 
+					hit = hitTest(imEnabled); 
 					
 					mixin(hintHandler); 
 					
 					bool focused = focusUpdate
 						(
 						actContainer, id_,
-						enabled, hit.pressed, inputs.Esc.pressed,  //enabled, enter, exit
+						imEnabled, hit.pressed, inputs.Esc.pressed,  //enabled, enter, exit
 						/*onEnter	*/ {},
 						/*onFocus	*/ {},
 						/*onExit	*/ {}
@@ -8683,7 +8708,7 @@ struct im
 						}
 					}
 					
-					applyLinkStyle(enabled, focused, hit.captured, hit.hover_smooth); 
+					applyLinkStyle(imEnabled, focused, hit.captured, hit.hover_smooth); 
 					
 					static if(isSomeString!T0)
 					Text(text); 
@@ -8774,17 +8799,17 @@ struct im
 					margin.left = margin.right = 2; 
 					
 					actContainer.id = id_; 
-					hit = hitTest(enabled); 
+					hit = hitTest(imEnabled); 
 					mixin(hintHandler); 
 					
 					//update checkbox state
-					if(enabled && hit.clicked)
+					if(imEnabled && hit.clicked)
 					state.toggle; 
 					
 					//mixin GetChkBoxColors;
 					RGB hoverColor(RGB baseColor, RGB bkColor)
 					{
-						return !enabled 	? clWinBtnDisabledText
+						return !imEnabled 	? clWinBtnDisabledText
 							: mix(baseColor, bkColor, hit.captured ? 0.5f : hit.hover_smooth*0.3f); 
 					} 
 					
@@ -8899,7 +8924,7 @@ struct im
 			Row!(_M_, _L_)
 			(
 				{
-					hit = hitTest(enabled); 
+					hit = hitTest(imEnabled); 
 					
 					if(
 						!isSelected && hit.hover && (
@@ -8946,7 +8971,7 @@ struct im
 			Column(
 				{
 					actContainer.id = id_; //Todo: lame way of passing that fucking genericId
-					hit = hitTest(enabled); 
+					hit = hitTest(imEnabled); 
 					border = "1 normal gray"; 
 					
 					foreach(i, s; items)
@@ -9507,7 +9532,7 @@ struct im
 					
 					bool userModified; 
 					
-					if(hit.pressed && enabled)
+					if(hit.pressed && hit.enabled)
 					{
 						//Todo: enabled handling
 						userModified = true; 
@@ -9893,9 +9918,9 @@ struct im
 				bool userModified; 
 				HitInfo hit; 
 				auto sl = new SliderClass(
-					id_, enabled, normValue, _range, userModified, targetView.mousePos.vec2, 
+					id_, imEnabled, normValue, _range, userModified, targetView.mousePos.vec2, 
 					style, hit, getStaticParamDef(SliderOrientation.auto_, args), 
-					getStaticParamDef(SliderStyle.slider, args), theme=="tool" ? 1 : 1.4f
+					getStaticParamDef(SliderStyle.slider, args), theme.isTool ? 1 : 1.4f
 				); 
 				
 				append(sl); push(sl, id_); scope(exit) pop; 
@@ -9907,7 +9932,7 @@ struct im
 				
 				//Todo: args hanfling is bad here! only handles delegates. Ignored named parameters!
 				
-				if(userModified && enabled)
+				if(userModified && imEnabled)
 				{
 					
 					if(_range.isEndless)
@@ -11742,10 +11767,10 @@ version(/+$DIDE_REGION Dead code 260813+/all)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x51CC9EB16D5C4).檢(hit.toJson)); 
+					((0x5206FEB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x51D03EB16D5C4).檢(localMouse)); 
+					((0x520A9EB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
