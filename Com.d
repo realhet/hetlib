@@ -603,7 +603,7 @@ class ComPort
 						Text(" Select "); 
 						foreach(p; comPorts.existingPorts)
 						{
-							if(Btn(p.name, selected(sameText(p.name, settings.port)), hint([p.description, p.deviceId].join(' ')), genericId(p.id)))
+							if(Btn(p.name, ((sameText(p.name, settings.port)).名!q{selected}), hint([p.description, p.deviceId].join(' ')), genericId(p.id)))
 							{
 								settings.port = p.name; 
 								choosePort = false; 

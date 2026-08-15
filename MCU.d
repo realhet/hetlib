@@ -49,8 +49,8 @@ void ColorRow(string colorName, float hScale = 1)
 						border.inset = true; 
 					}
 					outerWidth = 52; 
-					style.bkColor = bkColor = colorName.toWireColor; 
-					style.fontColor = blackOrWhiteFor(bkColor); flags.hAlign = HAlign.center; 
+					background = style.bkColor = colorName.toWireColor; 
+					style.fontColor = blackOrWhiteFor(style.bkColor); flags.hAlign = HAlign.center; 
 					fh = fh*hScale; 
 					Text(colorName); 
 				}
@@ -393,7 +393,7 @@ struct ConnectorInfo
 //A clickable button with the connector type. Clicking shows a ConnectorPanel.
 
 //ConnectorBtn //////////////////////////////////////////////////
-void ConnectorBtn(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, T...)(string conn, string[string] pinColorMap, T args)
+void ConnectorBtn(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(string conn, string[string] pinColorMap, in Args args)
 {
 	with(im)
 	{
@@ -406,9 +406,9 @@ void ConnectorBtn(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false
 			pinColorMap = args[0]; 
 		+/
 		
-		auto	ci = connectorInfo(conn); 
-		const	hasDetail = ci.valid && ci.type!=ConnectorInfo.Type.Wire,
-		bk = actContainer.bkColor; 
+		auto ci = connectorInfo(conn); 
+		const 	hasDetail 	= ci.valid && ci.type!=ConnectorInfo.Type.Wire,
+			bk 	= actContainer.bkColor; 
 		
 		struct IMData
 		{
@@ -419,7 +419,7 @@ void ConnectorBtn(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false
 		IMData* imData; 
 		
 		if(
-			Btn!(_M_, _L_, isWhite)
+			Btn!(_M_, _L_)
 			(
 				{
 					
@@ -565,7 +565,7 @@ class ArduinoNanoProject
 			with(im)
 			Row(
 				YAlign.top, {
-					style.bkColor = bkColor = clWhite; 
+					background = style.bkColor = clWhite; 
 					margin = "0"; 
 					border = "1 normal gray"; 
 					border.extendBottomRight = true; 
@@ -732,7 +732,7 @@ class ArduinoNanoProject
 				margin = "2 4"; 
 				border = "2 normal gray"; 
 				padding = "4"; 
-				style.bkColor = bkColor = RGB(230, 230, 230); 
+				background = style.bkColor = RGB(230, 230, 230); 
 				flags.yAlign = YAlign.baseline; 
 			}, args
 		); 

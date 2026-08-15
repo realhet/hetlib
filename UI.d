@@ -512,7 +512,9 @@ version(/+$DIDE_REGION+/all)
 		FontId fontId; 
 		ubyte fontHeight = DefaultFontHeight; 
 		ubyte fontFlags; 
-		RGB fontColor=clBlack, bkColor=clWhite; 
+		RGB fg=clBlack, bg=clWhite; 
+		
+		alias fontColor = fg, bkColor = bg; 
 		
 		private static BOOLPROP(string name, int bitIdx)
 		=> iq{
@@ -552,7 +554,7 @@ version(/+$DIDE_REGION+/all)
 			if(auto p="transparent"	in map)
 			transparent		= (*p).toInt!=0; 
 			if(auto p="fontColor"	in map)
-			fontColor		=	(*p).toRGB; 
+			fontColor	=	(*p).toRGB; 
 			if(auto p="bkColor"	in map)
 			bkColor	  =	(*p).toRGB; 
 		} 
@@ -667,11 +669,11 @@ version(/+$DIDE_REGION+/all)
 		a("comment"	, tsComment	, tsNormal, { tsComment.fontHeight = rfh(12); }); 
 		a("error"	, tsError	, tsNormal,	{ tsError.bold = tsError.underline = true; tsError.bkColor = clRed; tsError.fontColor = clYellow; }); 
 		a("bold"	, tsBold	, tsNormal, { tsBold.bold = true; }); 
-		a("bold2"	, tsBold2	, tsBold	, { tsBold2.fontColor = clChapter; }); 
+		a("bold2"	, tsBold2	, tsBold	, { tsBold2.fg = clChapter; }); 
 		a("quote"	, tsQuote	, tsNormal,	{ tsQuote.italic = true; }); 
 		a("code"	, tsCode	, tsNormal, { tsCode.fontId = FontId.Lucida_Console; tsCode.fontHeight = rfh(18); tsCode.bold = false; }); //Todo: should be half bold?
-		a("link"	, tsLink	, tsNormal, { tsLink.underline = true; tsLink.fontColor = clLink; }); 
-		a("title"	, tsTitle	, tsNormal,	{ tsTitle.bold = true; tsTitle.fontColor = clChapter; tsTitle.fontHeight = rfh(64); }); 
+		a("link"	, tsLink	, tsNormal, { tsLink.underline = true; tsLink.fg = clLink; }); 
+		a("title"	, tsTitle	, tsNormal,	{ tsTitle.bold = true; tsTitle.fg = clChapter; tsTitle.fontHeight = rfh(64); }); 
 		a("chapter"	, tsChapter	, tsTitle , { tsChapter.fontHeight = rfh(40); }); 
 		a("chapter2", tsChapter2, tsTitle , { tsChapter2.fontHeight = rfh(32); }); 
 		a("chapter3", tsChapter3, tsTitle , { tsChapter3.fontHeight = rfh(27); }); 
@@ -1878,150 +1880,148 @@ version(/+$DIDE_REGION+/all)
 }
 version(/+$DIDE_REGION+/all)
 {
-	/*
-		Text editing.
-		
-		Problemas dolgok:
-		- wrapping
-		- 3 fele pozicio meghatarozas szovegen belul:
-		
-			TextPosition{
-				TextIndex	  :	int
-				TextLineCol		: { int line, int col; }
-				TextXY	  : { float x, float y0, float y1; }  //y0 and y1 covers the whole wrappedLine.height
-			}
-		
-			TextRange{ TextPosition p0, p1; }
-		
-	*/
-	
-	/// TextPos marks a specific place inside a text.
-	struct TextPos
-	{
-		enum Type
-		{ none, idx, lc, xy} 
-		
-		private
-		{
-			Type type; 
-			int fIdx, fLine, fColumn; //Todo: union
-			vec2 fPoint; 
-			float fHeight=0; 
-			
-			void enforceType(string file = __FILE__, int line = __LINE__)(Type t) const
-			{
-				if(t!=type)
-				throw new Exception("TextPos type mismatch error. %s required.".format(t), file, line); 
-			} 
-		} 
-		
-		this(int idx	     )
-		{ type = Type.idx	; 	 fIdx	 = idx	;                     } 
-		this(int line, int column	     )
-		{ type = Type.lc	; 		fLine	 = line	; 	 fColumn = column; 	} 
-		this(in vec2 point, float height)
-		{ type = Type.xy; 	fPoint = point; 	 fHeight = height; 	} 
-		
-		bool valid() const
-		{ return type != Type.none; } 
-		bool isIdx() const
-		{ return type == Type.idx	; } 
-		bool isLC () const
-		{ return type == Type.lc	; } 
-		bool isXY () const
-		{ return type == Type.xy	; } 
-		
-		auto idx	 (string file = __FILE__, int line = __LINE__)() const
-		{ enforceType!(file, line)(Type.idx); return fIdx	; } 
-		auto line	 (string file = __FILE__, int lin_ = __LINE__)() const
-		{ enforceType!(file, lin_)(Type.lc ); return fLine	; } 
-		auto column(string file = __FILE__, int line = __LINE__)() const
-		{ enforceType!(file, line)(Type.lc ); return fColumn; } 
-		auto point (string file = __FILE__, int line = __LINE__)() const
-		{ enforceType!(file, line)(Type.xy ); return fPoint; } 
-		auto height(string file = __FILE__, int line = __LINE__)() const
-		{ enforceType!(file, line)(Type.xy ); return fHeight; } 
-		
-		string toString() const
-		{
-			string s; 
-			with(Type)
-			final switch(type)
-			{
-				case none: s = "none"; break; 
-				case idx	: s = format!"idx = %s"(idx); break; 
-				case lc	: s = format!"line = %s, column = %s"(line, column); break; 
-				case xy	: s = format!"point = (%.1f, %.1f), height = %.1f"(point.x, point.y, height); break; 
-			}
-			
-			return Unqual!(typeof(this)).stringof ~ "(" ~ s ~ ")"; 
-		} 
-	} 
-	
-	/// a linearly selected range of text.
-	struct TextRange
-	{ TextPos st, en; } 
-	
-	struct EditCmd
-	{
-		private enum _intParamDefault 	= int.min+1,
-		_pointParamDefault 	= vec2(-1e30, -1e30); 
-		
-		enum Cmd
-		{
-			/+caret commands+/	//parameters
-			nop,	
-			cInsert,	//text to insert
-			cDelete, cDeleteBack, 	//number of glyphs to delete. Default 1
-			cLeft, cRight,	//number of repetitions. Default 1
-			cUp, cDown,	
-			cHome, cEnd,	
-			cMouse	//caret goes to mouse
-		} 
-		alias cmd this; 
-		
-		Cmd cmd; 
-		int _intParam = _intParamDefault; 
-		vec2 _pointParam = _pointParamDefault; 
-		
-		//parameter access
-		string strParam; 
-		int intParam(int def=0) const
-		{ return _intParam==_intParamDefault ? def : _intParam; } 
-		vec2 pointParam(in vec2 def=vec2(0)) const
-		{ return _pointParam==_pointParamDefault ? def : _pointParam; } 
-		
-		this(T...)(Cmd cmd, T args)
-		{
-			this.cmd = cmd; 
-			static foreach(a; args)
-			{
-				static if(isSomeString!(typeof(a)))
-				strParam = a; 
-				static if(isIntegral  !(typeof(a)))
-				_intParam = a; 
-				static if(is(const typeof(a) == ConstOf!vec2))
-				_pointParam = a; 
-			}
-		} 
-		
-		auto toString() const
-		{
-			auto s = format!"EditCmd(%s"(cmd); 
-			if(_intParam != _intParamDefault)
-			s ~= " " ~ _intParam.text; 
-			if(strParam.length)
-			s ~= " " ~ strParam.text; 
-			if(_pointParam != _pointParamDefault)
-			s ~= " " ~ format!"(%.1f, %.1f)"(pointParam.x, pointParam.y); 
-			return s ~ ")"; 
-		} 
-	} 
-	
-	/// All the information needed for a text editor
 	struct TextEditorState
 	{
-		 //TextEditorState /////////////////////////////////////
+		/*
+			Text editing.
+			
+			Problemas dolgok:
+			- wrapping
+			- 3 fele pozicio meghatarozas szovegen belul:
+			
+				TextPosition{
+					TextIndex	  :	int
+					TextLineCol		: { int line, int col; }
+					TextXY	  : { float x, float y0, float y1; }  //y0 and y1 covers the whole wrappedLine.height
+				}
+			
+				TextRange{ TextPosition p0, p1; }
+			
+		*/
+		
+		/// TextPos marks a specific place inside a text.
+		struct TextPos
+		{
+			enum Type
+			{ none, idx, lc, xy} 
+			
+			private
+			{
+				Type type; 
+				int fIdx, fLine, fColumn; //Todo: union
+				vec2 fPoint; 
+				float fHeight=0; 
+				
+				void enforceType(string file = __FILE__, int line = __LINE__)(Type t) const
+				{
+					if(t!=type)
+					throw new Exception("TextPos type mismatch error. %s required.".format(t), file, line); 
+				} 
+			} 
+			
+			this(int idx	     )
+			{ type = Type.idx	; 	 fIdx	 = idx	;                     } 
+			this(int line, int column	     )
+			{ type = Type.lc	; 		fLine	 = line	; 	 fColumn = column; 	} 
+			this(in vec2 point, float height)
+			{ type = Type.xy; 	fPoint = point; 	 fHeight = height; 	} 
+			
+			bool valid() const
+			{ return type != Type.none; } 
+			bool isIdx() const
+			{ return type == Type.idx	; } 
+			bool isLC () const
+			{ return type == Type.lc	; } 
+			bool isXY () const
+			{ return type == Type.xy	; } 
+			
+			auto idx	 (string file = __FILE__, int line = __LINE__)() const
+			{ enforceType!(file, line)(Type.idx); return fIdx	; } 
+			auto line	 (string file = __FILE__, int lin_ = __LINE__)() const
+			{ enforceType!(file, lin_)(Type.lc ); return fLine	; } 
+			auto column(string file = __FILE__, int line = __LINE__)() const
+			{ enforceType!(file, line)(Type.lc ); return fColumn; } 
+			auto point (string file = __FILE__, int line = __LINE__)() const
+			{ enforceType!(file, line)(Type.xy ); return fPoint; } 
+			auto height(string file = __FILE__, int line = __LINE__)() const
+			{ enforceType!(file, line)(Type.xy ); return fHeight; } 
+			
+			string toString() const
+			{
+				string s; 
+				with(Type)
+				final switch(type)
+				{
+					case none: s = "none"; break; 
+					case idx	: s = format!"idx = %s"(idx); break; 
+					case lc	: s = format!"line = %s, column = %s"(line, column); break; 
+					case xy	: s = format!"point = (%.1f, %.1f), height = %.1f"(point.x, point.y, height); break; 
+				}
+				
+				return Unqual!(typeof(this)).stringof ~ "(" ~ s ~ ")"; 
+			} 
+		} 
+		
+		/// a linearly selected range of text.
+		struct TextRange
+		{ TextPos st, en; } 
+		
+		struct EditCmd
+		{
+			private enum _intParamDefault 	= int.min+1,
+			_pointParamDefault 	= vec2(-1e30, -1e30); 
+			
+			enum Cmd
+			{
+				/+caret commands+/	//parameters
+				nop,	
+				cInsert,	//text to insert
+				cDelete, cDeleteBack, 	//number of glyphs to delete. Default 1
+				cLeft, cRight,	//number of repetitions. Default 1
+				cUp, cDown,	
+				cHome, cEnd,	
+				cMouse	//caret goes to mouse
+			} 
+			alias cmd this; 
+			
+			Cmd cmd; 
+			int _intParam = _intParamDefault; 
+			vec2 _pointParam = _pointParamDefault; 
+			
+			//parameter access
+			string strParam; 
+			int intParam(int def=0) const
+			{ return _intParam==_intParamDefault ? def : _intParam; } 
+			vec2 pointParam(in vec2 def=vec2(0)) const
+			{ return _pointParam==_pointParamDefault ? def : _pointParam; } 
+			
+			this(T...)(Cmd cmd, T args)
+			{
+				this.cmd = cmd; 
+				static foreach(a; args)
+				{
+					static if(isSomeString!(typeof(a)))
+					strParam = a; 
+					static if(isIntegral  !(typeof(a)))
+					_intParam = a; 
+					static if(is(const typeof(a) == ConstOf!vec2))
+					_pointParam = a; 
+				}
+			} 
+			
+			auto toString() const
+			{
+				auto s = format!"EditCmd(%s"(cmd); 
+				if(_intParam != _intParamDefault)
+				s ~= " " ~ _intParam.text; 
+				if(strParam.length)
+				s ~= " " ~ strParam.text; 
+				if(_pointParam != _pointParamDefault)
+				s ~= " " ~ format!"(%.1f, %.1f)"(pointParam.x, pointParam.y); 
+				return s ~ ")"; 
+			} 
+		} 
+		
 		string str; 	//the string being edited Edit() fills it
 		float defaultFontHeight; 	//used when there's no text to display 0 -> uibase.NortmalFontHeight
 		int[] cellStrOfs; 	//mapping petween glyphs and string ranges Edit() fills it
@@ -3304,7 +3304,7 @@ version(/+$DIDE_REGION+/all)
 				[q{bool},q{1},q{"noBackground"},q{},q{/++/}],
 				[q{bool},q{1},q{"cullSubCells"},q{},q{/+clipSubCells must be enabled too+/}],
 				[q{bool},q{1},q{"_hasDrawCallback"},q{},q{/++/}],
-				[q{bool},q{1},q{"selected"},q{},q{/+maintained by system, not by user (in applyBtnStyle)+/}],
+				[q{bool},q{1},q{"selected"},q{},q{/+maintained by system+/}],
 				[q{bool},q{1},q{"hidden"},q{},q{/+only affects draw() calls.+/}],
 				[q{bool},q{1},q{"dontSearch"},q{},q{/+no search() inside this container+/}],
 				[q{bool},q{1},q{"noHitTest"},q{},q{/+don't even bother to add this container and it's subcontainers to the hit list.+/}],
@@ -3324,6 +3324,7 @@ version(/+$DIDE_REGION+/all)
 					//3: Arduino 
 				+/}],
 				[q{bool},q{1},q{"enabled"},q{1},q{/++/}],
+				[q{bool},q{1},q{"down"},q{1},q{/+Anything with a HitRec sets this. (It is actually h.captured)+/}],
 			]))
 		) .GEN!q{GEN_bitfields}); 
 	} 
@@ -5309,7 +5310,7 @@ version(/+$DIDE_REGION+/all)
 				Container(
 					((identityStr(this)).genericArg!q{id}),
 					{
-						theme = "tool"; 
+						theme.isTool = true; 
 						with(flags)
 						vScrollState 	= ScrollState.auto_,
 						hScrollState 	= ScrollState.auto_,
@@ -5326,7 +5327,7 @@ version(/+$DIDE_REGION+/all)
 						Container({ outerPos = vec2(maxRowWidth, rows.length*rowHeight); outerSize = vec2(0); }); 
 						
 						flags.saveVisibleBounds = true; 
-						if(const visibleBounds = imstVisibleBounds(actId))
+						if(const visibleBounds = imstVisibleBounds(imId))
 						{
 							void doit(int i, TreeRow r)
 							{
@@ -5416,7 +5417,7 @@ version(/+$DIDE_REGION+/all)
 		} 
 	} 
 	
-	
+	
 	
 	/+
 		260718: Size reduction
@@ -5448,6 +5449,713 @@ version(/+$DIDE_REGION+/all)
 }
 version(/+$DIDE_REGION+/all)
 {
+	enum SliderOrientation
+	{ horz, vert, round, auto_} 
+	private pure bool isLinear(in SliderOrientation o)
+	{
+		with(SliderOrientation)
+		return o==horz || o==vert; 
+	} 
+	private pure bool isRound (in SliderOrientation o)
+	{
+		with(SliderOrientation)
+		return o==round; 
+	} 
+	
+	enum SliderStyle
+	{ slider, scrollBar} 
+	
+	struct ScrollBarOptions
+	{
+		float pageSize = 0; //pageSize in win32
+		int thickness = 13; 
+		int margin = 2; 
+		int minThumbSize_pixels = 5; 
+	} 
+	
+	pure static auto getActualSliderOrientation
+		(SliderOrientation orientation, in bounds2 r, SliderStyle style)
+	{
+		//scrollbar can only be horz or vert.
+		if(style==SliderStyle.scrollBar && !isLinear(orientation))
+		orientation = SliderOrientation.auto_; 
+		
+		if(orientation != SliderOrientation.auto_)
+		return orientation; 
+		
+		immutable THRESHOLD = 1.5f; 
+		float aspect = safeDiv(r.width/r.height, 1); 
+		return aspect>=THRESHOLD	? SliderOrientation.horz:
+		aspect<=(1/THRESHOLD)	? SliderOrientation.vert:
+		SliderOrientation.round; 
+	} 
+	class Slider : Container
+	{
+		//Note: must be a Container because hitTest works on Containers only.
+		
+		//Todo: shift precise mode: must use float knob position to improve the precision
+		
+		SliderOrientation orientation; 
+		SliderStyle sliderStyle; 
+		RGB /+bkColor, <-already defined in Container+/clLine, clThumb, clRuler; 
+		float baseSize; //this is calculated from current fontHeight and theme.
+		float normThumbSize; //if it is a scrollbar, this is not nan and specifies the normalized size of the thumb.
+		//these are the derived sizes
+		float rulerOfs	()
+		{ return baseSize*0.5f; } 
+		float lwLine	()
+		{ return baseSize*(2.0f*InvDefaultFontHeight); } 
+		float lwRuler	()
+		{ return lwLine*0.5f; } 
+		
+		/// this is the half thickness of the thumb in the active direction
+		float calcLwThumb	(SliderOrientation ori)
+		{
+			if(sliderStyle ==	SliderStyle.scrollBar && !isnan(normThumbSize))
+			{
+				const minSizePixels = min(innerWidth, MinScrollThumbSize); 
+				return max((ori==SliderOrientation.horz ? innerWidth : innerHeight) * normThumbSize.clamp(0, 1), minSizePixels) * .5f; 
+			}else
+			{ return baseSize*(1.0f/3); }
+		} 
+		
+		
+		int rulerDiv0 = 9, rulerDiv1 = 4; 
+		ubyte rulerSides=3; 
+		
+		float nPos, nCenter=0;  //center is the start of the marking on the line
+		int wrapCnt; //for endless, to see if there was a wrapping or not. Used to reconstruct actual value
+		
+		bounds2 hitBounds; 
+		
+		bool focused; 
+		
+		this(
+			in im.Id id, bool enabled, ref float nPos_, in ValueRange range_, ref bool userModified, vec2 mousePos, 
+			TextStyle ts, out im.HitInfo hit, SliderOrientation orientation, SliderStyle sliderStyle, float fhScale, float normThumbSize=float.init
+		)
+		{
+			this.id = id; 
+			this.orientation = orientation; 
+			this.sliderStyle = sliderStyle; 
+			this.nPos = enabled ? nPos_ : nPos_/+float.init+//+Todo: hideThumb option+/; 
+			this.normThumbSize = normThumbSize; 
+			
+			if(sliderStyle==SliderStyle.scrollBar)
+			padding = "2"; 
+			
+			hit = im.hitTest(this, enabled); 
+			hitBounds = hit.hitBounds; 
+			
+			if(1 || sliderStyle==SliderStyle.slider)
+			focused = im.focusUpdate(
+				this, id,
+				enabled,
+				hit.pressed || hit.hover && inputs.RMB.pressed, //when to enter
+				inputs["Esc"].pressed,  //when to exit
+				/*onEnter	*/ {},
+				/*onFocus	*/ {},
+				/*onExit	*/ {}
+			); 
+			
+			//res.focused = focused;
+			
+			if(focused && im.canProcessUserInput)
+			userModified |= im.sliderState.handleKeyboard(nPos, range_, 8); 
+			
+			bkColor = ts.bkColor; 
+			const hoverOrFocus = enabled ? max(hit.hover_smooth*.5f, focused ? 1.0f : 0) : 0; 
+			
+			final switch(sliderStyle)
+			{
+				case SliderStyle.slider: 
+					clThumb =	mix(mix(clSliderThumb, clSliderThumbHover, hoverOrFocus), clSliderThumbPressed, hit.captured_smooth); 
+					clLine =	mix(mix(clSliderLine , clSliderLineHover , hoverOrFocus), clSliderLinePressed , hit.captured_smooth); 
+					clRuler = clGray/+mix(bkColor, ts.fontColor, 0.5)+/; //disable ruler for now
+					
+					if(focused) { clThumb = clBlack; clLine = clBlack; }//Todo: lame logic
+					
+					rulerSides = 0; 
+				break; 
+				case SliderStyle.scrollBar: 
+					clThumb = mix(clScrollThumb, clScrollThumbPressed, hoverOrFocus); 
+					bkColor = mix(clScrollBk, clScrollThumb, min(hoverOrFocus, .5f)); 
+					
+					if(focused) { clThumb = clBlack; }//Todo: lame logic
+					
+					//clThumb = mix(clWinBtn, clWinBtnPressed, max(hit.hover_smooth*.5f, sliderState.pressed_id==id ? 1 : 0));
+					rulerSides = 0; 
+				break; 
+			}
+			
+			if(!enabled)
+			clLine = clThumb = clGray; //Todo: nem clGray ez, hanem clDisabledText vagy ilyesmi
+			
+			baseSize = ts.fontHeight*fhScale*0.8f; 
+			outerSize = vec2(baseSize*6, baseSize); //default size
+			
+			userModified |= im.sliderState.handleMouse(id, hit, nPos, mousePos, range_, wrapCnt); 
+			
+			if(userModified)
+			nPos_ = nPos; 
+		} 
+		
+		override bounds2 getHitBounds()
+		{ return outerBounds; } 
+		
+		private void drawThumb(Drawing dr, vec2 a, vec2 t, float lwThumb)
+		{
+			final switch(sliderStyle)
+			{
+				case SliderStyle.slider: 
+					dr.lineWidth = lwThumb; dr.color = clThumb; 
+					const t90 = t.rotate90; 
+					dr.line(a-t90, a+t90); 
+				break; 
+				case SliderStyle.scrollBar: 
+					dr.color = clThumb; 
+					const horz = orientation==SliderOrientation.horz,
+								halfSize = horz ? vec2(lwThumb, innerHeight*.5f) : vec2(innerWidth*.5f, lwThumb),
+								bnd = bounds2(a, a).inflated(halfSize); 
+					dr.fillRect(bnd); 
+				break; 
+			}
+		} 
+		
+		private void drawLine(Drawing dr, vec2 a, vec2 b, RGB cl)
+		{ dr.lineWidth = lwLine; dr.color = cl; dr.line(a, b); } 
+		
+		override void draw(Drawing dr)
+		{
+			const mod_update = !hitBounds.empty && !inputs.LMB.value; 
+			
+			dr.color = bkColor; dr.fillRect(borderBounds_inner); 
+			drawBorder(dr); 
+			
+			dr.alpha = 1; dr.lineStyle = LineStyle.normal; dr.arrowStyle = ArrowStyle.none; 
+			
+			auto b = innerBounds; 
+			const 	actOrientation = getActualSliderOrientation(orientation, b, sliderStyle),
+				lwThumb = calcLwThumb(actOrientation); 
+			
+			if(isLinear(actOrientation))
+			{
+				const horz = actOrientation == SliderOrientation.horz,
+							thumbOfs = (horz ? vec2(1,	0) : vec2(0, -1)) * lwThumb,
+							p0 = (horz ? b.leftCenter	: b.bottomCenter) + thumbOfs,
+							p1 = (horz ? b.rightCenter	: b.topCenter   ) - thumbOfs; 
+				
+				if(sliderStyle==SliderStyle.slider && rulerSides)
+				{
+					const rp0 = horz ? p0 : p1,
+								rp1 = horz ? p1 : p0,
+								ro0 = horz ? vec2(0, rulerOfs) : vec2(rulerOfs, 0),
+								ro1 = ro0*.4f; 
+					if(rulerSides&1)
+					drawStraightRuler(dr, bounds2(rp0-ro0, rp1-ro1), rulerDiv0, rulerDiv1, true ); 
+					if(rulerSides&2)
+					drawStraightRuler(dr, bounds2(rp0+ro1, rp1+ro0), rulerDiv0, rulerDiv1, false); 
+				}
+				
+				if(sliderStyle==SliderStyle.slider)
+				drawLine(dr, p0, p1, clLine); 
+				
+				if(!isnan(nPos))
+				{
+					auto p = mix(p0, p1, nPos); 
+					if(!isnan(nCenter) && sliderStyle==SliderStyle.slider)
+					drawLine(dr, mix(p0, p1, nCenter), p, clThumb); 
+					
+					drawThumb(dr, p, thumbOfs, lwThumb); 
+					
+					if(mod_update)
+					{
+						vec2 thumbHalfSize; 
+						if(sliderStyle==SliderStyle.slider)
+						{
+							thumbHalfSize = lwThumb * vec2(0.5f, 1.5f); 
+							if(!horz)
+							swap(thumbHalfSize.x, thumbHalfSize.y); 
+						}else
+						{ thumbHalfSize = horz ? vec2(lwThumb, outerHeight*.5f) : vec2(outerWidth*.5f, lwThumb); }
+						const thumbRect = bounds2(p, p).inflated(thumbHalfSize); 
+						im.sliderState.afterDraw(id, actOrientation, dr.inputTransform(p0), dr.inputTransform(p1), dr.inputTransform(thumbRect)); 
+					}
+				}
+				
+			}else if(isRound(actOrientation))
+			{
+				//center square
+				bool endless = false; 
+				
+				b = b.fittingSquare; 
+				if(mod_update)
+				im.sliderState.afterDraw(id, actOrientation, dr.inputTransform(b.center), dr.inputTransform(b.center), dr.inputTransform(b)); 
+				
+				auto c = b.center, r = b.width*0.4f; 
+				
+				if(rulerSides)
+				drawRoundRuler(dr, c, r, rulerDiv0, rulerDiv1, endless); 
+				r *= 0.8f; 
+				
+				float a0 = (endless ? 0 : 0.25f)*PIf; 
+				float a1 = (endless ? 2 : 1.75f)*PIf; 
+				
+				dr.lineWidth = lwLine; 
+				dr.color = clLine; 
+				dr.circle(c, r, a0, a1); 
+				
+				if(!isnan(nPos))
+				{
+					float n = 1-nPos; 
+					n = endless ? n.fract : n.clamp(0, 1);  //Todo: ezt megcsinalni a range-val
+					float a = mix(a0, a1, n); 
+					if(!endless && !isnan(nCenter))
+					{
+						float ac = mix(a0, a1, (1-nCenter).clamp(0, 1)); 
+						dr.color = clThumb; 
+						if(ac>=a)
+						dr.circle(c, r, a, ac); 
+						else dr.circle(c, r, ac, a); 
+					}
+					
+					dr.lineWidth = lwThumb; 
+					dr.color = clThumb; 
+					auto v = vec2(sin(a), cos(a)); 
+					dr.line(c, c+v*r); 
+				}
+			}
+			
+			drawDebug(dr); 
+		} 
+		
+		//Draw Rulers
+		protected void drawStraightRuler(Drawing dr, in bounds2 r, int cnt, int cnt2=-1, bool topleft=true)
+		{
+			cnt--; 
+			if(cnt<=0)
+			return; 
+			if(cnt2<0)
+			cnt2 = cnt; 
+			dr.color = clRuler; dr.lineWidth = lwRuler; 
+			if(r.height < r.width)
+			{
+				float c = r.center.y,
+							b = r.top,
+							t = r.bottom,
+							j = r.left,
+							ja = r.width/cnt; 
+				if(!topleft)
+				swap(b, t); 
+				foreach(i; 0..cnt+1)
+				{
+					dr.vLine(j, b, cnt2 && i%cnt2==0 ? t : c); 
+					j += ja; 
+				}
+			}else
+			{
+				float c = r.center.x,
+							b = r.left,
+							t = r.right,
+							j = r.top,
+							ja = r.height/cnt; 
+				if(!topleft)
+				swap(b, t); 
+				foreach(i; 0..cnt+1)
+				{
+					dr.hLine(b, j, cnt2 && i%cnt2==0 ? t : c); 
+					j += ja; 
+				}
+			}
+		} 
+		
+		protected void drawRoundRuler(Drawing dr, in vec2 center, float radius, int cnt, int cnt2=-1, bool endless=false)
+		{
+				cnt--; 
+				if(cnt<=0)
+			return; 
+				if(cnt2<0)
+			cnt2 = cnt; 
+			//radius *= (1/1.25f);
+				dr.color = clRuler; dr.lineWidth = lwRuler; 
+				foreach(i; 0..cnt+1)
+			{
+				float a = endless ? 2*PIf*i/cnt
+													: -0.25f*PIf + 1.5f*PIf*i/cnt; 
+				float co = -cos(a), si = -sin(a); 
+				dr.moveTo(center.x+co*radius, center.y+si*radius); 
+				float radius2 = radius*(!endless && (cnt2 && i%cnt2==0) ? 1.25f : 1.125f); 
+				dr.lineTo(center.x+co*radius2, center.y+si*radius2); 
+			}
+		} 
+	} 
+	
+	class DateTimeRuler : Container
+	{
+		//Note: must be a Container because hitTest works on Containers only.
+		
+		RGB clText, clRedText, clMajorTick, clMinorTick; 
+		DateTime tMin, tMax, t0, t1, t0_draw, t1_draw; 
+		bounds2 hitBounds; 
+		
+		bool mouseAtTopHalf; 
+		@property mouseAtBottomHalf() => !mouseAtTopHalf; 
+		
+		bool focused; float hoverOrFocus=0; 
+		
+		DateTime highlighted_t; 
+		bool show_highlighted_t; 
+		
+		void sanitizeRanges()
+		{
+			//both ranges must be always valid
+			if(tMax<=tMin)
+			{
+				tMax = tMin; 
+				if(tMin.raw==ulong.max) tMin.raw--; 
+				tMax.raw = tMin.raw+1; 
+			}
+			t0 = t0.clamp(tMin, tMax); 
+			t1 = t1.clamp(t0, tMax); 
+			if(t0==t1)
+			{ if(t0==tMax) t0.raw--; else t1.raw++; }
+		} 
+		
+		static struct NormalizedSliderData
+		{
+			ulong w, w_outer; 
+			float nPos; 
+			float pageSize; 
+			ValueRange rng; 
+			
+			int wrapCnt; 
+			
+			bool changed_kb, changed_m; 
+			
+			this(
+				DateTime tMin, DateTime tMax, 
+				DateTime t0, DateTime t1
+			)
+			{
+				w = t1.raw - t0.raw; 
+				w_outer = tMax.raw - tMin.raw; 
+				
+				nPos = (((float(t0.raw - tMin.raw)))/(w_outer - w)); 
+				pageSize = (((float(w)))/(w_outer)); 
+				rng = ValueRange(0, 1, pageSize / 8); 
+			} 
+			
+			bool handleKeyboard()
+			{
+				const b = im.sliderState.handleKeyboard(nPos, rng, pageSize); 
+				if(b) changed_kb = true; return b; 
+			} 
+			
+			bool handleMouse(in im.Id id, in im.HitInfo hit, in vec2 mousePos)
+			{
+				const b = im.sliderState.handleMouse	(
+					id, hit, nPos, mousePos,
+					rng, wrapCnt
+				); 
+				if(b) changed_m = true; return b; 
+			} 
+			
+			@property changed() => changed_kb || changed_m; 
+		} 
+		
+		auto getNormalizedSliderData()
+		=> NormalizedSliderData(tMin, tMax, t0, t1); 
+		
+		bool jumpTo(float nPos)
+		{
+			if(nPos.isnan) return false; nPos = nPos.clamp(0, 1); 
+			const 	w 	= t1.raw 	- t0.raw,
+				w_outer 	= tMax.raw 	- tMin.raw; 
+			const t0_prev = t0, t1_prev = t1; 
+			t0 = tMin .shift(w_outer - w, nPos, tMin, tMax), 
+			t1 = t0   .shift(w, 1, tMin, tMax); 
+			sanitizeRanges; return (t0!=t0_prev) || (t1!=t1_prev); 
+		} 
+		
+		bool scrollByTime(DateTime startT0, Time Δt)
+		{
+			const len = t1.raw - t0.raw; const t0_prev = t0, t1_prev = t1; 
+			t0 = startT0             .scroll(Δt, tMin.raw, tMax.raw-len),
+			t1 = startT0.add_raw(len).scroll(Δt, tMin.raw+len, tMax.raw); 
+			sanitizeRanges; return (t0!=t0_prev) || (t1!=t1_prev); 
+		} 
+		
+		bool zoomAround(DateTime center, float amount)
+		{
+			if(amount.isnan || !amount) return false; 
+			
+			float sc = 1 + inputs.MW.delta.abs * .25; 
+			if(inputs.MW.delta>0) sc = 1/sc; 
+			
+			bool tryZoom()
+			{
+				auto calcLen() => t1.raw-t0.raw; 
+				const len = calcLen; 
+				t0 = t0.scale(center, sc, tMin, tMax); 
+				t1 = t1.scale(center, sc, tMin, tMax); 
+				sanitizeRanges; 
+				return len!=calcLen; 
+			} 
+			
+			if(!tryZoom)
+			{
+				if(sc>1/+zoom out attempt failed?+/)
+				{
+					sc = 2/+increase coom out amount+/; 
+					if(!tryZoom)
+					{
+						/+
+							Maybe it is next to tMax, then 
+							zoom away from t1.
+						+/
+						center = t1; 
+						if(!tryZoom)
+						{
+							t0 = tMin, t1 = tMax; 
+							/+return home as a last resort.+/
+						}
+					}
+				}
+			}
+			
+			return true; 
+		} 
+		
+		
+		
+		this(
+			in im.Id id, bool enabled, 	const DateTime tMin_, 	const DateTime tMax_, 
+				ref DateTime t0_, 	ref DateTime t1_, 
+			const ref TextStyle ts, vec2 mousePos, ref bool userModified, out im.HitInfo hit
+		)
+		{
+			this.id = id; 
+			tMin 	= tMin_,
+			tMax 	= tMax_,
+			t0 	= t0_,
+			t1 	= t1_; 
+			sanitizeRanges; 
+			
+			hit = im.hitTest(this, enabled); 
+			hitBounds = hit.hitBounds; 
+			
+			mouseAtTopHalf = !hitBounds || mousePos.y < hitBounds.center.y; 
+			
+			const 	norm_mouseX 	= ((
+				hitBounds && 
+				hitBounds.width
+			)?(((mousePos.x-hitBounds.left)/(hitBounds.width))):(0)),
+				t_hovered_top 	= tMin.shift(tMax.raw-tMin.raw, norm_mouseX, tMin, tMax),
+				t_hovered_bottom 	= t0.shift(t1.raw-t0.raw, norm_mouseX, tMin, tMax); 
+			
+			show_highlighted_t = mouseAtBottomHalf; 
+			highlighted_t = t_hovered_bottom; 
+			
+			enum canFocus = true; 
+			if(canFocus)
+			focused = im.focusUpdate
+			(
+				this, id, enabled,
+				hit.pressed || hit.hover && (
+					inputs.RMB.pressed ||
+					inputs.MMB.pressed ||
+					inputs.MW.delta
+				), //when to enter
+				inputs["Esc"].pressed, //when to exit
+				/*onEnter*/ {},
+				/*onFocus*/ {},
+				/*onExit*/ {}
+			); 
+			
+			ref rss = im.dateTimeRulerScrollState; 
+			
+			if(focused && im.canProcessUserInput)
+			{
+				//mouse and kbd handling on the top half as a scrollbar slider
+				{
+					auto nsd = getNormalizedSliderData; 
+					
+					nsd.handleKeyboard; 
+					
+					if(hit.pressed && mouseAtBottomHalf)
+					{/+beep; +//+left button pressed at t_hovered_bottom+/}
+					else { nsd.handleMouse(id, hit, mousePos); }
+					
+					if(nsd.changed)
+					{ if(jumpTo(nsd.nPos)) userModified = true; }
+				}
+				
+				//Zooming
+				if(hitBounds && mouseAtBottomHalf && inputs.MW.delta)
+				{
+					if(zoomAround(t_hovered_bottom, inputs.MW.delta))
+					userModified = true; 
+				}
+				
+				//Scrolling
+				{
+					if(hitBounds && mouseAtBottomHalf && inputs.MMB.pressed)
+					{ rss.startScroll(mousePos, t0, t1); }
+					
+					if(hitBounds && rss.scrolling)
+					{
+						//It can be only measured inside the hitbox.
+						rss.updateScroll((t1-t0)/hitBounds.width); 
+					}
+					
+					if(rss.scrolling)
+					{
+						if(
+							scrollByTime(
+								rss.startT0,
+								rss.currentDelta(mousePos)
+							)
+						)
+						userModified = true; 
+					}
+				}
+			}
+			
+			if(!focused || !inputs.MMB.down) rss.scrolling = false; 
+			
+			bkColor = ts.bkColor; 
+			clText = ts.fontColor; 
+			
+			hoverOrFocus = enabled ? max(hit.hover_smooth*.33f, focused ? 1.0f : 0) : 0; 
+			
+			clRedText = clRed; 
+			clMajorTick = clText; 
+			clMinorTick = mix(clMajorTick, bkColor, .125f); 
+			
+			const fh = ts.fontHeight; 
+			innerSize = vec2(fh*20, fh*2.5*2) /+default size+/; 
+			
+			if(userModified)
+			{ t0_ = t0, t1_ = t1; }
+		} 
+		
+		override void draw(Drawing dr)
+		{
+			const t0 = t0_draw, t1 = t1_draw; 
+			
+			
+			const mod_update = !hitBounds.empty && !inputs.LMB.value; 
+			
+			const b = innerBounds + innerPos; 
+			const fh = b.height/5.625f, rh = fh*5/2; 
+			auto 	bTop 	= bounds2(b.left, b.top, b.right, b.top+rh),
+				bBottom 	= bounds2(b.left, b.bottom-rh, b.right, b.bottom); 
+			bounds2 bCenter, bThumb; 
+			float t0x, t1x; 
+			
+			{
+				dr.pushClipBounds(bounds2(vec2(0), outerSize)); scope(exit) dr.popClipBounds; 
+				
+				import het.ui_ruler; 
+				const 	topIsFine 	= drawHRuler(dr, bTop, tMin, tMax, shiftUpwards: true),
+					bottomIsFine 	= drawHRuler(dr, bBottom, t0, t1); 
+				if(!topIsFine) bTop.bottom -= fh; 
+				if(!bottomIsFine) bBottom.top += fh; 
+				bCenter = bounds2(b.left, bTop.bottom, b.right, bBottom.top); 
+				
+				{
+					dr.color = clAccent; dr.alpha = .25; scope(exit) dr.alpha = 1; 
+					void fill(float leftX0, float leftX1, float rightX0, float rightX1, int y0, int y1)
+					{
+						const step = 1.0f/(y1-y0); float t=step/2; 
+						foreach(i; 0..y1-y0)
+						{
+							const y = i+y0, tt = (1-cos(t*(float(π))).signedpow(0.0625))/2; 
+							dr.fillRect(
+								bounds2(
+									mix(leftX0 , leftX1 , tt), y, 
+									mix(rightX0, rightX1, tt), y+1
+								)
+							); 
+							t += step; 
+						}
+					} 
+					
+					float remap(DateTime t)
+					=> b.left + ((b.width*(t.raw.clamp(tMin.raw, tMax.raw) - tMin.raw))/(tMax.raw - tMin.raw)); 
+					t0x = remap(t0), t1x = remap(t1); 
+					
+					dr.fillRect(bounds2(b.left, b.top, t0x, bCenter.top.ifloor)); 
+					dr.fillRect(bounds2(t1x, b.top, b.right, bCenter.top.ifloor)); 
+					fill(bCenter.left, bCenter.left, t0x, bCenter.left, bCenter.top.ifloor, bCenter.bottom.iceil); 
+					fill(t1x, bCenter.right, bCenter.right, bCenter.right, bCenter.top.ifloor, bCenter.bottom.iceil); 
+					
+					bThumb = bounds2(t0x, bTop.top, t1x, bTop.bottom); 
+				}
+			}
+			
+			drawBorder(dr); 
+			if(hoverOrFocus)
+			{
+				dr.alpha = hoverOrFocus; scope(exit) dr.alpha = 1; 
+				dr.color = clBlack; dr.lineWidth = 2; 
+				dr.drawRect(b.inflated(vec2(-1, 0/+Todo: A bit lame, but looks good+/))); 
+				
+				
+				if(!mouseAtTopHalf) dr.alpha = hoverOrFocus/2; 
+				const bt = bThumb.inflated(vec2(-1,0)); 
+				if(false)
+				{ dr.color = clAccent; dr.drawRect(bt); }
+				else
+				with(bt)
+				{
+					dr.line(topLeft, bottomLeft); 
+					dr.line(topRight, bottomRight); 
+					dr.line(bottomLeft, bottomRight); 
+				}
+				
+				if(show_highlighted_t)
+				{
+					dr.alpha = hoverOrFocus; 
+					
+					const t = highlighted_t; 
+					const xTop = b.left + ((b.width*(t.raw.clamp(tMin.raw, tMax.raw) - tMin.raw))/(tMax.raw - tMin.raw)); 
+					const xBottom = b.left + ((b.width*(t.raw.clamp(t0.raw, t1.raw) - t0.raw))/(t1.raw - t0.raw)); 
+					
+					dr.lineWidth = 1.05f; dr.color = clRedText; 
+					
+					const 	A = vec2(xTop, bTop.top), 
+						B = vec2(xTop, bCenter.top),
+						C = vec2(xBottom, bCenter.center.y), 
+						D = vec2(xBottom, bBottom.bottom); 
+					dr.line(A, B); /+dr.line(B, C);+/ dr.line(C, D); 
+					
+					version(/+$DIDE_REGION+/none) {
+						//curver line is ugly
+						dr.line(A, B); 
+						enum N = 10; 
+						const P = iota(N).map!((i){
+							const t = i*(1.0f/(N-1)); 
+							const tt = (1-cos(t*(float(π))).signedpow(0.0625))/2; 
+							return vec2(mix(B.x, C.x, tt), mix(B.y, C.y, t)); 
+						}).array; 
+						foreach(i; 1..P.length) dr.line(P[i-1], P[i]); 
+						dr.line(C, D); 
+					}
+				}
+			}
+			
+			im.sliderState.afterDraw(
+				id, SliderOrientation.horz, 
+				dr.inputTransform(bTop.topLeft     + bThumb.size/2), 
+				dr.inputTransform(bTop.bottomRight - bThumb.size/2), 
+				dr.inputTransform(bThumb)
+			); 
+			
+			drawDebug(dr); 
+		} 
+	} 
+	
 	//Todo: Unqual is not needed to check a type. Try to push this idea through a whole testApp.
 	//Todo: form resize eseten remeg a viewGUI-ra rajzolt cucc.
 	//Todo: Beavatkozas / gombnyomas utan NE jojjon elo a Button hint. Meg a tobbi controllon se!
@@ -5904,7 +6612,7 @@ version(/+$DIDE_REGION+/all)
 				{
 					Btn(
 						{
-							bkColor = RGB(40, 40, 40); 
+							background = RGB(40, 40, 40); 
 							padding = "3"; 
 							margin = "2 0"; 
 							innerWidth = graphWidth; 
@@ -6076,7 +6784,7 @@ version(/+$DIDE_REGION+/all)
 					{
 						padding = "4"; 
 						border = "1 normal silver"; 
-						theme = Theme.tool; 
+						theme.tool; 
 						Text(boldStr("Resource Monitor")); 	Spacer; 
 						VirtualFileGraph; 	Spacer; 
 						BitmapCacheGraph; 	Spacer; 
@@ -6151,7 +6859,7 @@ version(/+$DIDE_REGION+/all)
 							foreach(idx, ref f; globalShaderParams.floats)
 							Row(
 								{
-									theme.setTool; 
+									theme.tool; 
 									Text(idx.format!"float%d\t"); 
 									Slider(f, linRange(0, 1), { width = 12*fh; }, genericId(idx)); 
 								}
@@ -6665,6 +7373,7 @@ struct im
 							h.captured_smooth 	= max(h.hover_smooth, h.captured),
 							h.hitBounds	= lastHitStack.get(idx).hitBounds,
 							h.localPos	= lastHitStack.get(idx).localPos; 
+						
 					}
 					return h; 
 					//Todo: architectural bug: captured is delayed by 1 frame according to repeated
@@ -6701,6 +7410,8 @@ struct im
 				assert(container !is null); 
 				auto res = hitTestManager.check(container.id); 
 				res.enabled = enabled; 
+				
+				container.flags.down = res.captured; 
 				return res; 
 			}  auto hitTest(bool enabled=true)
 			{ return hitTest(actContainer, enabled); } 
@@ -6906,7 +7617,7 @@ struct im
 									//Todo: row kell?
 									padding = "4"; 
 									style.fontColor = clHintText; 
-									style.bkColor = bkColor = clHintBk; 
+									background = style.bkColor = clHintBk; 
 									flags.rowElasticTabs = true; 
 									
 									Text(lastHint.markup); 
@@ -6921,7 +7632,7 @@ struct im
 								{
 									padding = "4"; 
 									style.fontColor = clHintDetailsText; 
-									style.bkColor = bkColor = clHintDetailsBk; 
+									background = style.bkColor = clHintDetailsBk; 
 									flags.rowElasticTabs = true; 
 									//Todo: Why is this redundancy?
 									
@@ -6961,13 +7672,258 @@ struct im
 			struct enable 
 				{ bool val; 	 enum M = q{auto oldEnabled = enabled; scope(exit) enabled = oldEnabled; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled = enabled && a.val; 	}; } 
 		*/
-		struct selected
-		{ bool val; 	 enum M = q{auto _selected = false; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == selected)) _selected	= a.val; 	}; } 
+		
+		deprecated immutable selected_M = q{static foreach(a; args) static if(isGenericArg!(typeof(cast()a), "selected")) imSelected	= a.val; 	}; 
+		
 		
 		/+private enum range_M = q{range _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == range)) _range = a; }; +/
-		private enum range_M = q{ValueRange _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == ValueRange)) _range = a; }; 
+		deprecated private enum range_M = q{ValueRange _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == ValueRange)) _range = a; }; 
 		
 		
+		SliderState sliderState; 
+		
+		private struct SliderState
+		{
+			//information about the current slider being modified
+			
+			/+Usage: Call handleKeyboard(), handleMouse() and don't forget to call afterDraw()!!!+/
+			
+			//information generated and maintained in update
+			Id pressed_id; 
+			vec2 pressed_thumbMouseOfs, pressed_rawMousePos; 
+			float pressed_nPos; //normalized pos
+			int lockedDirection; //0:unknown, 1:h, 2:v
+			
+			void onPress(in Id id, ref float nPos, in vec2 mousePos)
+			{
+				//mouse was pressed, initialize values
+				pressed_id = id; 
+				pressed_rawMousePos = rawMousePos; 
+				pressed_nPos = nPos; 
+				
+				//remember the thumb-mouse offset at the time of press
+				pressed_thumbMouseOfs = drawn_thumbRect.center-mousePos;  //
+				
+				//if pressed on a round knob, first it must decide if up/down or left/right
+				lockedDirection = 0; 
+			} 
+			
+			//information saved in draw(). All vectors are transformed into view space.
+			Id drawn_id; 
+			SliderOrientation drawn_orientation; 
+			vec2 drawn_p0, drawn_p1; 
+			bounds2 drawn_thumbRect; 
+			
+			void afterDraw(in Id id, in SliderOrientation ori, vec2 p0, vec2 p1, in bounds2 bKnob)
+			{
+				drawn_id = id; 
+				drawn_orientation = ori; 
+				drawn_p0 = p0; 
+				drawn_p1 = p1; 
+				drawn_thumbRect = bKnob; 
+			} 
+			
+			//after onPress() it can jump to the mouse
+			void jumpToPoint(ref float nPos, in vec2 mousePos, bool isEndless)
+			{
+				if(drawn_orientation==SliderOrientation.horz)
+				{
+					pressed_thumbMouseOfs.x = 0; 
+					nPos = remap_clamp(mousePos.x, drawn_p0.x, drawn_p1.x, 0, 1); 
+					if(mousePos.x<drawn_p0.x)
+					pressed_thumbMouseOfs.x = drawn_p0.x-mousePos.x; 
+					if(mousePos.x>drawn_p1.x)
+					pressed_thumbMouseOfs.x = drawn_p1.x-mousePos.x 
+						- ((isEndless)?(1):(0))/+prevent infinite incrementing+/; 
+				}
+				else if(drawn_orientation==SliderOrientation.vert)
+				{
+					pressed_thumbMouseOfs.y = 0; 
+					nPos = remap_clamp(mousePos.y, drawn_p0.y, drawn_p1.y, 0, 1); 
+					//Note: p1 and p0 are intentionally swapped!!!
+					if(mousePos.y<drawn_p1.y)
+					pressed_thumbMouseOfs.y = drawn_p1.y-mousePos.y; 
+					/+
+						Todo: test vertical circular slider jump to the very ends, 
+						and see if not jumps to opposite si
+					+/
+					if(mousePos.y>drawn_p0.y)
+					pressed_thumbMouseOfs.y = drawn_p0.y-mousePos.y 
+						- ((isEndless)?(1):(0)); 
+				}
+				else { NOTIMPL; }
+			} 
+			
+			void mouseAdjust(
+				ref float nPos, in vec2 mousePos, bool isClamped, bool isCircular, bool isEndless, 
+				ref int wrapCnt, float adjustSpeed
+			)
+			{
+				if(drawn_orientation==SliderOrientation.horz)
+				{
+					slowMouse(adjustSpeed!=1, adjustSpeed); 
+					auto p = mousePos.x+pressed_thumbMouseOfs.x; 
+					if(isCircular || isEndless)
+					mouseMoveRelX(wrapInRange(p, drawn_p0.x, drawn_p1.x, wrapCnt)); 
+					nPos = remap(p, drawn_p0.x, drawn_p1.x, 0, 1); 
+					if(isClamped)
+					nPos = nPos.clamp(0, 1); 
+				}
+				else if(drawn_orientation==SliderOrientation.vert)
+				{
+					slowMouse(adjustSpeed!=1, adjustSpeed); 
+					auto p = mousePos.y+pressed_thumbMouseOfs.y; 
+					if(isCircular || isEndless)
+					mouseMoveRelY(wrapInRange(p, drawn_p0.y, drawn_p1.y, wrapCnt)); 
+					nPos = remap(p, drawn_p0.y, drawn_p1.y, 0, 1); 
+					if(isClamped)
+					nPos = nPos.clamp(0, 1); 
+				}
+				else if(drawn_orientation==SliderOrientation.round)
+				{
+					auto diff = rawMousePos-pressed_rawMousePos; 
+					auto act_dir = abs(diff.x)>abs(diff.y) ? 1 : 2; 
+					if(lockedDirection==0 && length(diff)>=3)
+					lockedDirection = act_dir; 
+					
+					const omniDirection = true; //right or up is the positive side
+					const delta = 
+						((omniDirection)?(inputs.MXraw.delta -inputs.MYraw.delta) :(((((lockedDirection)?(lockedDirection) :(act_dir))==1) ?(inputs.MXraw.delta):(-inputs.MYraw.delta)))); 
+					
+					pressed_nPos += delta*(adjustSpeed*(1.0f/180)); 
+					//it adds small delta's, so it could be overdriven
+					
+					pressed_nPos = pressed_nPos.clamp(0, 1); 
+					nPos = pressed_nPos; 
+					/+
+						Todo: it can't modify npos because npos can be an integer 
+						too. In this case, the pressed_nPos name is bad.
+					+/
+					
+					//Todo: endless????
+					//Todo: ha tulmegy, akkor vinnie kell magaval a base-t is!!!
+					//Todo: Ctrl precizitas megoldasa globalisan az inputs.d-ben.
+				}
+				else { raise("Invalid orientation"); }
+			} 
+			
+			void mouseAdjust(ref float nPos, in vec2 mousePos, in ValueRange range_, ref int wrapCnt, float adjustSpeed)
+			{ mouseAdjust(nPos, mousePos, range_.isClamped, range_.isCircular, range_.isEndless, wrapCnt, adjustSpeed); } 
+			
+			bool handleKeyboard(ref float nPos, in ValueRange range_, float pageSize)
+			{
+				if(nPos.isnan)
+				return false; 
+				
+				bool userModified; 
+				
+				void set(float n)
+				{
+					nPos = n.clamp(0, 1); 
+					userModified = true; 
+				} 
+				
+				void delta(float scale)
+				{
+					//modifiers
+					if(scale) {
+						if(inputs.Shift) scale*=10; 
+						if(inputs.Ctrl) scale/=10; 
+						if(inputs.Alt) scale/=100; 
+					}
+					/+Todo: this layout is incompatible with the mouse Shift = slow behavior.+/
+					
+					auto nStep()
+					{ return range_.step.ifz(1) / (range_.max-range_.min); } 
+					set(nPos + nStep *scale); 
+				} 
+				
+				const 	horz 	= drawn_orientation != SliderOrientation.vert, //round knobs are working for both
+					vert 	= drawn_orientation != SliderOrientation.horz; 
+				
+				if(horz && inputs.Left.repeated	|| vert && inputs.Down.repeated)
+				delta(-1); 
+				if(horz && inputs.Right.repeated	|| vert && inputs.Up.repeated)
+				delta(1); 
+				version(none)
+				{
+					/+
+						Todo: Make a forking focused control system that only sends these keys to only the focused control.
+						Until that only the arrows will work.
+						A mouse click somewhere else should also loce focus automatically
+					+/
+					if(inputs.PgDn.repeated)
+					delta(-pageSize); 
+					if(inputs.PgUp.repeated)
+					delta(pageSize); 
+					if(inputs.Home.down)
+					set(0); 
+					if(inputs.End .down)
+					set(1); 
+				}
+				
+				return userModified; 
+			} 
+			
+			bool handleMouse(in Id id, in HitInfo hit, ref float nPos, in vec2 mousePos, in ValueRange range_, ref int wrapCnt)
+			{
+				if(nPos.isnan)
+				return false; 
+				
+				bool userModified; 
+				
+				if(hit.pressed && hit.enabled)
+				{
+					//Todo: enabled handling
+					userModified = true; 
+					
+					onPress(id, nPos, mousePos); 
+					
+					//decide wether the knob has to jump to the mouse position or not
+					const doJump = isLinear(drawn_orientation) && !drawn_thumbRect.contains!"[)"(mousePos); 
+					if(doJump)
+					{ jumpToPoint(nPos, mousePos, range_.isEndless); }
+					
+					//round knob: lock the mouse and start measuring delta movement
+					if(isRound(drawn_orientation))
+					{
+						//Todo: "round" knob never jumps
+						mouseLock; /+
+							Bug: possible bug when the slider disappears, 
+							and the mouse stays locked forever
+						+/
+					}
+				}
+				
+				//continuous update if active
+				if(id==pressed_id)
+				{
+					userModified = true; 
+					const adjustSpeed = 	inputs.Shift.active 	? 10 : 
+						inputs.Ctrl.active 	? 0.1f : 
+						inputs.Alt.active 	? 0.01f 
+							: 1; //Note: this is a scaling factor...
+					mouseAdjust(nPos, mousePos, range_, wrapCnt, adjustSpeed); 
+				}
+				
+				//hit.released
+				if(hit.released)
+				{
+					pressed_id = Id.init; 
+					
+					//Todo: this isn't safe! what if the control disappears!!!
+					if(isLinear(drawn_orientation))	{ slowMouse(false); }
+					else	{ mouseUnlock; }
+				}
+				
+				return userModified; 
+			} 
+			
+		} 
+		
+		auto hScrollInfo = ScrollInfo('H'); 
+		auto vScrollInfo = ScrollInfo('V'); 
+		
 		struct ScrollInfo
 		{
 			char orientation; 
@@ -6983,7 +7939,7 @@ struct im
 				
 				//persistent data
 				float offset=0; 
-				im.SliderClass slider; 
+				.Slider slider; 
 			} 
 			
 			protected ScrollInfoRec[Id] infos; 
@@ -7090,7 +8046,7 @@ struct im
 						Todo: scrollbars only work on GUI surface. This flag shlould be inherited automatically, 
 								just like the upcoming enabled flag.
 					+/
-					auto sl = new SliderClass
+					auto sl = new .Slider
 						(
 						combine(info.container.id, orientation), enabled, normValue, 
 						linRange(0, 1), userModified, view_gui.mousePos.vec2, tsNormal, hit,
@@ -7135,9 +8091,6 @@ struct im
 				infos.values.each!print; 
 			} 
 		} 
-		
-		auto hScrollInfo = ScrollInfo('H'); 
-		auto vScrollInfo = ScrollInfo('V'); 
 		
 		version(/+$DIDE_REGION internal state+/all)
 		{
@@ -7157,7 +8110,15 @@ struct im
 			//Todo: ezt egy alias this-el egyszerusiteni. Jelenleg az im-ben is meg az im.StackEntry-ben is ugyanaz van redundansan deklaralva
 			.Container actContainer, lastContainer; //top of the containerStack for faster access
 			TextStyle textStyle;   alias style = textStyle; //Todo: style.opDispatch("fontHeight=0.5x")
-			struct Theme
+			
+			enum Theme: ubyte
+			{
+				reset, 
+				noTool, 	tool,
+				noWhite, 	white
+			} 
+			
+			struct ThemeState
 			{
 				mixin((
 					(表([
@@ -7167,19 +8128,24 @@ struct im
 					]))
 				).調!(GEN_bitfields)); 
 				
-				void setTool() { isTool = true; } 	void noTool() { isTool = false; } 
-				void setWhite() { isWhite = true; } 	void noWhite() { isWhite = false; } 
-				void clear() { this = Theme.init; } 
+				void reset() { this = ThemeState.init; } 
+				void tool() { isTool = true; } 	void noTool() { isTool = false; } 
+				void white() { isWhite = true; } 	void noWhite() { isWhite = false; } 
 				
-				static immutable
+				
+				void set(Theme t)
 				{
-					Theme tool() { Theme t; t.setTool; return t; } 
-					Theme white() { Theme t; t.setWhite; return t; } 
-					Theme toolWhite() { Theme t; t.setTool; t.setWhite; return t; } 
+					if(!t) reset; 
+					else
+					{
+						ref val = *(cast(ubyte*)(&this)); 
+						const i = (cast(int)(t))-1; 
+						val = (cast(ubyte)(((i&1)?(val.setBit(i/2)) :(val.clearBit(i/2))))); 
+					}
 				} 
 			} 
 			
-			Theme theme; 
+			ThemeState theme; 
 			
 			@property
 			{
@@ -7193,8 +8159,13 @@ struct im
 				
 				bool imEnabled()
 				=> ((actContainer)?(actContainer.flags.enabled):(true/+empty root is always enabled+/)); 
-				bool imEnabled(bool e)
-				{ if(actContainer) actContainer.flags.enabled = e; return e; } 
+				bool imEnabled(bool a)
+				{ if(actContainer) actContainer.flags.enabled = a; return a; } 
+				
+				bool imSelected()
+				=> ((actContainer)?(actContainer.flags.selected):(false)); 
+				bool imSelected(bool a)
+				{ if(actContainer) actContainer.flags.selected = a; return a; } 
 			} 
 			
 			auto lastCell(T:Cell=Cell)()
@@ -7206,7 +8177,7 @@ struct im
 			} 
 			
 			private struct StackEntry
-			{ .Container container; TextStyle textStyle; Theme theme; } 
+			{ .Container container; TextStyle textStyle; ThemeState theme; } 
 			private StackEntry[] stack; 
 			
 			
@@ -7374,8 +8345,17 @@ struct im
 					"innerSize", "outerSize", "innerPos", "outerPos", "pos", 
 					"width", "height"
 				].map!ContainerProp.join ~
-				["flags", "flex", "margin", "border", "padding", "bkColor"].map!ContainerRef.join
+				[
+					"flags", "flex", "margin", "border", "padding", 
+					/+"bkColor" removed: 260815+/
+				].map!ContainerRef.join
 			); 
+			
+			@property background()
+			=> actContainer.bkColor; 
+			
+			@property background(RGB a)
+			{ actContainer.bkColor = a; style.bkColor = a; return a; } 
 			
 			
 			
@@ -7428,43 +8408,41 @@ struct im
 	}
 	version(/+$DIDE_REGION+/all)
 	{
+		
 		enum StdPropertyDefs = 
 		(表([
-			[q{isG!"id"},q{/+already handled+/}],
-			[q{//q{isT!PanelPosition}q{panelPosition = a; }
-			}],
-			[],
 			[q{//Properties (set only once at creation)
 			}],
+			[q{isG!"id"},q{/+already handled+/}],
+			[q{isG!"init"},q{a(); }],
 			[q{isT!YAlign},q{flags.yAlign = a; }],
 			[q{isT!HAlign},q{flags.hAlign = a; }],
 			[q{isT!VAlign},q{flags.vAlign = a; }],
+			[q{isT!Theme},q{theme.set(a); }],
 			[q{isG!"padding" || isT!Padding},q{padding = a; }],
 			[q{isG!"border" || isT!Border},q{border = a; }],
 			[q{isG!"margin" || isT!Margin},q{margin = a; }],
+			[q{isG!"background"},q{background = a; }],
+			[q{isT!RGB},q{style.fg = a; }],
 			[q{isG!"flex"},q{flex = a; }],
 			[q{isG!"enabled"},q{imEnabled = a; }],
+			[q{isG!"selected"},q{imSelected = a; }],
 		])),
-		
+		
 		StdCompositionDefs = 
 		(表([
 			[q{//Composition updates (can be changed any time)
 			}],
 			[q{isT!TextStyle},q{textStyle = a; }],
 			[q{isG!"style"},q{textStyle.modify(a); }],
-			[q{isG!"syntax" || isT!SyntaxKind},q{
-				textStyle.applySyntax(a.to!SyntaxKind); 
-				bkColor = textStyle.bkColor; 
-			}],
-			[q{isT!Theme},q{theme = a; }],
-			[q{isG!"fontColor"},q{style.fontColor = a; }],
-			[q{isG!"bkColor" || isT!RGB},q{style.bkColor = bkColor = a; }],
+			[q{isG!"syntax" || isT!SyntaxKind},q{textStyle.applySyntax(a.to!SyntaxKind); }],
+			[q{isG!"fg"},q{style.fontColor = a; }],
+			[q{isG!"bg"},q{style.bkColor = a; }],
 			[q{isG!"bold"},q{style.bold = a; }],
 			[q{isG!"italic"},q{style.italic = a; }],
 			[q{isG!"underline"},q{style.underline = a; }],
 			[],
-			[q{//Emitters
-			}],
+			[q{/+Emitters /+Todo: It should not inject editable chars Edit!+/+/}],
 			[q{isSomeString!T},q{Text(a); }],
 			[q{is(T : Cell)},q{im.append(cast()a); }],
 			[q{is(T : const(Cell)[])},q{im.append(cast(Cell[])a); }],
@@ -7477,12 +8455,12 @@ struct im
 				ASM viewer needed.
 				/+Link: https://www.jmdavisprog.com/articles/why-const-sucks.html+/
 			+/}],
-		])); 
+		])); 
 		
 		template ContainerScript(string optionsStr)
 		{
 			enum ThisStr = "ContainerScript!(`"~optionsStr~"`)"; 
-			enum Option { selected, focused, hint, panelPosition } 
+			enum Option {panelPosition, hit, hint, focused} 
 			
 			enum options = optionsStr.split(' ').map!(to!Option).array; 
 			
@@ -7505,6 +8483,14 @@ struct im
 					OPT!"panelPosition"
 					(q{PanelPosition panelPosition; })
 				)
+				$(
+					OPT!"hit"
+					(q{HitInfo hit; })
+				)
+				$(
+					OPT!"hint"
+					(q{HintRec hintRec; })
+				)
 			}.text; 
 			
 			string ProcessProperties()
@@ -7514,7 +8500,12 @@ struct im
 					OPT!"panelPosition"
 					(q{~(表([[q{isT!PanelPosition},q{panelPosition = a; }],])).rows.array})
 				)
+				$(
+					OPT!"hint"
+					(q{~(表([[q{isT!HintRec},q{hintRec = cast()a; }],])).rows.array})
+				)
 				~ StdPropertyDefs.rows.array; 
+				
 				static foreach(a; args)
 				{
 					{
@@ -7535,6 +8526,14 @@ struct im
 							scope(exit) if(panelPosition) finalizePanelPosition(_container, panelPosition, clientArea); 
 						}
 					)
+				)
+				$(
+					OPT!"hit"
+					(q{hit = hitTest(_container, imEnabled); })
+				)
+				$(
+					OPT!"hint"
+					(q{handleHint(_container, hintRec, hit); })
 				)
 			}.text; 
 			
@@ -7557,7 +8556,7 @@ struct im
 					}
 				}
 			}.text; 
-		} 
+		} 
 		
 		private void _Container(CType, Args...)(in Args args)
 		{
@@ -7587,7 +8586,8 @@ struct im
 			
 			version(/+$DIDE_REGION Return custom results+/all)
 			{ return; }
-		} 
+		} 
+		
 		void Container(CType=.Container, string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
 		{
 			setIncomingId!(_M_, _L_)(); 
@@ -7608,7 +8608,7 @@ struct im
 		
 		void Flex(float value = 1)
 		{ Row(((value).名!q{flex})); } 
-		
+		
 		void Text(Args...)(in Args args)
 		{
 			//Todo: not multiline yet
@@ -7814,13 +8814,13 @@ struct im
 			SpacerRow(
 				fh*InvDefaultFontHeight, {
 					margin = "0.33333x 0"; 
-					bkColor = mix(style.bkColor, style.fontColor, 0.25f); 
+					background = mix(style.bkColor, style.fontColor, 0.25f); 
 				}
 			); 
 		} 
 		
 		void HLine()
-		{ Row({ innerHeight = 1; bkColor = mix(clWinBackground, clWinText, .25f); }); } 
+		{ Row({ innerHeight = 1; background = mix(clWinBackground, clWinText, .25f); }); } 
 		
 		void Panel(CType = .Column, string _M_=__MODULE__, size_t _L_=__LINE__, T...)(in T args)
 		{
@@ -7920,13 +8920,6 @@ struct im
 				
 				applyBtnBorder(bColor); 
 				
-				flags.selected = selected; 
-				/+
-					Todo: nem itt van a helye. minden containernek kezelnie kell a selected 
-					generic parametert, 	a focused mar kozpontositva van. 
-					Az enabledet is meg kell igy csinalni.
-				+/
-				
 				if(!enabled)
 				{
 					style.fontColor	= clWinBtnDisabledText; 
@@ -7956,11 +8949,11 @@ struct im
 				
 				if(selected)
 				{
-					style.bkColor	= mix(style.bkColor, clAccent, .5f); 
-					border.color	= mix(border.color , clAccent, .5f); 
+					style.bkColor = mix(style.bkColor, clAccent, .5f); 
+					border.color = mix(border.color , clAccent, .5f); 
 				}
 				
-				bkColor = style.bkColor; 
+				background = style.bkColor; 
 				//Todo: update the backgroundColor of the container. Should be automatic, but how?...
 				//Todo: handle focused
 			} 
@@ -7978,11 +8971,12 @@ struct im
 				if(!enabled)
 				{ style.fontColor = mix(style.fontColor, style.bkColor, 0.5f); }
 				
-				bkColor = style.bkColor; 
+				background = style.bkColor; 
 			} 
 		}
 		version(/+$DIDE_REGION+/all) {
-			HitInfo Static(string _M_=__MODULE__, size_t _L_=__LINE__, V, Args...)(in V value, in Args args)
+			HitInfo Static(string _M_=__MODULE__, size_t _L_=__LINE__, V, Args...)
+				(in V value, in Args args)
 			{
 				setIncomingId!(_M_, _L_)(); 
 				static if(is(V : Property))
@@ -7995,31 +8989,24 @@ struct im
 			{
 				version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
 				{
-					alias SCR = ContainerScript!"", CType = .Row; 
+					alias SCR = ContainerScript!q{hit hint}, CType = .Row; 
 					mixin(SCR.Create); 
 				}
 				
 				version(/+$DIDE_REGION Local variable declarations+/all)
 				{
-					HitInfo hit; 
-					HintRec hintRec; 
-					
 					applyEditStyle(true, false, 0); 
 					flags.hAlign = ((isNumeric!V)?(HAlign.right) :(HAlign.left)); 
 				}
 				
 				version(/+$DIDE_REGION Load all properties+/all)
 				{
-					enum CustomPropertyDefs = 
-					(表([[q{isT!HintRec},q{hintRec = cast()a; }],])); 
+					enum CustomPropertyDefs = (表([[],])); 
 					mixin(SCR.ProcessProperties); 
 				}
 				
 				version(/+$DIDE_REGION Do custom behavior+/all)
 				{
-					hit = hitTest(_container, imEnabled); 
-					handleHint(_container, hintRec, hit); 
-					
 					static if(__traits(compiles, value()))	value(); 
 					else { _container.appendMarkupLine(value.text, style); }
 				}
@@ -8040,78 +9027,6 @@ struct im
 				}
 			} 
 		}
-		version(/+$DIDE_REGION+/all) {
-			
-			HitInfo Btn(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, Args...)(in Args args)
-			{
-				setIncomingId!(_M_, _L_)(); 
-				return _Btn!(isWhite)(args); 
-			} 
-			
-			private HitInfo _Btn(bool isWhite=false, Args...)(in Args args)
-			{
-				version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
-				{
-					alias SCR = ContainerScript!"", CType = .Row; 
-					mixin(SCR.Create); 
-				}
-				
-				version(/+$DIDE_REGION Local variable declarations+/all)
-				{
-					bool focusOnPress, _selected; 
-					HitInfo hit; 
-					HintRec hintRec; 
-					
-					//flags.wordWrap = false;
-					flags.hAlign = HAlign.center; 
-				}
-				
-				version(/+$DIDE_REGION Load all properties+/all)
-				{
-					enum CustomPropertyDefs = 
-					(表([
-						[q{isG!"focusOnPress"},q{focusOnPress = a; }],
-						[q{isG!"selected"},q{_selected = a; }],
-						[q{isT!selected},q{_selected = a.val; }],
-						[q{isT!HintRec},q{hintRec = cast()a; }],
-						[q{isT!ValueRange},q{/+Todo: Just let it pass for IncBtn!!!+/}],
-					])); 
-					mixin(SCR.ProcessProperties); 
-				}
-				
-				version(/+$DIDE_REGION Do custom behavior+/all)
-				{
-					hit = hitTest(_container, imEnabled); 
-					handleHint(_container, hintRec, hit); 
-					
-					bool focused = focusUpdate
-					(
-						_container, _id,
-						imEnabled, ((focusOnPress)?(hit.pressed) :(hit.clicked)), inputs.Esc.pressed,  //enabled, enter, exit
-						/*onEnter	*/ {},
-						/*onFocus	*/ {},
-						/*onExit	*/ {}
-					); 
-					
-					applyBtnStyle(isWhite, imEnabled, focused, _selected, hit.captured, hit.hover_smooth); 
-				}
-				
-				version(/+$DIDE_REGION Handle the recursive composition+/all)
-				{
-					void handleKey(KeyCombo key)
-					{ if(canProcessUserInput && key.pressed) hit.clicked = true; } 
-					
-					enum CustomCompositionDefs = 
-					(表([[q{isT!KeyCombo || isG!"key"},q{handleKey(KeyCombo(cast()a)); }],])); 
-					mixin(SCR.ProcessComposition); 
-				}
-				
-				version(/+$DIDE_REGION Return custom results+/all)
-				{ return hit; }
-			} 
-		}
-		
-		
 		auto Edit(string _M_=__MODULE__, size_t _L_=__LINE__, V, Args...)(ref V value, in Args args)
 		{
 			static if(is(T0==Path))
@@ -8222,7 +9137,8 @@ struct im
 						
 						//must override the previous value from another edit
 						//Todo: this must be rewritten with imStorage bounds.
-						textEditorState.cmdQueue ~= EditCmd(EditCmd.cEnd); 
+						with(textEditorState)
+						{ cmdQueue ~= EditCmd(EditCmd.cEnd); }
 						
 						/+
 							for keyboard entry: 
@@ -8323,7 +9239,7 @@ struct im
 								
 								void colorize(RGB cl)
 								{
-									style.bkColor = bkColor = mix(bkColor, cl, 0.25f); 
+									background = style.bkColor = mix(background, cl, 0.25f); 
 									border.color = cl; 
 								} 
 								
@@ -8385,6 +9301,68 @@ struct im
 			
 			return res; 
 		} 
+		HitInfo Btn(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
+		{
+			setIncomingId!(_M_, _L_)(); 
+			return _Btn(args); 
+		} 
+		
+		auto WhiteBtn(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
+		=> Btn!(_M_, _L_)(args, Theme.white); 
+		
+		private HitInfo _Btn(bool isWhite=false, Args...)(in Args args)
+		{
+			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
+			{
+				alias SCR = ContainerScript!q{hit hint}, CType = .Row; 
+				mixin(SCR.Create); 
+			}
+			
+			version(/+$DIDE_REGION Local variable declarations+/all)
+			{
+				bool focusOnPress; 
+				
+				//flags.wordWrap = false;
+				flags.hAlign = HAlign.center; 
+			}
+			
+			version(/+$DIDE_REGION Load all properties+/all)
+			{
+				enum CustomPropertyDefs = 
+				(表([
+					[q{isG!"focusOnPress"},q{focusOnPress = a; }],
+					[q{isT!ValueRange},q{/+Todo: Just let it pass for IncBtn!!!+/}],
+				])); 
+				mixin(SCR.ProcessProperties); 
+			}
+			
+			version(/+$DIDE_REGION Do custom behavior+/all)
+			{
+				bool focused = focusUpdate
+				(
+					_container, _id,
+					imEnabled, ((focusOnPress)?(hit.pressed) :(hit.clicked)), inputs.Esc.pressed,  //enabled, enter, exit
+					/*onEnter	*/ {},
+					/*onFocus	*/ {},
+					/*onExit	*/ {}
+				); 
+				
+				applyBtnStyle(theme.isWhite, imEnabled, focused, imSelected, hit.captured, hit.hover_smooth); 
+			}
+			
+			version(/+$DIDE_REGION Handle the recursive composition+/all)
+			{
+				void handleKey(KeyCombo key)
+				{ if(canProcessUserInput && key.pressed) hit.clicked = true; } 
+				
+				enum CustomCompositionDefs = 
+				(表([[q{isT!KeyCombo || isG!"key"},q{handleKey(KeyCombo(cast()a)); }],])); 
+				mixin(SCR.ProcessComposition); 
+			}
+			
+			version(/+$DIDE_REGION Return custom results+/all)
+			{ return hit; }
+		} 
 		
 		auto IncBtn(string _M_=__MODULE__, size_t _L_=__LINE__, int sign=1, T0, T...)
 			(ref T0 value, T args)
@@ -8392,7 +9370,7 @@ struct im
 		{
 			mixin(range_M); 
 			
-			auto capt = symbolStr(`Calculator` ~ ((sign>0)?(`Addition`):(`Subtract`))); 
+			auto capt = symbolStr(`Calculator` ~ ((sign>0)?(`Addition`) :(`Subtract`))); 
 			enum isInt = isIntegral!T0; 
 			
 			auto hit = Btn!(_M_, _L_)(capt, args, ((sign).名!q{id}), ((true).名!q{focusOnPress})); 
@@ -8415,10 +9393,12 @@ struct im
 			return chg; 
 		} 
 		
-		auto DecBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(ref T0 value, T args)
+		auto DecBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)
+			(ref T0 value, T args)
 		{ return IncBtn!(_M_, _L_, -1)(value, args); } 
 		
-		auto IncDecBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(ref T0 value, T args)
+		auto IncDecBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)
+			(ref T0 value, T args)
 		{
 			bool res; 
 			Row(
@@ -8434,7 +9414,8 @@ struct im
 			return res; 
 		} 
 		
-		auto IncDec(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(ref T0 value, T args)
+		auto IncDec(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)
+			(ref T0 value, T args)
 		{
 			auto oldValue = value; 
 			
@@ -8444,15 +9425,14 @@ struct im
 			IncDecBtn(value, args); 
 			return oldValue != value; 
 		} 
-		
-		auto WhiteBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(T0 text, T args)
-		{ return Btn!(_M_, _L_, true, T0, T)(text, args); } 
 		
 		//BtnRow //////////////////////////////////
 		
-		auto BtnRow(Cntr = .Row, string _M_=__MODULE__, size_t _L_=__LINE__, T...)(void delegate() fun, in T args)
+		auto BtnRow(Cntr = .Row, string _M_=__MODULE__, size_t _L_=__LINE__, T...)
+			(void delegate() fun, in T args)
 		{
-			Container!(Cntr, _M_, _L_)(
+			Container!(Cntr, _M_, _L_)
+			(
 				{
 					flags.btnRowLines = true; 
 					
@@ -8475,22 +9455,23 @@ struct im
 							c.margin.top = 0; if(!last)
 							c.margin.bottom= 0; 
 						}
-						
 					}
 				}, args
 			); 
 		} 
 		
-		auto BtnRow(Cntr = .Row, string _M_=__MODULE__, size_t _L_=__LINE__, T...)(ref int idx, in string[] captions, in T args)
+		auto BtnRow(Cntr = .Row, string _M_=__MODULE__, size_t _L_=__LINE__, T...)
+			(ref int idx, in string[] captions, in T args)
 		{
 			auto last = idx; 
 			
-			BtnRow!(Cntr, _M_, _L_)(
+			BtnRow!(Cntr, _M_, _L_)
+			(
 				{
 					foreach(i0, capt; captions)
 					{
 						const i = cast(int)i0; 
-						if(Btn(capt, genericId(i), selected(idx==i)))
+						if(Btn(capt, genericId(i), ((idx==i).名!q{selected})))
 						idx = i; 
 					}
 				}, args
@@ -8499,64 +9480,63 @@ struct im
 			return last != idx; 
 		} 
 		
-		auto BtnRow(Cntr = .Row, string _M_=__MODULE__, size_t _L_=__LINE__, A, Args...)(ref A value, in A[] items, in Args args)
+		auto BtnRow(Cntr = .Row, string _M_=__MODULE__, size_t _L_=__LINE__, A, Args...)
+			(ref A value, in A[] items, in Args args)
 		{
 			auto idx = cast(int) items.countUntil(value); //Todo: it's a copy from ListBox. Refactor needed
 			auto res = BtnRow!(Cntr, _M_, _L_)(idx, items, args); 
-			if(res)
-			value = items[idx]; 
+			if(res) value = items[idx]; 
 			return res; 
 		} 
 		
 		//Todo: (enum, enum[]) is ambiguous!!! only (enum) works on its the full members.
-		auto BtnRow(Cntr = .Row, string _M_=__MODULE__, size_t _L_=__LINE__, E, Args...)(ref E e, in Args args)
+		auto BtnRow(Cntr = .Row, string _M_=__MODULE__, size_t _L_=__LINE__, E, Args...)
+			(ref E e, in Args args)
 		if(is(E==enum))
 		{
 			string s = e.text; 
 			auto res = BtnRow!(Cntr, _M_, _L_)(s, EnumMemberNames!E, args); 
-			if(res)
-			ignoreExceptions({ e = s.to!E; }); 
+			if(res) ignoreExceptions({ e = s.to!E; }); 
 			return res; 
 		} 
 		
 		
-		bool TabsHeader(string _M_=__MODULE__, size_t _L_=__LINE__, T, I, A...)(T[] items, ref I idx, A args)
+		bool TabsHeader(string _M_=__MODULE__, size_t _L_=__LINE__, T, I, A...)
+			(T[] items, ref I idx, A args)
 			if(isIntegral!I)
 		{
 			static customDraw(Drawing dr, .Container cntr)
 			{
-				bool materialStyle = true; //Todo: theme selection.  tool, white, material... these are conflicting now.
+				bool materialStyle = true; 
+				//Todo: theme selection.  tool, white, material... these are conflicting now.
 				
-				auto btns = cast(.Container[])(cntr.subCells); 
-				if(btns.empty)
-				return; 
+				auto btns = (cast(.Container[])(cntr.subCells)); if(btns.empty) return; 
 				
 				if(!materialStyle)
 				{
-					dr.lineWidth = 2; 
-					bool first = true; 
-					vec2 bOfs; 
+					dr.lineWidth = 2; bool first = true; vec2 bOfs; 
 					foreach(btn; btns)
 					{
 						const bnd = btn.borderBounds; 
 						const sel = btn.flags.selected; 
 						
-						if(first)
-						bOfs = bnd.bottomLeft; 
+						if(first) bOfs = bnd.bottomLeft; 
 						
 						dr.color = clWinBtn; 
-						if(first)	dr.lineTo(bnd.bottomLeft); 
-						else	dr.moveTo(bnd.bottomLeft); first = false; 
-						if(sel)
-						{
+						if(first)	dr.moveTo(bnd.bottomLeft); 
+						else	dr.lineTo(bnd.bottomLeft); 
+						if(sel) {
 							dr.lineTo(bnd.topLeft); 
 							dr.lineTo(bnd.topRight); 
 						}
 						dr.lineTo(bnd.bottomRight); 
+						
+						first = false; 
 					}
 					
 					dr.lineTo(cntr.innerWidth-bOfs.x, bOfs.y); //extend right
-				}else
+				}
+				else
 				{
 					dr.lineWidth = 4; 
 					dr.color = clWinBtn; 
@@ -8564,7 +9544,8 @@ struct im
 					dr.hLine(bOfs.x, bOfs.y, cntr.innerWidth-bOfs.x); 
 					
 					dr.color = clAccent; 
-					btns.filter!(b => b.flags.selected).each!((b){
+					btns	.filter!((b)=>(b.flags.selected))
+						.each!((b){
 						with(b.borderBounds)
 						dr.hLine(left, bottom, right); 
 					}); 
@@ -8588,7 +9569,7 @@ struct im
 										Need a completely white Btn (link) for this.
 									+/
 									
-									bkColor = clWinBackground; 
+									background = clWinBackground; 
 									border.color = clWinBackground; 
 									flags.selected = i==idx; 
 									//Todo: Ez kurvaga'ny! Ez adja at a selectiont a draw callbacknak
@@ -8605,7 +9586,7 @@ struct im
 			
 			return clicked; 
 		} 
-		
+		
 		void TabsPage(string _M_=__MODULE__, size_t _L_=__LINE__, A...)(A args)
 		{
 			Column!(_M_, _L_)
@@ -8672,7 +9653,8 @@ struct im
 				}
 			); 
 		} 
-		
+	}
+	version(/+$DIDE_REGION+/all) {
 		auto Link(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(T0 text, T args)
 			if(isSomeString!T0 || __traits(compiles, text()) )
 		{
@@ -8740,7 +9722,7 @@ struct im
 		auto OldListItem(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(T0 text, T args)
 			if(isSomeString!T0 || __traits(compiles, text()) )
 		{
-			mixin(prepareId, enable.M, selected.M); 
+			mixin(prepareId, enable.M, selected_M); 
 			
 			//Todo: This is only the base of a listitem. Later it must communicate with a container
 			
@@ -8790,7 +9772,7 @@ struct im
 		//ChkBox //////////////////////////////
 		auto ChkBox(string _M_=__MODULE__, size_t _L_=__LINE__, string chkBoxStyle="chk", C, T...)(ref bool state, C caption, T args)
 		{
-			mixin(prepareId, selected.M); 
+			mixin(prepareId); 
 			
 			HitInfo hit; 
 			Row(
@@ -8897,7 +9879,7 @@ struct im
 					flags.hAlign = HAlign.left; 
 					ledFun(); 
 					if(actContainer.subCells.length)
-					Spacer(fh*0.25f); 
+					Spacer(fh*0.25f); 
 					width = 3.5*fh; 
 					static if(isSomeString!T)
 					Text(caption); 
@@ -8935,8 +9917,8 @@ struct im
 					isSelected = true; 
 					
 					padding = "2 2"; 
-					bkColor = mix(bkColor, clAccent, max(isSelected ? 0.66f:0, hit.hover_smooth*0.33f)); 
-					style.bkColor = bkColor; 
+					background = mix(background, clAccent, max(isSelected ? 0.66f:0, hit.hover_smooth*0.33f)); 
+					style.bkColor = background; 
 					
 					static if(__traits(compiles, s()))
 					s(); 
@@ -9295,598 +10277,13 @@ struct im
 			if(res)
 			ignoreExceptions({ e = s.to!E; }); 
 			return res; 
-		} 
-	}
-	version(/+$DIDE_REGION+/all) {
+		} 
 		version(/+$DIDE_REGION+/all)
 		{
-				//------------------------------->>>>>>>>>>    Slider ////////////////////////////////////////////////////////////////////////////////////////////////////////////
-			
-				enum SliderOrientation
-			{ horz, vert, round, auto_} 
-				private pure bool isLinear(in SliderOrientation o)
-			{
-				with(SliderOrientation)
-				return o==horz || o==vert; 
-			} 
-				private pure bool isRound (in SliderOrientation o)
-			{
-				with(SliderOrientation)
-				return o==round; 
-			} 
-			
-				enum SliderStyle
-			{ slider, scrollBar} 
-			
-				struct ScrollBarOptions
-			{
-				float pageSize = 0; //pageSize in win32
-				int thickness = 13; 
-				int margin = 2; 
-				int minThumbSize_pixels = 5; 
-			} 
-			
-				pure static auto getActualSliderOrientation(SliderOrientation orientation, in bounds2 r, SliderStyle style)
-			{
-				//scrollbar can only be horz or vert.
-				if(style==SliderStyle.scrollBar && !isLinear(orientation))
-				orientation = SliderOrientation.auto_; 
-				
-				if(orientation != SliderOrientation.auto_)
-				return orientation; 
-				
-				immutable THRESHOLD = 1.5f; 
-				float aspect = safeDiv(r.width/r.height, 1); 
-				return aspect>=THRESHOLD	? SliderOrientation.horz:
-							 aspect<=(1/THRESHOLD)	? SliderOrientation.vert:
-																			 SliderOrientation.round; 
-			} 
-			
-				private struct SliderState
-			{
-				//information about the current slider being modified
-				
-				/+Usage: Call handleKeyboard(), handleMouse() and don't forget to call afterDraw()!!!+/
-				
-				//information generated and maintained in update
-				Id pressed_id; 
-				vec2 pressed_thumbMouseOfs, pressed_rawMousePos; 
-				float pressed_nPos; //normalized pos
-				int lockedDirection; //0:unknown, 1:h, 2:v
-				
-				void onPress(in Id id, ref float nPos, in vec2 mousePos)
-				{
-					//mouse was pressed, initialize values
-					pressed_id = id; 
-					pressed_rawMousePos = rawMousePos; 
-					pressed_nPos = nPos; 
-					
-					//remember the thumb-mouse offset at the time of press
-					pressed_thumbMouseOfs = drawn_thumbRect.center-mousePos;  //
-					
-					//if pressed on a round knob, first it must decide if up/down or left/right
-					lockedDirection = 0; 
-				} 
-				
-				//information saved in draw(). All vectors are transformed into view space.
-				Id drawn_id; 
-				SliderOrientation drawn_orientation; 
-				vec2 drawn_p0, drawn_p1; 
-				bounds2 drawn_thumbRect; 
-				
-				void afterDraw(in Id id, in SliderOrientation ori, vec2 p0, vec2 p1, in bounds2 bKnob)
-				{
-					drawn_id = id; 
-					drawn_orientation = ori; 
-					drawn_p0 = p0; 
-					drawn_p1 = p1; 
-					drawn_thumbRect = bKnob; 
-				} 
-				
-				//after onPress() it can jump to the mouse
-				void jumpToPoint(ref float nPos, in vec2 mousePos, bool isEndless)
-				{
-					if(drawn_orientation==SliderOrientation.horz)
-					{
-						pressed_thumbMouseOfs.x = 0; 
-						nPos = remap_clamp(mousePos.x, drawn_p0.x, drawn_p1.x, 0, 1); 
-						if(mousePos.x<drawn_p0.x)
-						pressed_thumbMouseOfs.x = drawn_p0.x-mousePos.x; 
-						if(mousePos.x>drawn_p1.x)
-						pressed_thumbMouseOfs.x = drawn_p1.x-mousePos.x 
-							- ((isEndless)?(1):(0))/+prevent infinite incrementing+/; 
-					}
-					else if(drawn_orientation==SliderOrientation.vert)
-					{
-						pressed_thumbMouseOfs.y = 0; 
-						nPos = remap_clamp(mousePos.y, drawn_p0.y, drawn_p1.y, 0, 1); 
-						//Note: p1 and p0 are intentionally swapped!!!
-						if(mousePos.y<drawn_p1.y)
-						pressed_thumbMouseOfs.y = drawn_p1.y-mousePos.y; 
-						/+
-							Todo: test vertical circular slider jump to the very ends, 
-							and see if not jumps to opposite si
-						+/
-						if(mousePos.y>drawn_p0.y)
-						pressed_thumbMouseOfs.y = drawn_p0.y-mousePos.y 
-							- ((isEndless)?(1):(0)); 
-					}
-					else { NOTIMPL; }
-				} 
-				
-				void mouseAdjust(
-					ref float nPos, in vec2 mousePos, bool isClamped, bool isCircular, bool isEndless, 
-					ref int wrapCnt, float adjustSpeed
-				)
-				{
-					if(drawn_orientation==SliderOrientation.horz)
-					{
-						slowMouse(adjustSpeed!=1, adjustSpeed); 
-						auto p = mousePos.x+pressed_thumbMouseOfs.x; 
-						if(isCircular || isEndless)
-						mouseMoveRelX(wrapInRange(p, drawn_p0.x, drawn_p1.x, wrapCnt)); 
-						nPos = remap(p, drawn_p0.x, drawn_p1.x, 0, 1); 
-						if(isClamped)
-						nPos = nPos.clamp(0, 1); 
-					}
-					else if(drawn_orientation==SliderOrientation.vert)
-					{
-						slowMouse(adjustSpeed!=1, adjustSpeed); 
-						auto p = mousePos.y+pressed_thumbMouseOfs.y; 
-						if(isCircular || isEndless)
-						mouseMoveRelY(wrapInRange(p, drawn_p0.y, drawn_p1.y, wrapCnt)); 
-						nPos = remap(p, drawn_p0.y, drawn_p1.y, 0, 1); 
-						if(isClamped)
-						nPos = nPos.clamp(0, 1); 
-					}
-					else if(drawn_orientation==SliderOrientation.round)
-					{
-						auto diff = rawMousePos-pressed_rawMousePos; 
-						auto act_dir = abs(diff.x)>abs(diff.y) ? 1 : 2; 
-						if(lockedDirection==0 && length(diff)>=3)
-						lockedDirection = act_dir; 
-						
-						const omniDirection = true; //right or up is the positive side
-						const delta = 
-							((omniDirection)?(inputs.MXraw.delta -inputs.MYraw.delta) :(((((lockedDirection)?(lockedDirection) :(act_dir))==1) ?(inputs.MXraw.delta):(-inputs.MYraw.delta)))); 
-						
-						pressed_nPos += delta*(adjustSpeed*(1.0f/180)); 
-						//it adds small delta's, so it could be overdriven
-						
-						pressed_nPos = pressed_nPos.clamp(0, 1); 
-						nPos = pressed_nPos; 
-						/+
-							Todo: it can't modify npos because npos can be an integer 
-							too. In this case, the pressed_nPos name is bad.
-						+/
-						
-						//Todo: endless????
-						//Todo: ha tulmegy, akkor vinnie kell magaval a base-t is!!!
-						//Todo: Ctrl precizitas megoldasa globalisan az inputs.d-ben.
-					}
-					else { raise("Invalid orientation"); }
-				} 
-				
-				void mouseAdjust(ref float nPos, in vec2 mousePos, in ValueRange range_, ref int wrapCnt, float adjustSpeed)
-				{ mouseAdjust(nPos, mousePos, range_.isClamped, range_.isCircular, range_.isEndless, wrapCnt, adjustSpeed); } 
-				
-				bool handleKeyboard(ref float nPos, in ValueRange range_, float pageSize)
-				{
-					if(nPos.isnan)
-					return false; 
-					
-					bool userModified; 
-					
-					void set(float n)
-					{
-						nPos = n.clamp(0, 1); 
-						userModified = true; 
-					} 
-					
-					void delta(float scale)
-					{
-						//modifiers
-						if(scale) {
-							if(inputs.Shift) scale*=10; 
-							if(inputs.Ctrl) scale/=10; 
-							if(inputs.Alt) scale/=100; 
-						}
-						/+Todo: this layout is incompatible with the mouse Shift = slow behavior.+/
-						
-						auto nStep()
-						{ return range_.step.ifz(1) / (range_.max-range_.min); } 
-						set(nPos + nStep *scale); 
-					} 
-					
-					const 	horz 	= drawn_orientation != SliderOrientation.vert, //round knobs are working for both
-						vert 	= drawn_orientation != SliderOrientation.horz; 
-					
-					if(horz && inputs.Left.repeated	|| vert && inputs.Down.repeated)
-					delta(-1); 
-					if(horz && inputs.Right.repeated	|| vert && inputs.Up.repeated)
-					delta(1); 
-					version(none)
-					{
-						/+
-							Todo: Make a forking focused control system that only sends these keys to only the focused control.
-							Until that only the arrows will work.
-							A mouse click somewhere else should also loce focus automatically
-						+/
-						if(inputs.PgDn.repeated)
-						delta(-pageSize); 
-						if(inputs.PgUp.repeated)
-						delta(pageSize); 
-						if(inputs.Home.down)
-						set(0); 
-						if(inputs.End .down)
-						set(1); 
-					}
-					
-					return userModified; 
-				} 
-				
-				bool handleMouse(in Id id, in HitInfo hit, ref float nPos, in vec2 mousePos, in ValueRange range_, ref int wrapCnt)
-				{
-					if(nPos.isnan)
-					return false; 
-					
-					bool userModified; 
-					
-					if(hit.pressed && hit.enabled)
-					{
-						//Todo: enabled handling
-						userModified = true; 
-						
-						onPress(id, nPos, mousePos); 
-						
-						//decide wether the knob has to jump to the mouse position or not
-						const doJump = isLinear(drawn_orientation) && !drawn_thumbRect.contains!"[)"(mousePos); 
-						if(doJump)
-						{ jumpToPoint(nPos, mousePos, range_.isEndless); }
-						
-						//round knob: lock the mouse and start measuring delta movement
-						if(isRound(drawn_orientation))
-						{
-							//Todo: "round" knob never jumps
-							mouseLock; /+
-								Bug: possible bug when the slider disappears, 
-								and the mouse stays locked forever
-							+/
-						}
-					}
-					
-					//continuous update if active
-					if(id==pressed_id)
-					{
-						userModified = true; 
-						const adjustSpeed = 	inputs.Shift.active 	? 10 : 
-							inputs.Ctrl.active 	? 0.1f : 
-							inputs.Alt.active 	? 0.01f 
-								: 1; //Note: this is a scaling factor...
-						mouseAdjust(nPos, mousePos, range_, wrapCnt, adjustSpeed); 
-					}
-					
-					//hit.released
-					if(hit.released)
-					{
-						pressed_id = Id.init; 
-						
-						//Todo: this isn't safe! what if the control disappears!!!
-						if(isLinear(drawn_orientation))	{ slowMouse(false); }
-						else	{ mouseUnlock; }
-					}
-					
-					return userModified; 
-				} 
-				
-			} 
-			SliderState sliderState; 
-			
-			class SliderClass : .Container
-			{
-				//Note: must be a Container because hitTest works on Containers only.
-				
-				//Todo: shift precise mode: must use float knob position to improve the precision
-				
-				SliderOrientation orientation; 
-				SliderStyle sliderStyle; 
-				RGB /+bkColor, <-already defined in Container+/clLine, clThumb, clRuler; 
-				float baseSize; //this is calculated from current fontHeight and theme.
-				float normThumbSize; //if it is a scrollbar, this is not nan and specifies the normalized size of the thumb.
-				//these are the derived sizes
-				float rulerOfs	()
-				{ return baseSize*0.5f; } 
-				float lwLine	()
-				{ return baseSize*(2.0f*InvDefaultFontHeight); } 
-				float lwRuler	()
-				{ return lwLine*0.5f; } 
-				
-				/// this is the half thickness of the thumb in the active direction
-				float calcLwThumb	(SliderOrientation ori)
-				{
-					if(sliderStyle ==	SliderStyle.scrollBar && !isnan(normThumbSize))
-					{
-						const minSizePixels = min(innerWidth, MinScrollThumbSize); 
-						return max((ori==SliderOrientation.horz ? innerWidth : innerHeight) * normThumbSize.clamp(0, 1), minSizePixels) * .5f; 
-					}else
-					{ return baseSize*(1.0f/3); }
-				} 
-				
-				
-				int rulerDiv0 = 9, rulerDiv1 = 4; 
-				ubyte rulerSides=3; 
-				
-				float nPos, nCenter=0;  //center is the start of the marking on the line
-				int wrapCnt; //for endless, to see if there was a wrapping or not. Used to reconstruct actual value
-				
-				bounds2 hitBounds; 
-				
-				bool focused; 
-				
-				this(
-					in Id id, bool enabled, ref float nPos_, in ValueRange range_, ref bool userModified, vec2 mousePos, 
-					TextStyle ts, out HitInfo hit, SliderOrientation orientation, SliderStyle sliderStyle, float fhScale, float normThumbSize=float.init
-				)
-				{
-					this.id = id; 
-					this.orientation = orientation; 
-					this.sliderStyle = sliderStyle; 
-					this.nPos = enabled ? nPos_ : nPos_/+float.init+//+Todo: hideThumb option+/; 
-					this.normThumbSize = normThumbSize; 
-					
-					if(sliderStyle==SliderStyle.scrollBar)
-					padding = "2"; 
-					
-					hit = im.hitTest(this, enabled); 
-					hitBounds = hit.hitBounds; 
-					
-					if(1 || sliderStyle==SliderStyle.slider)
-					focused = im.focusUpdate(
-						this, id,
-						enabled,
-						hit.pressed || hit.hover && inputs.RMB.pressed, //when to enter
-						inputs["Esc"].pressed,  //when to exit
-						/*onEnter	*/ {},
-						/*onFocus	*/ {},
-						/*onExit	*/ {}
-					); 
-					
-					//res.focused = focused;
-					
-					if(focused && canProcessUserInput)
-					userModified |= sliderState.handleKeyboard(nPos, range_, 8); 
-					
-					bkColor = ts.bkColor; 
-					const hoverOrFocus = enabled ? max(hit.hover_smooth*.5f, focused ? 1.0f : 0) : 0; 
-					
-					final switch(sliderStyle)
-					{
-						case SliderStyle.slider: 
-							clThumb =	mix(mix(clSliderThumb, clSliderThumbHover, hoverOrFocus), clSliderThumbPressed, hit.captured_smooth); 
-							clLine =	mix(mix(clSliderLine , clSliderLineHover , hoverOrFocus), clSliderLinePressed , hit.captured_smooth); 
-							clRuler = clGray/+mix(bkColor, ts.fontColor, 0.5)+/; //disable ruler for now
-							
-							if(focused) { clThumb = clBlack; clLine = clBlack; }//Todo: lame logic
-							
-							rulerSides = 0; 
-						break; 
-						case SliderStyle.scrollBar: 
-							clThumb = mix(clScrollThumb, clScrollThumbPressed, hoverOrFocus); 
-							bkColor = mix(clScrollBk, clScrollThumb, min(hoverOrFocus, .5f)); 
-							
-							if(focused) { clThumb = clBlack; }//Todo: lame logic
-							
-							//clThumb = mix(clWinBtn, clWinBtnPressed, max(hit.hover_smooth*.5f, sliderState.pressed_id==id ? 1 : 0));
-							rulerSides = 0; 
-						break; 
-					}
-					
-					if(!enabled)
-					clLine = clThumb = clGray; //Todo: nem clGray ez, hanem clDisabledText vagy ilyesmi
-					
-					baseSize = ts.fontHeight*fhScale*0.8f; 
-					outerSize = vec2(baseSize*6, baseSize); //default size
-					
-					userModified |= sliderState.handleMouse(id, hit, nPos, mousePos, range_, wrapCnt); 
-					
-					if(userModified)
-					nPos_ = nPos; 
-				} 
-				
-				override bounds2 getHitBounds()
-				{ return outerBounds; } 
-				
-				private void drawThumb(Drawing dr, vec2 a, vec2 t, float lwThumb)
-				{
-					final switch(sliderStyle)
-					{
-						case SliderStyle.slider: 
-							dr.lineWidth = lwThumb; dr.color = clThumb; 
-							const t90 = t.rotate90; 
-							dr.line(a-t90, a+t90); 
-						break; 
-						case SliderStyle.scrollBar: 
-							dr.color = clThumb; 
-							const horz = orientation==SliderOrientation.horz,
-										halfSize = horz ? vec2(lwThumb, innerHeight*.5f) : vec2(innerWidth*.5f, lwThumb),
-										bnd = bounds2(a, a).inflated(halfSize); 
-							dr.fillRect(bnd); 
-						break; 
-					}
-				} 
-				
-				private void drawLine(Drawing dr, vec2 a, vec2 b, RGB cl)
-				{ dr.lineWidth = lwLine; dr.color = cl; dr.line(a, b); } 
-				
-				override void draw(Drawing dr)
-				{
-					const mod_update = !hitBounds.empty && !inputs.LMB.value; 
-					
-					dr.color = bkColor; dr.fillRect(borderBounds_inner); 
-					drawBorder(dr); 
-					
-					dr.alpha = 1; dr.lineStyle = LineStyle.normal; dr.arrowStyle = ArrowStyle.none; 
-					
-					auto b = innerBounds; 
-					const 	actOrientation = getActualSliderOrientation(orientation, b, sliderStyle),
-						lwThumb = calcLwThumb(actOrientation); 
-					
-					if(isLinear(actOrientation))
-					{
-						const horz = actOrientation == SliderOrientation.horz,
-									thumbOfs = (horz ? vec2(1,	0) : vec2(0, -1)) * lwThumb,
-									p0 = (horz ? b.leftCenter	: b.bottomCenter) + thumbOfs,
-									p1 = (horz ? b.rightCenter	: b.topCenter   ) - thumbOfs; 
-						
-						if(sliderStyle==SliderStyle.slider && rulerSides)
-						{
-							const rp0 = horz ? p0 : p1,
-										rp1 = horz ? p1 : p0,
-										ro0 = horz ? vec2(0, rulerOfs) : vec2(rulerOfs, 0),
-										ro1 = ro0*.4f; 
-							if(rulerSides&1)
-							drawStraightRuler(dr, bounds2(rp0-ro0, rp1-ro1), rulerDiv0, rulerDiv1, true ); 
-							if(rulerSides&2)
-							drawStraightRuler(dr, bounds2(rp0+ro1, rp1+ro0), rulerDiv0, rulerDiv1, false); 
-						}
-						
-						if(sliderStyle==SliderStyle.slider)
-						drawLine(dr, p0, p1, clLine); 
-						
-						if(!isnan(nPos))
-						{
-							auto p = mix(p0, p1, nPos); 
-							if(!isnan(nCenter) && sliderStyle==SliderStyle.slider)
-							drawLine(dr, mix(p0, p1, nCenter), p, clThumb); 
-							
-							drawThumb(dr, p, thumbOfs, lwThumb); 
-							
-							if(mod_update)
-							{
-								vec2 thumbHalfSize; 
-								if(sliderStyle==SliderStyle.slider)
-								{
-									thumbHalfSize = lwThumb * vec2(0.5f, 1.5f); 
-									if(!horz)
-									swap(thumbHalfSize.x, thumbHalfSize.y); 
-								}else
-								{ thumbHalfSize = horz ? vec2(lwThumb, outerHeight*.5f) : vec2(outerWidth*.5f, lwThumb); }
-								const thumbRect = bounds2(p, p).inflated(thumbHalfSize); 
-								sliderState.afterDraw(id, actOrientation, dr.inputTransform(p0), dr.inputTransform(p1), dr.inputTransform(thumbRect)); 
-							}
-						}
-						
-					}else if(isRound(actOrientation))
-					{
-						//center square
-						bool endless = false; 
-						
-						b = b.fittingSquare; 
-						if(mod_update)
-						sliderState.afterDraw(id, actOrientation, dr.inputTransform(b.center), dr.inputTransform(b.center), dr.inputTransform(b)); 
-						
-						auto c = b.center, r = b.width*0.4f; 
-						
-						if(rulerSides)
-						drawRoundRuler(dr, c, r, rulerDiv0, rulerDiv1, endless); 
-						r *= 0.8f; 
-						
-						float a0 = (endless ? 0 : 0.25f)*PIf; 
-						float a1 = (endless ? 2 : 1.75f)*PIf; 
-						
-						dr.lineWidth = lwLine; 
-						dr.color = clLine; 
-						dr.circle(c, r, a0, a1); 
-						
-						if(!isnan(nPos))
-						{
-							float n = 1-nPos; 
-							n = endless ? n.fract : n.clamp(0, 1);  //Todo: ezt megcsinalni a range-val
-							float a = mix(a0, a1, n); 
-							if(!endless && !isnan(nCenter))
-							{
-								float ac = mix(a0, a1, (1-nCenter).clamp(0, 1)); 
-								dr.color = clThumb; 
-								if(ac>=a)
-								dr.circle(c, r, a, ac); 
-								else dr.circle(c, r, ac, a); 
-							}
-							
-							dr.lineWidth = lwThumb; 
-							dr.color = clThumb; 
-							auto v = vec2(sin(a), cos(a)); 
-							dr.line(c, c+v*r); 
-						}
-					}
-					
-					drawDebug(dr); 
-				} 
-				
-				//Draw Rulers
-				protected void drawStraightRuler(Drawing dr, in bounds2 r, int cnt, int cnt2=-1, bool topleft=true)
-				{
-					cnt--; 
-					if(cnt<=0)
-					return; 
-					if(cnt2<0)
-					cnt2 = cnt; 
-					dr.color = clRuler; dr.lineWidth = lwRuler; 
-					if(r.height < r.width)
-					{
-						float c = r.center.y,
-									b = r.top,
-									t = r.bottom,
-									j = r.left,
-									ja = r.width/cnt; 
-						if(!topleft)
-						swap(b, t); 
-						foreach(i; 0..cnt+1)
-						{
-							dr.vLine(j, b, cnt2 && i%cnt2==0 ? t : c); 
-							j += ja; 
-						}
-					}else
-					{
-						float c = r.center.x,
-									b = r.left,
-									t = r.right,
-									j = r.top,
-									ja = r.height/cnt; 
-						if(!topleft)
-						swap(b, t); 
-						foreach(i; 0..cnt+1)
-						{
-							dr.hLine(b, j, cnt2 && i%cnt2==0 ? t : c); 
-							j += ja; 
-						}
-					}
-				} 
-				
-				protected void drawRoundRuler(Drawing dr, in vec2 center, float radius, int cnt, int cnt2=-1, bool endless=false)
-				{
-						cnt--; 
-						if(cnt<=0)
-					return; 
-						if(cnt2<0)
-					cnt2 = cnt; 
-					//radius *= (1/1.25f);
-						dr.color = clRuler; dr.lineWidth = lwRuler; 
-						foreach(i; 0..cnt+1)
-					{
-						float a = endless ? 2*PIf*i/cnt
-															: -0.25f*PIf + 1.5f*PIf*i/cnt; 
-						float co = -cos(a), si = -sin(a); 
-						dr.moveTo(center.x+co*radius, center.y+si*radius); 
-						float radius2 = radius*(!endless && (cnt2 && i%cnt2==0) ? 1.25f : 1.125f); 
-						dr.lineTo(center.x+co*radius2, center.y+si*radius2); 
-					}
-				} 
-			} 
-			
 			auto Slider(string _M_=__MODULE__, size_t _L_=__LINE__, V, T...)(ref V value, T args)
 				if(isFloatingPoint!V || isIntegral!V)
 			{
-				mixin(prepareId, selected.M, range_M);  //Todo: selected???
+				mixin(prepareId, selected_M, range_M);  //Todo: selected???
 				
 				//flipped range interval. Needed for vertical scrollbar
 				const flipped = !_range.isOrdered; 
@@ -9917,7 +10314,7 @@ struct im
 				
 				bool userModified; 
 				HitInfo hit; 
-				auto sl = new SliderClass(
+				auto sl = new .Slider(
 					id_, imEnabled, normValue, _range, userModified, targetView.mousePos.vec2, 
 					style, hit, getStaticParamDef(SliderOrientation.auto_, args), 
 					getStaticParamDef(SliderStyle.slider, args), theme.isTool ? 1 : 1.4f
@@ -10147,371 +10544,7 @@ struct im
 				} 
 			}
 			
-			class DateTimeRuler : .Container
-			{
-				//Note: must be a Container because hitTest works on Containers only.
-				
-				RGB clText, clRedText, clMajorTick, clMinorTick; 
-				DateTime tMin, tMax, t0, t1, t0_draw, t1_draw; 
-				bounds2 hitBounds; 
-				
-				bool mouseAtTopHalf; 
-				@property mouseAtBottomHalf() => !mouseAtTopHalf; 
-				
-				bool focused; float hoverOrFocus=0; 
-				
-				DateTime highlighted_t; 
-				bool show_highlighted_t; 
-				
-				void sanitizeRanges()
-				{
-					//both ranges must be always valid
-					if(tMax<=tMin)
-					{
-						tMax = tMin; 
-						if(tMin.raw==ulong.max) tMin.raw--; 
-						tMax.raw = tMin.raw+1; 
-					}
-					t0 = t0.clamp(tMin, tMax); 
-					t1 = t1.clamp(t0, tMax); 
-					if(t0==t1)
-					{ if(t0==tMax) t0.raw--; else t1.raw++; }
-				} 
-				
-				static struct NormalizedSliderData
-				{
-					ulong w, w_outer; 
-					float nPos; 
-					float pageSize; 
-					ValueRange rng; 
-					
-					int wrapCnt; 
-					
-					bool changed_kb, changed_m; 
-					
-					this(
-						DateTime tMin, DateTime tMax, 
-						DateTime t0, DateTime t1
-					)
-					{
-						w = t1.raw - t0.raw; 
-						w_outer = tMax.raw - tMin.raw; 
-						
-						nPos = (((float(t0.raw - tMin.raw)))/(w_outer - w)); 
-						pageSize = (((float(w)))/(w_outer)); 
-						rng = ValueRange(0, 1, pageSize / 8); 
-					} 
-					
-					bool handleKeyboard()
-					{
-						const b = sliderState.handleKeyboard(nPos, rng, pageSize); 
-						if(b) changed_kb = true; return b; 
-					} 
-					
-					bool handleMouse(in Id id, in HitInfo hit, in vec2 mousePos)
-					{
-						const b = sliderState.handleMouse	(
-							id, hit, nPos, mousePos,
-							rng, wrapCnt
-						); 
-						if(b) changed_m = true; return b; 
-					} 
-					
-					@property changed() => changed_kb || changed_m; 
-				} 
-				
-				auto getNormalizedSliderData()
-				=> NormalizedSliderData(tMin, tMax, t0, t1); 
-				
-				bool jumpTo(float nPos)
-				{
-					if(nPos.isnan) return false; nPos = nPos.clamp(0, 1); 
-					const 	w 	= t1.raw 	- t0.raw,
-						w_outer 	= tMax.raw 	- tMin.raw; 
-					const t0_prev = t0, t1_prev = t1; 
-					t0 = tMin .shift(w_outer - w, nPos, tMin, tMax), 
-					t1 = t0   .shift(w, 1, tMin, tMax); 
-					sanitizeRanges; return (t0!=t0_prev) || (t1!=t1_prev); 
-				} 
-				
-				bool scrollByTime(DateTime startT0, Time Δt)
-				{
-					const len = t1.raw - t0.raw; const t0_prev = t0, t1_prev = t1; 
-					t0 = startT0             .scroll(Δt, tMin.raw, tMax.raw-len),
-					t1 = startT0.add_raw(len).scroll(Δt, tMin.raw+len, tMax.raw); 
-					sanitizeRanges; return (t0!=t0_prev) || (t1!=t1_prev); 
-				} 
-				
-				bool zoomAround(DateTime center, float amount)
-				{
-					if(amount.isnan || !amount) return false; 
-					
-					float sc = 1 + inputs.MW.delta.abs * .25; 
-					if(inputs.MW.delta>0) sc = 1/sc; 
-					
-					bool tryZoom()
-					{
-						auto calcLen() => t1.raw-t0.raw; 
-						const len = calcLen; 
-						t0 = t0.scale(center, sc, tMin, tMax); 
-						t1 = t1.scale(center, sc, tMin, tMax); 
-						sanitizeRanges; 
-						return len!=calcLen; 
-					} 
-					
-					if(!tryZoom)
-					{
-						if(sc>1/+zoom out attempt failed?+/)
-						{
-							sc = 2/+increase coom out amount+/; 
-							if(!tryZoom)
-							{
-								/+
-									Maybe it is next to tMax, then 
-									zoom away from t1.
-								+/
-								center = t1; 
-								if(!tryZoom)
-								{
-									t0 = tMin, t1 = tMax; 
-									/+return home as a last resort.+/
-								}
-							}
-						}
-					}
-					
-					return true; 
-				} 
-				
-				
-				
-				this(
-					in Id id, bool enabled, 	const DateTime tMin_, 	const DateTime tMax_, 
-						ref DateTime t0_, 	ref DateTime t1_, 
-					const ref TextStyle ts, vec2 mousePos, ref bool userModified, out HitInfo hit
-				)
-				{
-					this.id = id; 
-					tMin 	= tMin_,
-					tMax 	= tMax_,
-					t0 	= t0_,
-					t1 	= t1_; 
-					sanitizeRanges; 
-					
-					hit = im.hitTest(this, enabled); 
-					hitBounds = hit.hitBounds; 
-					
-					mouseAtTopHalf = !hitBounds || mousePos.y < hitBounds.center.y; 
-					
-					const 	norm_mouseX 	= ((
-						hitBounds && 
-						hitBounds.width
-					)?(((mousePos.x-hitBounds.left)/(hitBounds.width))):(0)),
-						t_hovered_top 	= tMin.shift(tMax.raw-tMin.raw, norm_mouseX, tMin, tMax),
-						t_hovered_bottom 	= t0.shift(t1.raw-t0.raw, norm_mouseX, tMin, tMax); 
-					
-					show_highlighted_t = mouseAtBottomHalf; 
-					highlighted_t = t_hovered_bottom; 
-					
-					enum canFocus = true; 
-					if(canFocus)
-					focused = im.focusUpdate
-					(
-						this, id, enabled,
-						hit.pressed || hit.hover && (
-							inputs.RMB.pressed ||
-							inputs.MMB.pressed ||
-							inputs.MW.delta
-						), //when to enter
-						inputs["Esc"].pressed, //when to exit
-						/*onEnter*/ {},
-						/*onFocus*/ {},
-						/*onExit*/ {}
-					); 
-					
-					ref rss = dateTimeRulerScrollState; 
-					
-					if(focused && canProcessUserInput)
-					{
-						//mouse and kbd handling on the top half as a scrollbar slider
-						{
-							auto nsd = getNormalizedSliderData; 
-							
-							nsd.handleKeyboard; 
-							
-							if(hit.pressed && mouseAtBottomHalf)
-							{/+beep; +//+left button pressed at t_hovered_bottom+/}
-							else { nsd.handleMouse(id, hit, mousePos); }
-							
-							if(nsd.changed)
-							{ if(jumpTo(nsd.nPos)) userModified = true; }
-						}
-						
-						//Zooming
-						if(hitBounds && mouseAtBottomHalf && inputs.MW.delta)
-						{
-							if(zoomAround(t_hovered_bottom, inputs.MW.delta))
-							userModified = true; 
-						}
-						
-						//Scrolling
-						{
-							if(hitBounds && mouseAtBottomHalf && inputs.MMB.pressed)
-							{ rss.startScroll(mousePos, t0, t1); }
-							
-							if(hitBounds && rss.scrolling)
-							{
-								//It can be only measured inside the hitbox.
-								rss.updateScroll((t1-t0)/hitBounds.width); 
-							}
-							
-							if(rss.scrolling)
-							{
-								if(
-									scrollByTime(
-										rss.startT0,
-										rss.currentDelta(mousePos)
-									)
-								)
-								userModified = true; 
-							}
-						}
-					}
-					
-					if(!focused || !inputs.MMB.down) rss.scrolling = false; 
-					
-					bkColor = ts.bkColor; 
-					clText = ts.fontColor; 
-					
-					hoverOrFocus = enabled ? max(hit.hover_smooth*.33f, focused ? 1.0f : 0) : 0; 
-					
-					clRedText = clRed; 
-					clMajorTick = clText; 
-					clMinorTick = mix(clMajorTick, bkColor, .125f); 
-					
-					const fh = ts.fontHeight; 
-					innerSize = vec2(fh*20, fh*2.5*2) /+default size+/; 
-					
-					if(userModified)
-					{ t0_ = t0, t1_ = t1; }
-				} 
-				
-				override void draw(Drawing dr)
-				{
-					const t0 = t0_draw, t1 = t1_draw; 
-					
-					
-					const mod_update = !hitBounds.empty && !inputs.LMB.value; 
-					
-					const b = innerBounds + innerPos; 
-					const fh = b.height/5.625f, rh = fh*5/2; 
-					auto 	bTop 	= bounds2(b.left, b.top, b.right, b.top+rh),
-						bBottom 	= bounds2(b.left, b.bottom-rh, b.right, b.bottom); 
-					bounds2 bCenter, bThumb; 
-					float t0x, t1x; 
-					
-					{
-						dr.pushClipBounds(bounds2(vec2(0), outerSize)); scope(exit) dr.popClipBounds; 
-						
-						import het.ui_ruler; 
-						const 	topIsFine 	= drawHRuler(dr, bTop, tMin, tMax, shiftUpwards: true),
-							bottomIsFine 	= drawHRuler(dr, bBottom, t0, t1); 
-						if(!topIsFine) bTop.bottom -= fh; 
-						if(!bottomIsFine) bBottom.top += fh; 
-						bCenter = bounds2(b.left, bTop.bottom, b.right, bBottom.top); 
-						
-						{
-							dr.color = clAccent; dr.alpha = .25; scope(exit) dr.alpha = 1; 
-							void fill(float leftX0, float leftX1, float rightX0, float rightX1, int y0, int y1)
-							{
-								const step = 1.0f/(y1-y0); float t=step/2; 
-								foreach(i; 0..y1-y0)
-								{
-									const y = i+y0, tt = (1-cos(t*(float(π))).signedpow(0.0625))/2; 
-									dr.fillRect(
-										bounds2(
-											mix(leftX0 , leftX1 , tt), y, 
-											mix(rightX0, rightX1, tt), y+1
-										)
-									); 
-									t += step; 
-								}
-							} 
-							
-							float remap(DateTime t)
-							=> b.left + ((b.width*(t.raw.clamp(tMin.raw, tMax.raw) - tMin.raw))/(tMax.raw - tMin.raw)); 
-							t0x = remap(t0), t1x = remap(t1); 
-							
-							dr.fillRect(bounds2(b.left, b.top, t0x, bCenter.top.ifloor)); 
-							dr.fillRect(bounds2(t1x, b.top, b.right, bCenter.top.ifloor)); 
-							fill(bCenter.left, bCenter.left, t0x, bCenter.left, bCenter.top.ifloor, bCenter.bottom.iceil); 
-							fill(t1x, bCenter.right, bCenter.right, bCenter.right, bCenter.top.ifloor, bCenter.bottom.iceil); 
-							
-							bThumb = bounds2(t0x, bTop.top, t1x, bTop.bottom); 
-						}
-					}
-					
-					drawBorder(dr); 
-					if(hoverOrFocus)
-					{
-						dr.alpha = hoverOrFocus; scope(exit) dr.alpha = 1; 
-						dr.color = clBlack; dr.lineWidth = 2; 
-						dr.drawRect(b.inflated(vec2(-1, 0/+Todo: A bit lame, but looks good+/))); 
-						
-						
-						if(!mouseAtTopHalf) dr.alpha = hoverOrFocus/2; 
-						const bt = bThumb.inflated(vec2(-1,0)); 
-						if(false)
-						{ dr.color = clAccent; dr.drawRect(bt); }
-						else
-						with(bt)
-						{
-							dr.line(topLeft, bottomLeft); 
-							dr.line(topRight, bottomRight); 
-							dr.line(bottomLeft, bottomRight); 
-						}
-						
-						if(show_highlighted_t)
-						{
-							dr.alpha = hoverOrFocus; 
-							
-							const t = highlighted_t; 
-							const xTop = b.left + ((b.width*(t.raw.clamp(tMin.raw, tMax.raw) - tMin.raw))/(tMax.raw - tMin.raw)); 
-							const xBottom = b.left + ((b.width*(t.raw.clamp(t0.raw, t1.raw) - t0.raw))/(t1.raw - t0.raw)); 
-							
-							dr.lineWidth = 1.05f; dr.color = clRedText; 
-							
-							const 	A = vec2(xTop, bTop.top), 
-								B = vec2(xTop, bCenter.top),
-								C = vec2(xBottom, bCenter.center.y), 
-								D = vec2(xBottom, bBottom.bottom); 
-							dr.line(A, B); /+dr.line(B, C);+/ dr.line(C, D); 
-							
-							version(/+$DIDE_REGION+/none) {
-								//curver line is ugly
-								dr.line(A, B); 
-								enum N = 10; 
-								const P = iota(N).map!((i){
-									const t = i*(1.0f/(N-1)); 
-									const tt = (1-cos(t*(float(π))).signedpow(0.0625))/2; 
-									return vec2(mix(B.x, C.x, tt), mix(B.y, C.y, t)); 
-								}).array; 
-								foreach(i; 1..P.length) dr.line(P[i-1], P[i]); 
-								dr.line(C, D); 
-							}
-						}
-					}
-					
-					sliderState.afterDraw(
-						id, SliderOrientation.horz, 
-						dr.inputTransform(bTop.topLeft     + bThumb.size/2), 
-						dr.inputTransform(bTop.bottomRight - bThumb.size/2), 
-						dr.inputTransform(bThumb)
-					); 
-					
-					drawDebug(dr); 
-				} 
-			} 
+			
 			
 			auto Node(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(ref bool state, void delegate() title, void delegate() contents, Args args)
 			{
@@ -10662,17 +10695,16 @@ struct im
 				//CrashTestMarker /////////////////////////
 				void CrashTestMarker(double angle, RGB c1 = clYellow)
 			{
-				const
-					c2 = style.fontColor,
-					f = fh,
-					oldBkColor = bkColor; //Todo: it has to be inherited
+				const 	c2 = style.fontColor,
+					f = fh; 
+				const RGB 	oldBkColor = background; //Todo: it has to be inherited
 				
 				Container(
 					{
 						flags.clickable = false; 
 						width = f; 
 						height = f; 
-						bkColor = oldBkColor; 
+						background = oldBkColor; 
 						//Todo: make mouse clicks fall throug this to the parent container
 						
 						
@@ -10781,7 +10813,7 @@ struct im
 				appendMessage(type, prefix~msg, 0/+clear counter, the status itself will be the signal.+/); 
 				
 				if(flashMessages.length) flashMessages.back.when = when; 
-			} 
+			} 
 			
 			void flashInfo(string msg)
 			{ flashMessage(FlashMessage.Type.info, msg); } 	void flashInfo(string prefix, string msg)
@@ -10819,7 +10851,7 @@ struct im
 					Panel(
 						PanelPosition.bottomCenter, 
 						{
-							bkColor = clWhite; 
+							background = clWhite; 
 							style.bold = true; 
 							foreach(m; flashMessages)
 							Row(
@@ -11532,6 +11564,7 @@ version(/+$DIDE_REGION Dead code 260813+/all)
 		}
 	} 
 	
+	
 	auto Btn0(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)
 		if(isSomeString!T0 || __traits(compiles, text()) )
 	{
@@ -11579,7 +11612,7 @@ version(/+$DIDE_REGION Dead code 260813+/all)
 		hit.clicked = true; 
 		
 		return hit; 
-	} 
+	} 
 	
 	version(/+$DIDE_REGION+/all) {
 		auto Btn1(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, Args...)(in Args args)
@@ -11691,7 +11724,7 @@ version(/+$DIDE_REGION Dead code 260813+/all)
 				value = newValue; 
 			}catch(Exception)
 			{ wasConvertError = true; }
-		} 
+		} 
 		
 		Row(
 			{
@@ -11747,7 +11780,7 @@ version(/+$DIDE_REGION Dead code 260813+/all)
 					/*onFocus	*/ {/*_EditHandleInput(value, textEditorState.str, chg);*/},
 					/*onExit	*/ {}
 				); 
-				res.focused = focused; 
+				res.focused = focused; 
 				
 				static if(std.traits.isNumeric!T0)
 				flags.hAlign = HAlign.right; 
@@ -11767,10 +11800,10 @@ version(/+$DIDE_REGION Dead code 260813+/all)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x5206FEB16D5C4).檢(hit.toJson)); 
+					((0x51AE9EB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x520A9EB16D5C4).檢(localMouse)); 
+					((0x51B23EB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 

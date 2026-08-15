@@ -1032,20 +1032,25 @@ version(/+$DIDE_REGION+/all) {
 			//prepare/finalize the old, immediate mode keyboard 'actions' interface (inputs.d)
 			actions.beginUpdate; 
 			
-			//update the local mouse struct
-			onMouseUpdate; 
-			
-			//update the smooth scolling of the fullscreen 'view'. Navigation using actions must be issued manually -> view.navigate
-			onUpdateViewAnimation; 
-			
-			//UI integration: prepare and finalize the IMGUI for every frame
-			onUpdateUIBeginFrame; 
-			
-			
-			//call the user overridden update method for the window
-			try { onUpdate; }catch(Throwable t) { showException(t); }
-			
-			onUpdateUIEndFrame; 
+			try
+			{
+				//update the local mouse struct
+				onMouseUpdate; 
+				
+				//update the smooth scolling of the fullscreen 'view'. Navigation using actions must be issued manually -> view.navigate
+				onUpdateViewAnimation; 
+				
+				//UI integration: prepare and finalize the IMGUI for every frame
+				onUpdateUIBeginFrame; 
+				
+				
+				//call the user overridden update method for the window
+				try { onUpdate; }catch(Exception e) { showException(e); }
+				
+				onUpdateUIEndFrame; 
+				
+			}
+			catch(Exception e) { showException(e); }
 			
 			{ if(actions.changed) invalidate;  actions.endUpdate; }
 			
