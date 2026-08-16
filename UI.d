@@ -5549,13 +5549,9 @@ version(/+$DIDE_REGION+/all)
 			
 			if(1 || sliderStyle==SliderStyle.slider)
 			focused = im.focusUpdate(
-				this, id,
-				enabled,
+				this, id, enabled,
 				hit.pressed || hit.hover && inputs.RMB.pressed, //when to enter
-				inputs["Esc"].pressed,  //when to exit
-				/*onEnter	*/ {},
-				/*onFocus	*/ {},
-				/*onExit	*/ {}
+				inputs.Esc.pressed,  //when to exit
 			); 
 			
 			//res.focused = focused;
@@ -5966,10 +5962,7 @@ version(/+$DIDE_REGION+/all)
 					inputs.MMB.pressed ||
 					inputs.MW.delta
 				), //when to enter
-				inputs["Esc"].pressed, //when to exit
-				/*onEnter*/ {},
-				/*onFocus*/ {},
-				/*onExit*/ {}
+				inputs.Esc.pressed, //when to exit
 			); 
 			
 			ref rss = im.dateTimeRulerScrollState; 
@@ -7440,19 +7433,31 @@ struct im
 			} 
 			
 			/// internal use only
-			bool focusUpdate(
-				.Container container, in Id id, bool canFocus, lazy bool enterFocusNow, lazy bool exitFocusNow, 
-				void delegate() onEnter, void delegate() onFocused, void delegate() onExit
-			)
+			
+			struct FocusState
 			{
+				mixin((
+					(表([
+						[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/}],
+						[q{bool},q{1},q{"focused"}],
+						[q{bool},q{1},q{"entered"}],
+						[q{bool},q{1},q{"exited"}],
+					]))
+				).調!(GEN_bitfields)); 
+				alias this = focused; 
+			} 
+			
+			FocusState focusUpdate(.Container container, in Id id, bool canFocus, lazy bool enterFocusNow, lazy bool exitFocusNow)
+			{
+				FocusState res; 
+				
 				if(focusedState.id==id)
 				{
 					if(!canFocus || exitFocusNow)
 					{
 						//not enabled anymore: exit focus
-						if(onExit) onExit(); 
+						res.exited = true; 
 						focusedState.reset; 
-						
 						onFocusLost(id); 
 					}
 				}
@@ -7468,15 +7473,13 @@ struct im
 						//Todo: ez bugos, mert nem hivodik meg a focusExit, amikor ez elveszi a focust
 						
 						focusedState.container = container; 
-						if(onEnter) onEnter(); 
+						res.entered = true; 
 					}
 				}
 				
-				const res = focusedState.id==id; 
+				res.focused = focusedState.id==id; 
 				if(res) focusedState.container = container; 
 				container.flags.focused = res; 
-				
-				if(res && onFocused) onFocused(); 
 				
 				return res; 
 			} 
@@ -8357,6 +8360,12 @@ struct im
 			@property background(RGB a)
 			{ actContainer.bkColor = a; style.bkColor = a; return a; } 
 			
+			@property ref bg()
+			=> style.bg; 
+			
+			@property ref fg()
+			=> style.fg; 
+			
 			
 			
 			/+
@@ -8457,10 +8466,19 @@ struct im
 			+/}],
 		])); 
 		
+		mixin template ContainerScript_Init(CType_, string optionsStr_, 表 props, 表 comps)
+		{
+			alias CType = CType_; 
+			alias SCR = ContainerScript!(optionsStr_); 
+			enum CustomPropertyDefs = props; 
+			enum CustomCompositionDefs = comps; 
+			/+Statement mixin can't go here, because mixin()  can only emit declarations.+/
+		} 
+		
 		template ContainerScript(string optionsStr)
 		{
 			enum ThisStr = "ContainerScript!(`"~optionsStr~"`)"; 
-			enum Option {panelPosition, hit, hint, focused} 
+			enum Option {panelPosition, hit, focus, hint, range} 
 			
 			enum options = optionsStr.split(' ').map!(to!Option).array; 
 			
@@ -8472,12 +8490,12 @@ struct im
 				auto _id = combine(imId, fetchIncomingId); 
 				static foreach(a; args) static if(isGenericArg!(typeof(cast()a), "id")) _id.appendIdx(a.value); 
 				
-				const parentEnabled = imEnabled; 
+				const parentEnabled = imEnabled; //Inherit `enabled` from parent.
 				
 				auto _container = new CType; 
 				append(_container); push(_container, _id); scope(exit) pop; 
-				imEnabled = parentEnabled; //Inherit from parent
-				_container.bkColor = style.bkColor; //Inherit bkcolor from the current fontStyle.
+				imEnabled = parentEnabled; //Inherit `enabled` from parent.
+				_container.bkColor = style.bkColor; //Inherit `bkcolor` from the current fontStyle.
 				
 				$(
 					OPT!"panelPosition"
@@ -8488,10 +8506,19 @@ struct im
 					(q{HitInfo hit; })
 				)
 				$(
+					OPT!"focus"
+					(q{bool mustEnterFocus, mustExitFocus; })
+				)
+				$(
 					OPT!"hint"
 					(q{HintRec hintRec; })
 				)
+				$(
+					OPT!"range"
+					(q{ValueRange range; })
+				)
 			}.text; 
+			
 			
 			string ProcessProperties()
 			=> iq{
@@ -8501,8 +8528,23 @@ struct im
 					(q{~(表([[q{isT!PanelPosition},q{panelPosition = a; }],])).rows.array})
 				)
 				$(
+					OPT!"focus"
+					(
+						q{
+							~(表([
+								[q{isG!"enter"},q{mustEnterFocus |= a; }],
+								[q{isG!"exit"},q{mustExitFocus |= a; }],
+							])).rows.array
+						}
+					)
+				)
+				$(
 					OPT!"hint"
 					(q{~(表([[q{isT!HintRec},q{hintRec = cast()a; }],])).rows.array})
+				)
+				$(
+					OPT!"range"
+					(q{~(表([[q{isT!ValueRange},q{range = a; }],])).rows.array})
 				)
 				~ StdPropertyDefs.rows.array; 
 				
@@ -8532,6 +8574,18 @@ struct im
 					(q{hit = hitTest(_container, imEnabled); })
 				)
 				$(
+					OPT!"focus"
+					(
+						q{
+							const focused = focusUpdate(
+								_container, _id, imEnabled,
+								mustEnterFocus || hit.pressed,
+								mustExitFocus || inputs.Esc.pressed
+							); 
+						}
+					)
+				)
+				$(
 					OPT!"hint"
 					(q{handleHint(_container, hintRec, hit); })
 				)
@@ -8556,33 +8610,30 @@ struct im
 					}
 				}
 			}.text; 
-		} 
+		} 
 		
-		private void _Container(CType, Args...)(in Args args)
+		
+		
+		
+		private void _Container(CType_, Args...)(in Args args)
 		{
 			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
 			{
-				alias SCR = ContainerScript!"panelPosition"; 
-				mixin(SCR.Create); //it leaves the `_container`, `_id` variables on this scope
+				mixin ContainerScript_Init!(CType_, q{panelPosition}, (表([[],])), (表([[],]))); 
+				mixin(SCR.Create); 
 			}
 			
 			version(/+$DIDE_REGION Local variable declarations+/all)
 			{}
 			
 			version(/+$DIDE_REGION Load all properties+/all)
-			{
-				enum CustomPropertyDefs = (表([[],])); 
-				mixin(SCR.ProcessProperties); 
-			}
+			{ mixin(SCR.ProcessProperties); }
 			
 			version(/+$DIDE_REGION Do custom behavior+/all)
 			{}
 			
 			version(/+$DIDE_REGION Handle the recursive composition+/all)
-			{
-				enum CustomCompositionDefs = (表([[],])); 
-				mixin(SCR.ProcessComposition); 
-			}
+			{ mixin(SCR.ProcessComposition); }
 			
 			version(/+$DIDE_REGION Return custom results+/all)
 			{ return; }
@@ -8782,6 +8833,35 @@ struct im
 		
 		void Img(string def)
 		{ Img(File(def)); } 
+		
+		auto Led(string _M_=__MODULE__, size_t _L_=__LINE__, T, Ta...)(in T param, Ta args)
+		{
+			float state = 0; 
+			
+			static if(is(T==bool))	state = param ? 1 : 0; 
+			else static if(isIntegral!T)	state = param ? 1 : 0; 
+			else static if(isFloatingPoint!T)	state = param.clamp(0, 1); 
+			else enforce(0, "im.Led() Unhandled param type: " ~ T.stringof); 
+			
+			auto shp = new .Shape; 
+			//set defaults
+			shp.innerSize = vec2(0.7, 1)*style.fontHeight; 
+			shp.color = clRainbowRed; 
+			
+			static foreach(a; args)
+			{
+				{
+					alias t = Unqual!(typeof(a)); 
+					static if(is(t==RGB))	shp.color = a; 
+					else static if(is(t==vec2))	shp.outerSize = a; 
+				}
+			}
+			
+			shp.color = mix(clBlack, shp.color, state.remap(0, 1, 0.2f, 1)); 
+			
+			imAppend(cast(.Cell)shp); 
+		} 
+		
 		private void SpacerRow(Args...)(float size, in Args args)
 		{
 			const vert = (cast(.Row)(actContainer)) !is null; 
@@ -8989,7 +9069,7 @@ struct im
 			{
 				version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
 				{
-					alias SCR = ContainerScript!q{hit hint}, CType = .Row; 
+					mixin ContainerScript_Init!(.Row, q{hit hint}, (表([[],])), (表([[],]))); 
 					mixin(SCR.Create); 
 				}
 				
@@ -9000,10 +9080,7 @@ struct im
 				}
 				
 				version(/+$DIDE_REGION Load all properties+/all)
-				{
-					enum CustomPropertyDefs = (表([[],])); 
-					mixin(SCR.ProcessProperties); 
-				}
+				{ mixin(SCR.ProcessProperties); }
 				
 				version(/+$DIDE_REGION Do custom behavior+/all)
 				{
@@ -9012,10 +9089,7 @@ struct im
 				}
 				
 				version(/+$DIDE_REGION Handle the recursive composition+/all)
-				{
-					enum CustomCompositionDefs = (表([[],])); 
-					mixin(SCR.ProcessComposition); 
-				}
+				{ mixin(SCR.ProcessComposition); }
 				
 				version(/+$DIDE_REGION Return custom results+/all)
 				{
@@ -9044,7 +9118,7 @@ struct im
 		{
 			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
 			{
-				alias SCR = ContainerScript!"", CType = .Row; 
+				mixin ContainerScript_Init!(.Row, q{hit focus hint range}, (表([[],])), (表([[],]))); 
 				mixin(SCR.Create); 
 			}
 			
@@ -9052,15 +9126,26 @@ struct im
 			{
 				auto _row = cast(.Row)_container; 
 				
+				flags.hAlign = ((isNumeric!V)?(HAlign.right) :(HAlign.left)); 
+				flags.clipSubCells = true; 
+			}
+			
+			version(/+$DIDE_REGION Load all properties+/all)
+			{ mixin(SCR.ProcessProperties); }
+			
+			version(/+$DIDE_REGION Do custom behavior+/all)
+			{
 				static struct EditResult {
 					HitInfo hit; 
 					bool changed, focused; 
-					alias changed this; 
+					alias this = changed; 
 				} 
 				EditResult res; 
-				HintRec hintRec; 
-				RANGE range; 
-				bool focusEnter; 
+				
+				res.hit = hit; 
+				res.focused = focused; 
+				
+				applyEditStyle(imEnabled, focused, res.hit.hover_smooth); 
 				
 				version(/+$DIDE_REGION Editor data transfer+/all)
 				{
@@ -9068,9 +9153,6 @@ struct im
 					{ textEditorState.str = value.text; } 
 					
 					bool wasConvertError; //editor2value messaging back with this
-					
-					enum ARGS = Args.stringof; 
-					
 					void editor2value()
 					{
 						try
@@ -9087,74 +9169,21 @@ struct im
 							res.changed = newValue != value; 
 							value = newValue; 
 						}
-						catch(Exception)
-						{ wasConvertError = true; }
+						catch(Exception) { wasConvertError = true; }
 					} 
 				}
 				
-				
-				
-				flags.hAlign = ((isNumeric!V)?(HAlign.right) :(HAlign.left)); 
-				flags.clipSubCells = true; 
-			}
-			
-			version(/+$DIDE_REGION Load all properties+/all)
-			{
-				enum CustomPropertyDefs = 
-				(表([
-					[q{isT!HintRec},q{hintRec = cast()a; }],
-					[q{isT!RANGE},q{range = a; }],
-					[q{isG!"focusEnter"},q{focusEnter = a; }],
-				])); 
-				mixin(SCR.ProcessProperties); 
-			}
-			
-			version(/+$DIDE_REGION Do custom behavior+/all)
-			{
-				res.hit = hitTest(_container, imEnabled); 
-				handleHint(_container, hintRec, res.hit); 
-				
-				//const focusEnter = getGenericArg!(args, bool, "focusEnter");
-				
-				/+
-					Note: This would be the implementation with a struct: 
-							static foreach(a; args) static if(is(typeof(a) == ManualFocus)) manualFocus = a.value;
-				+/
-				//The downside is that the struct litters the namespace with simple names.
-				/+
-					220820: this is too specific. Use the ManualFocus parameter instead. 
-						static foreach(a; args) static if(is(typeof(a) == KeyCombo)) if(a.pressed) manualFocus = true;
-				+/
-				
-				res.focused = focusUpdate
-					(
-					_container, _id,
-					imEnabled,
-					res.hit.pressed || focusEnter, //enter
-					inputs["Esc"].pressed,  //exit
-					/*onEnter*/ {
-						value2editor; 
-						
-						//must override the previous value from another edit
-						//Todo: this must be rewritten with imStorage bounds.
-						with(textEditorState)
-						{ cmdQueue ~= EditCmd(EditCmd.cEnd); }
-						
-						/+
-							for keyboard entry: 
-							textEditorState.cmdQueue ~= EditCmd(EditCmd.cEnd);
-						+/
-					},
-					/*onFocus*/ {/*_EditHandleInput(value, textEditorState.str, chg);*/},
-					/*onExit*/ {}
-				); 
-				applyEditStyle(imEnabled, res.focused, res.hit.hover_smooth); 
+				if(focused.entered)
+				{
+					value2editor; 
+					with(textEditorState) cmdQueue ~= EditCmd(EditCmd.cEnd); 
+				}
 				
 				version(/+$DIDE_REGION Text editor functionality 1+/all)
 				{
-					if(res.focused)
+					if(focused)
 					{
-						editor2value; //Todo: when to write back? always / only when change/exit?
+						editor2value; 
 						
 						textEditorState.row = _row; 
 						textEditorState.strModified = false; //ready for next modifications
@@ -9163,23 +9192,19 @@ struct im
 						
 						textEditorState.handleKeyboardInput
 							(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
+						
+						flags.dontHideSpaces = true; 
 					}
-					
-					if(res.focused)
-					flags.dontHideSpaces = true; 
 				}
 			}
 			
 			version(/+$DIDE_REGION Handle the recursive composition+/all)
-			{
-				enum CustomCompositionDefs = (表([[],])); 
-				mixin(SCR.ProcessComposition); 
-			}
+			{ mixin(SCR.ProcessComposition); }
 			
 			version(/+$DIDE_REGION Text editor functionality 2+/all)
 			{
 				//put the text out
-				if(res.focused)
+				if(focused)
 				{
 					if(wasConvertError) textStyle.fontColor = clRed; 
 					_row.appendMarkupLine(textEditorState.str, textStyle, textEditorState.cellStrOfs); 
@@ -9190,7 +9215,7 @@ struct im
 				const fh = style.fontHeight; 
 				
 				//set editor's defaultFontHeight for the caret when the string is empty
-				if(res.focused)
+				if(focused)
 				textEditorState.defaultFontHeight = fh; 
 				
 				//set minimal height for the control
@@ -9310,44 +9335,33 @@ struct im
 		auto WhiteBtn(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
 		=> Btn!(_M_, _L_)(args, Theme.white); 
 		
-		private HitInfo _Btn(bool isWhite=false, Args...)(in Args args)
+		private HitInfo _Btn(Args...)(in Args args)
 		{
 			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
 			{
-				alias SCR = ContainerScript!q{hit hint}, CType = .Row; 
+				mixin ContainerScript_Init!
+				(
+					.Row, q{hit focus hint}, (表([[],])),
+					(表([[q{isT!KeyCombo || isG!"key"},q{handleKey(KeyCombo(cast()a)); }],]))
+				); 
 				mixin(SCR.Create); 
 			}
 			
 			version(/+$DIDE_REGION Local variable declarations+/all)
 			{
-				bool focusOnPress; 
-				
 				//flags.wordWrap = false;
 				flags.hAlign = HAlign.center; 
 			}
 			
 			version(/+$DIDE_REGION Load all properties+/all)
-			{
-				enum CustomPropertyDefs = 
-				(表([
-					[q{isG!"focusOnPress"},q{focusOnPress = a; }],
-					[q{isT!ValueRange},q{/+Todo: Just let it pass for IncBtn!!!+/}],
-				])); 
-				mixin(SCR.ProcessProperties); 
-			}
+			{ mixin(SCR.ProcessProperties); }
 			
 			version(/+$DIDE_REGION Do custom behavior+/all)
 			{
-				bool focused = focusUpdate
-				(
-					_container, _id,
-					imEnabled, ((focusOnPress)?(hit.pressed) :(hit.clicked)), inputs.Esc.pressed,  //enabled, enter, exit
-					/*onEnter	*/ {},
-					/*onFocus	*/ {},
-					/*onExit	*/ {}
+				applyBtnStyle(
+					theme.isWhite, imEnabled, focused, imSelected, 
+					hit.captured, hit.hover_smooth
 				); 
-				
-				applyBtnStyle(theme.isWhite, imEnabled, focused, imSelected, hit.captured, hit.hover_smooth); 
 			}
 			
 			version(/+$DIDE_REGION Handle the recursive composition+/all)
@@ -9355,81 +9369,15 @@ struct im
 				void handleKey(KeyCombo key)
 				{ if(canProcessUserInput && key.pressed) hit.clicked = true; } 
 				
-				enum CustomCompositionDefs = 
-				(表([[q{isT!KeyCombo || isG!"key"},q{handleKey(KeyCombo(cast()a)); }],])); 
 				mixin(SCR.ProcessComposition); 
 			}
 			
 			version(/+$DIDE_REGION Return custom results+/all)
 			{ return hit; }
 		} 
-		
-		auto IncBtn(string _M_=__MODULE__, size_t _L_=__LINE__, int sign=1, T0, T...)
-			(ref T0 value, T args)
-			if(sign!=0 && isNumeric!T0)
-		{
-			mixin(range_M); 
-			
-			auto capt = symbolStr(`Calculator` ~ ((sign>0)?(`Addition`) :(`Subtract`))); 
-			enum isInt = isIntegral!T0; 
-			
-			auto hit = Btn!(_M_, _L_)(capt, args, ((sign).名!q{id}), ((true).名!q{focusOnPress})); 
-			//2 id's can pass because of the static foreach
-			
-			bool chg; 
-			if(hit.repeated)
-			{
-				auto 	oldValue 	= value,
-					step 	= abs(_range.step),
-					newValue 	= _range.clamp(value+step*sign); 
-				
-				if(isInt)
-				value = cast(T0)(round(newValue)); 
-				else value = cast(T0)newValue; 
-				
-				chg = newValue != oldValue; 
-			}
-			
-			return chg; 
-		} 
 		
-		auto DecBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)
-			(ref T0 value, T args)
-		{ return IncBtn!(_M_, _L_, -1)(value, args); } 
-		
-		auto IncDecBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)
-			(ref T0 value, T args)
-		{
-			bool res; 
-			Row(
-				{
-					flags.btnRowLines = true; 
-					auto r1 = DecBtn!(_M_, _L_)(value, args); 
-					lastCell.margin.right = 0; 
-					auto r2 = IncBtn!(_M_, _L_)(value, args); 
-					lastCell.margin.left = 0; 
-					res = r1 || r2; 
-				}
-			); 
-			return res; 
-		} 
-		
-		auto IncDec(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)
-			(ref T0 value, T args)
-		{
-			auto oldValue = value; 
-			
-			Edit!(_M_, _L_)(value, { width = 2*fh; }, args); 
-			//Todo: na itt total nem vilagos, hogy az args hova megy, meg mi a result
-			
-			IncDecBtn(value, args); 
-			return oldValue != value; 
-		} 
-		
-		//BtnRow //////////////////////////////////
-		
-		auto BtnRow(Cntr = .Row, string _M_=__MODULE__, size_t _L_=__LINE__, T...)
-			(void delegate() fun, in T args)
+		auto BtnRow(Cntr = .Row, string _M_=__MODULE__, size_t _L_=__LINE__, Args...)
+			(void delegate() fun, in Args args)
 		{
 			Container!(Cntr, _M_, _L_)
 			(
@@ -9499,7 +9447,112 @@ struct im
 			if(res) ignoreExceptions({ e = s.to!E; }); 
 			return res; 
 		} 
+		
 		
+		bool IncBtn(string _M_=__MODULE__, size_t _L_=__LINE__, Value, Args...)
+			(ref Value value, in Args args)
+		{ setIncomingId!(_M_, _L_)(); return _IncBtn!(+1)(value, args, ((+1).名!q{id})); } 
+		
+		bool DecBtn(string _M_=__MODULE__, size_t _L_=__LINE__, Value, Args...)
+			(ref Value value, in Args args)
+		{ setIncomingId!(_M_, _L_)(); return _IncBtn!(-1)(value, args, ((-1).名!q{id})); } 
+		
+		private bool _IncBtn(int sign=1, Value, Args...)(ref Value value, in Args args)
+			if(sign!=0 && isNumeric!Value)
+		{
+			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
+			{
+				mixin ContainerScript_Init!
+				(
+					.Row, q{hit focus hint range}, (表([[],])),
+					(表([[q{isT!KeyCombo || isG!"key"},q{handleKey(KeyCombo(cast()a)); }],]))
+				); 
+				mixin(SCR.Create); 
+			}
+			
+			version(/+$DIDE_REGION Local variable declarations+/all)
+			{ flags.hAlign = HAlign.center; }
+			
+			version(/+$DIDE_REGION Load all properties+/all)
+			{ mixin(SCR.ProcessProperties); }
+			
+			version(/+$DIDE_REGION Do custom behavior+/all)
+			{
+				applyBtnStyle(
+					theme.isWhite, imEnabled, focused, imSelected, 
+					hit.captured, hit.hover_smooth
+				); 
+				
+				Text(symbolStr(`Calculator` ~ ((sign>0)?(`Addition`) :(`Subtract`)))); 
+			}
+			
+			version(/+$DIDE_REGION Handle the recursive composition+/all)
+			{
+				bool chg; 
+				void increment()
+				{
+					auto 	oldValue 	= value,
+						step 	= abs(range.step),
+						newValue 	= range.clamp(value+step*sign); 
+					
+					//Todo: use shift/alt/ctrl to scale step.
+					
+					if(isIntegral!Value)	value = (cast(Value)((round(newValue)))); 
+					else	value = (cast(Value)(newValue)); 
+					
+					chg |= newValue != oldValue; 
+				} 
+				
+				if(hit.repeated) increment; 
+				
+				void handleKey(KeyCombo key)
+				{ if(canProcessUserInput && key.typed) increment; } 
+				
+				mixin(SCR.ProcessComposition); 
+			}
+			
+			version(/+$DIDE_REGION Return custom results+/all)
+			{ return chg; }
+		} 
+		
+		auto IncDecBtn(string _M_=__MODULE__, size_t _L_=__LINE__, Value, Args...)
+			(ref Value value, in Args args)
+		{
+			bool res; 
+			Row(
+				{
+					flags.btnRowLines = true; 
+					auto r1 = DecBtn!(_M_, _L_)(value, args); 
+					lastCell.margin.right = 0; 
+					auto r2 = IncBtn!(_M_, _L_)(value, args); 
+					lastCell.margin.left = 0; 
+					res = r1 || r2; 
+				}
+			); 
+			return res; 
+		} 
+		
+		auto IncDec(string _M_=__MODULE__, size_t _L_=__LINE__, Value, Args...)
+			(ref Value value, in Args args)
+		{
+			auto oldValue = value; 
+			
+			Edit!(_M_, _L_)(value, { width = 2*fh; }, args); 
+			
+			IncDecBtn(value, args); 
+			return oldValue != value; 
+		} 
+		
+		auto LedBtn(string _M_=__MODULE__, size_t _L_=__LINE__, S, Args...)
+			(in S ledState, RGB ledColor, in Args args)
+		{
+			return Btn!(_M_, _L_)(
+				mixin(舉!((HAlign),q{left})), {
+					Led(ledState, ledColor); 
+					Spacer(fh*0.25f); 
+				}, args
+			); 
+		} 
 		
 		bool TabsHeader(string _M_=__MODULE__, size_t _L_=__LINE__, T, I, A...)
 			(T[] items, ref I idx, A args)
@@ -9581,12 +9634,13 @@ struct im
 						{ idx = i.to!I; clicked = true; }
 					}
 					addDrawCallback(toDelegate(&customDraw)); 
-				}, args
+				}
+				, args
 			); 
 			
 			return clicked; 
 		} 
-		
+		
 		void TabsPage(string _M_=__MODULE__, size_t _L_=__LINE__, A...)(A args)
 		{
 			Column!(_M_, _L_)
@@ -9624,14 +9678,6 @@ struct im
 			alias TT = typeof(titles[0]); 
 			const len = titles.length; 
 			
-			/*
-				if(includeAll){
-							static if(isSomeString!TT) titles ~= "All";
-							else static if(isFunction!TT) titles ~= TT({ Text("All"); }, {} ); //inferred type
-							else static if(isDelegate!TT) titles ~= TT({ Text("All"); }, {} ); //inferred type
-							else static assert(0, "Unhandled type: "~TT.stringof);
-						}
-			*/
 			//Todo: includeAll is broken when title is a callable 
 			
 			
@@ -9669,13 +9715,9 @@ struct im
 					
 					mixin(hintHandler); 
 					
-					bool focused = focusUpdate
-						(
-						actContainer, id_,
-						imEnabled, hit.pressed, inputs.Esc.pressed,  //enabled, enter, exit
-						/*onEnter	*/ {},
-						/*onFocus	*/ {},
-						/*onExit	*/ {}
+					bool focused = focusUpdate	(
+						actContainer, id_, imEnabled, 
+						hit.pressed, inputs.Esc.pressed
 					); 
 					
 					//handle the space key when focused
@@ -9829,74 +9871,7 @@ struct im
 		auto RadioBtn(string _M_=__MODULE__, size_t _L_=__LINE__, C, T...)(ref bool state, C caption, T args)
 		{ return ChkBox!(_M_, _L_, "radio")(state, caption, args); } 
 		
-		auto Led(string _M_=__MODULE__, size_t _L_=__LINE__, T, Ta...)(T param, Ta args)
-		{
-			mixin(prepareId); 
-			auto hit = hitTestManager.check(id_); 
-			
-			float state = 0; 
-			
-			static if(is(Unqual!T==bool))
-			state = param ? 1 : 0; 
-			else static if(isIntegral!T) state = param ? 1 : 0; 
-			else static if(isFloatingPoint!T) state = param.clamp(0, 1); 
-			else enforce(0, "im.Led() Unhandled param type: " ~ T.stringof); 
-			
-			auto shp = new .Shape; 
-			//set defaults
-			shp.innerSize = vec2(0.7, 1)*style.fontHeight; 
-			shp.color = clRainbowRed; 
-			
-			static foreach(a; args)
-			{
-				{
-					alias t = Unqual!(typeof(a)); 
-					static if(is(t==RGB))
-					shp.color = a; 
-					static if(is(t==vec2))
-					shp.innerSize = a; 
-				}
-			}
-			
-			shp.color = mix(clBlack, shp.color, state.remap(0, 1, 0.2f, 1)); 
-			
-			actContainer.append(cast(.Cell)shp); 
-			
-			/*
-				Composite({
-							style.fontColor = clLime;
-							Text(tag(`symbol StatusCircleInner`));
-							style.fontColor = clGray;
-							Text(tag(`symbol StatusCircleRing`));
-						});
-			*/
-		} 
 		
-		auto LedBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T, Args...)(void delegate() ledFun, T caption, in Args args)
-		{
-			return Btn!(_M_, _L_)(
-				{
-					flags.hAlign = HAlign.left; 
-					ledFun(); 
-					if(actContainer.subCells.length)
-					Spacer(fh*0.25f); 
-					width = 3.5*fh; 
-					static if(isSomeString!T)
-					Text(caption); 
-					else caption(); 
-				}, args
-			); 
-		} 
-		
-		auto LedBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T, Args...)(bool ledState, RGB ledColor, T caption, in Args args)
-		{
-			return LedBtn!(_M_, _L_)(
-				{
-					if(ledColor!=clBlack)
-					{ flags.hAlign = HAlign.left; Led(ledState, ledColor); }
-				}, caption, args
-			); 
-		} 
 		
 		
 		auto ListBoxItem(string _M_=__MODULE__, size_t _L_=__LINE__, C, Args...)
@@ -11800,10 +11775,10 @@ version(/+$DIDE_REGION Dead code 260813+/all)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x51AE9EB16D5C4).檢(hit.toJson)); 
+					((0x51685EB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x51B23EB16D5C4).檢(localMouse)); 
+					((0x516BFEB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
@@ -11840,5 +11815,65 @@ version(/+$DIDE_REGION Dead code 260813+/all)
 		); 
 		
 		return res; //a hit testet vissza kene adni im.valtozoban
+	} 
+	auto IncBtn_old(string _M_=__MODULE__, size_t _L_=__LINE__, int sign=1, Value, Args...)
+		(ref Value value, in Args args)
+		if(sign!=0 && isNumeric!Value)
+	{
+		mixin(range_M); 
+		
+		auto capt = symbolStr(`Calculator` ~ ((sign>0)?(`Addition`) :(`Subtract`))); 
+		enum isInt = isIntegral!Value; 
+		
+		auto hit = Btn!(_M_, _L_)(capt, args, ((sign).名!q{id})); 
+		//2 id's can pass because of the static foreach
+		
+		bool chg; 
+		if(hit.repeated)
+		{
+			auto 	oldValue 	= value,
+				step 	= abs(_range.step),
+				newValue 	= _range.clamp(value+step*sign); 
+			
+			if(isInt)
+			value = cast(Value)(round(newValue)); 
+			else value = cast(Value)newValue; 
+			
+			chg = newValue != oldValue; 
+		}
+		
+		return chg; 
 	} 
+	
+	auto DecBtn_old(string _M_=__MODULE__, size_t _L_=__LINE__, Value, Args...)
+		(ref Value value, in Args args)
+	{ return IncBtn!(_M_, _L_, -1)(value, args); } 
+	
+	auto LedBtn_old(string _M_=__MODULE__, size_t _L_=__LINE__, T, Args...)(void delegate() ledFun, T caption, in Args args)
+	{
+		return Btn!(_M_, _L_)(
+			{
+				flags.hAlign = HAlign.left; 
+				ledFun(); 
+				if(actContainer.subCells.length)
+				Spacer(fh*0.25f); 
+				width = 3.5*fh; 
+				static if(isSomeString!T)
+				Text(caption); 
+				else caption(); 
+			}, args
+		); 
+	} 
+	
+	auto LedBtn_old(string _M_=__MODULE__, size_t _L_=__LINE__, T, Args...)(bool ledState, RGB ledColor, T caption, in Args args)
+	{
+		return LedBtn_old!(_M_, _L_)(
+			{
+				if(ledColor!=clBlack)
+				{ flags.hAlign = HAlign.left; Led(ledState, ledColor); }
+			}, caption, args
+		); 
+	} 
+	
+	
 }

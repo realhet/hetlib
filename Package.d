@@ -2890,7 +2890,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					foreach(r; rows)
 					{
 						{
-							auto type = r[0], name = r[2], bits = r[1].to!int, def = r[3].to!int.ifThrown(0); 
+							auto type = r[0], name = r[2], bits = r[1].to!int, def = r.get(3).to!int.ifThrown(0); 
 							totalDef = totalDef.setBits(totalBits, bits, def); 
 							if(def) totalDef |= (long(def) & ((1<<bits)-1))<<totalBits; 
 							res ~= format!`%s,%s,%s,`(type, name, bits); //Note: Name must evaluate to string literal
@@ -3427,15 +3427,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1AED759F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1AEDB59F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1AF9F59F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1AFA359F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B04959F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B0BE59F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B04D59F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B0C259F156A1})); 
 						+/
 					+/
 				+/
@@ -10882,6 +10882,8 @@ version(/+$DIDE_REGION Colors+/all)
 			if(s.isWild("*?(*?,*?,*?)"))
 			if(wild[0].toUpper.among("RGB", "RGB8"))
 			return RGB(wild.ints(1), wild.ints(2), wild.ints(3)); 
+			
+			//Todo: support colrnName + alpha too
 			
 			return colorByName(s, mustExists); 
 		} 

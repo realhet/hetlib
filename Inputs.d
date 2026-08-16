@@ -595,7 +595,7 @@ version(/+$DIDE_REGION+/all)
 		
 		auto opIndex(string name)
 		{
-			 //Todo: this should be const. And there should be access(name) which has read/write access.
+			//Todo: this should be const. And there should be access(name) which has read/write access.
 			
 			struct InpitEntryWrapper
 			{
