@@ -1401,7 +1401,10 @@ version(/+$DIDE_REGION+/all)
 				{
 					if(container.flags.noHitTest)
 					return false; //Note: false means -> keep continue the search
-					im.hitTestManager.addHitRect(container.id, hitBnd, mouse-(innerPos+ofs), container.flags.clickable); 
+					im.hitTestManager.addHitRect(
+						container.id, hitBnd, mouse-(innerPos+ofs), 
+						container.flags.clickable
+					); 
 				}else
 				{
 					//it's just a regular cell. Can't add to hitTest because it has no ID.
@@ -3360,7 +3363,7 @@ version(/+$DIDE_REGION+/all)
 	class Container : Cell
 	{
 		Cell[] subCells; 
-		SrcId id; //Scrolling needs it. Also useful for debugging.
+		SrcId id; //Scrolling needs it. Also useful for debugging. Also DIDE heavily relies on it.
 		ContainerFlags flags; 
 		protected
 		{
@@ -5449,54 +5452,18 @@ version(/+$DIDE_REGION+/all)
 }
 version(/+$DIDE_REGION+/all)
 {
-	enum SliderOrientation
-	{ horz, vert, round, auto_} 
-	private pure bool isLinear(in SliderOrientation o)
-	{
-		with(SliderOrientation)
-		return o==horz || o==vert; 
-	} 
-	private pure bool isRound (in SliderOrientation o)
-	{
-		with(SliderOrientation)
-		return o==round; 
-	} 
-	
-	enum SliderStyle
-	{ slider, scrollBar} 
-	
-	struct ScrollBarOptions
-	{
-		float pageSize = 0; //pageSize in win32
-		int thickness = 13; 
-		int margin = 2; 
-		int minThumbSize_pixels = 5; 
-	} 
-	
-	pure static auto getActualSliderOrientation
-		(SliderOrientation orientation, in bounds2 r, SliderStyle style)
-	{
-		//scrollbar can only be horz or vert.
-		if(style==SliderStyle.scrollBar && !isLinear(orientation))
-		orientation = SliderOrientation.auto_; 
-		
-		if(orientation != SliderOrientation.auto_)
-		return orientation; 
-		
-		immutable THRESHOLD = 1.5f; 
-		float aspect = safeDiv(r.width/r.height, 1); 
-		return aspect>=THRESHOLD	? SliderOrientation.horz:
-		aspect<=(1/THRESHOLD)	? SliderOrientation.vert:
-		SliderOrientation.round; 
-	} 
+	alias SliderOrientation = Slider.Orientation, SliderType = Slider.Type; 
 	class Slider : Container
 	{
 		//Note: must be a Container because hitTest works on Containers only.
 		
 		//Todo: shift precise mode: must use float knob position to improve the precision
 		
-		SliderOrientation orientation; 
-		SliderStyle sliderStyle; 
+		enum Orientation { horz, vert, round, auto_} 
+		enum Type { slider, scrollBar} 
+		
+		Orientation orientation; 
+		Type type; 
 		RGB /+bkColor, <-already defined in Container+/clLine, clThumb, clRuler; 
 		float baseSize; //this is calculated from current fontHeight and theme.
 		float normThumbSize; //if it is a scrollbar, this is not nan and specifies the normalized size of the thumb.
@@ -5508,13 +5475,32 @@ version(/+$DIDE_REGION+/all)
 		float lwRuler	()
 		{ return lwLine*0.5f; } 
 		
-		/// this is the half thickness of the thumb in the active direction
-		float calcLwThumb	(SliderOrientation ori)
+		static isRound(in Orientation orientation)
+		=> orientation==Orientation.round; 
+		static isLinear(in Orientation orientation)
+		=> !!orientation.among(Orientation.horz, Orientation.vert); 
+		static getActualSliderOrientation(Orientation orientation, in bounds2 r, in Type type)
 		{
-			if(sliderStyle ==	SliderStyle.scrollBar && !isnan(normThumbSize))
+			//scrollbar can only be horz or vert.
+			if(type==Type.scrollBar && !isLinear(orientation))
+			orientation = Orientation.auto_; 
+			
+			if(orientation != Orientation.auto_)
+			return orientation; 
+			enum THRESHOLD = 1.5f; 
+			float aspect = safeDiv(r.width/r.height, 1); 
+			return aspect>=THRESHOLD	? Orientation.horz:
+			aspect<=(1/THRESHOLD)	? Orientation.vert:
+				Orientation.round; 
+		} 
+		
+		/// this is the half thickness of the thumb in the active direction
+		float calcLwThumb	(Orientation ori)
+		{
+			if(type == Type.scrollBar && !isnan(normThumbSize))
 			{
 				const minSizePixels = min(innerWidth, MinScrollThumbSize); 
-				return max((ori==SliderOrientation.horz ? innerWidth : innerHeight) * normThumbSize.clamp(0, 1), minSizePixels) * .5f; 
+				return max((ori==Orientation.horz ? innerWidth : innerHeight) * normThumbSize.clamp(0, 1), minSizePixels) * .5f; 
 			}else
 			{ return baseSize*(1.0f/3); }
 		} 
@@ -5528,91 +5514,56 @@ version(/+$DIDE_REGION+/all)
 		
 		bounds2 hitBounds; 
 		
-		bool focused; 
-		
-		this(
-			in im.Id id, bool enabled, ref float nPos_, in ValueRange range_, ref bool userModified, vec2 mousePos, 
-			TextStyle ts, out im.HitInfo hit, SliderOrientation orientation, SliderStyle sliderStyle, float fhScale, float normThumbSize=float.init
-		)
+		void setupAppearance(bool enabled, bool focused, float hover_smooth, float captured_smooth, float baseSize)
 		{
-			this.id = id; 
-			this.orientation = orientation; 
-			this.sliderStyle = sliderStyle; 
-			this.nPos = enabled ? nPos_ : nPos_/+float.init+//+Todo: hideThumb option+/; 
-			this.normThumbSize = normThumbSize; 
+			const hoverOrFocus = enabled ? max(hover_smooth*.5f, focused ? 1.0f : 0) : 0; 
 			
-			if(sliderStyle==SliderStyle.scrollBar)
-			padding = "2"; 
-			
-			hit = im.hitTest(this, enabled); 
-			hitBounds = hit.hitBounds; 
-			
-			if(1 || sliderStyle==SliderStyle.slider)
-			focused = im.focusUpdate(
-				this, id, enabled,
-				hit.pressed || hit.hover && inputs.RMB.pressed, //when to enter
-				inputs.Esc.pressed,  //when to exit
-			); 
-			
-			//res.focused = focused;
-			
-			if(focused && im.canProcessUserInput)
-			userModified |= im.sliderState.handleKeyboard(nPos, range_, 8); 
-			
-			bkColor = ts.bkColor; 
-			const hoverOrFocus = enabled ? max(hit.hover_smooth*.5f, focused ? 1.0f : 0) : 0; 
-			
-			final switch(sliderStyle)
+			final switch(type)
 			{
-				case SliderStyle.slider: 
-					clThumb =	mix(mix(clSliderThumb, clSliderThumbHover, hoverOrFocus), clSliderThumbPressed, hit.captured_smooth); 
-					clLine =	mix(mix(clSliderLine , clSliderLineHover , hoverOrFocus), clSliderLinePressed , hit.captured_smooth); 
+				case Type.slider: 
+					clThumb = mix(mix(clSliderThumb, clSliderThumbHover, hoverOrFocus), clSliderThumbPressed, captured_smooth); 
+					clLine = mix(mix(clSliderLine , clSliderLineHover , hoverOrFocus), clSliderLinePressed , captured_smooth); 
 					clRuler = clGray/+mix(bkColor, ts.fontColor, 0.5)+/; //disable ruler for now
-					
+				
 					if(focused) { clThumb = clBlack; clLine = clBlack; }//Todo: lame logic
-					
+				
 					rulerSides = 0; 
 				break; 
-				case SliderStyle.scrollBar: 
+				case Type.scrollBar: 
 					clThumb = mix(clScrollThumb, clScrollThumbPressed, hoverOrFocus); 
 					bkColor = mix(clScrollBk, clScrollThumb, min(hoverOrFocus, .5f)); 
-					
+				
 					if(focused) { clThumb = clBlack; }//Todo: lame logic
-					
+				
 					//clThumb = mix(clWinBtn, clWinBtnPressed, max(hit.hover_smooth*.5f, sliderState.pressed_id==id ? 1 : 0));
 					rulerSides = 0; 
 				break; 
 			}
 			
-			if(!enabled)
-			clLine = clThumb = clGray; //Todo: nem clGray ez, hanem clDisabledText vagy ilyesmi
+			if(!enabled) clLine = clThumb = clGray; //Todo: nem clGray ez, hanem clDisabledText vagy ilyesmi
 			
-			baseSize = ts.fontHeight*fhScale*0.8f; 
-			outerSize = vec2(baseSize*6, baseSize); //default size
-			
-			userModified |= im.sliderState.handleMouse(id, hit, nPos, mousePos, range_, wrapCnt); 
-			
-			if(userModified)
-			nPos_ = nPos; 
-		} 
+			this.baseSize = baseSize; 
+			if(!outerSize) outerSize = vec2(baseSize*6, baseSize); //default size
+		} 
+		
 		
 		override bounds2 getHitBounds()
 		{ return outerBounds; } 
 		
 		private void drawThumb(Drawing dr, vec2 a, vec2 t, float lwThumb)
 		{
-			final switch(sliderStyle)
+			final switch(type)
 			{
-				case SliderStyle.slider: 
+				case Type.slider: 
 					dr.lineWidth = lwThumb; dr.color = clThumb; 
 					const t90 = t.rotate90; 
 					dr.line(a-t90, a+t90); 
 				break; 
-				case SliderStyle.scrollBar: 
+				case Type.scrollBar: 
 					dr.color = clThumb; 
-					const horz = orientation==SliderOrientation.horz,
-								halfSize = horz ? vec2(lwThumb, innerHeight*.5f) : vec2(innerWidth*.5f, lwThumb),
-								bnd = bounds2(a, a).inflated(halfSize); 
+					const 	horz 	= orientation==Orientation.horz,
+					halfSize 	= horz ? vec2(lwThumb, innerHeight*.5f) : vec2(innerWidth*.5f, lwThumb),
+					bnd 	= bounds2(a, a).inflated(halfSize); 
 					dr.fillRect(bnd); 
 				break; 
 			}
@@ -5620,6 +5571,7 @@ version(/+$DIDE_REGION+/all)
 		
 		private void drawLine(Drawing dr, vec2 a, vec2 b, RGB cl)
 		{ dr.lineWidth = lwLine; dr.color = cl; dr.line(a, b); } 
+		
 		
 		override void draw(Drawing dr)
 		{
@@ -5631,35 +5583,35 @@ version(/+$DIDE_REGION+/all)
 			dr.alpha = 1; dr.lineStyle = LineStyle.normal; dr.arrowStyle = ArrowStyle.none; 
 			
 			auto b = innerBounds; 
-			const 	actOrientation = getActualSliderOrientation(orientation, b, sliderStyle),
+			const 	actOrientation = getActualSliderOrientation(orientation, b, type),
 				lwThumb = calcLwThumb(actOrientation); 
 			
 			if(isLinear(actOrientation))
 			{
-				const horz = actOrientation == SliderOrientation.horz,
-							thumbOfs = (horz ? vec2(1,	0) : vec2(0, -1)) * lwThumb,
-							p0 = (horz ? b.leftCenter	: b.bottomCenter) + thumbOfs,
-							p1 = (horz ? b.rightCenter	: b.topCenter   ) - thumbOfs; 
+				const 	horz 	= actOrientation == Orientation.horz,
+					thumbOfs 	= (horz ? vec2(1,	0) : vec2(0, -1)) * lwThumb,
+					p0 	= (horz ? b.leftCenter	: b.bottomCenter) + thumbOfs,
+					p1 	= (horz ? b.rightCenter	: b.topCenter  ) - thumbOfs; 
 				
-				if(sliderStyle==SliderStyle.slider && rulerSides)
+				if(type==Type.slider && rulerSides)
 				{
-					const rp0 = horz ? p0 : p1,
-								rp1 = horz ? p1 : p0,
-								ro0 = horz ? vec2(0, rulerOfs) : vec2(rulerOfs, 0),
-								ro1 = ro0*.4f; 
+					const 	rp0 	= horz ? p0 : p1,
+						rp1 	= horz ? p1 : p0,
+						ro0 	= horz ? vec2(0, rulerOfs) : vec2(rulerOfs, 0),
+						ro1 	= ro0*.4f; 
 					if(rulerSides&1)
 					drawStraightRuler(dr, bounds2(rp0-ro0, rp1-ro1), rulerDiv0, rulerDiv1, true ); 
 					if(rulerSides&2)
 					drawStraightRuler(dr, bounds2(rp0+ro1, rp1+ro0), rulerDiv0, rulerDiv1, false); 
 				}
 				
-				if(sliderStyle==SliderStyle.slider)
+				if(type==Type.slider)
 				drawLine(dr, p0, p1, clLine); 
 				
 				if(!isnan(nPos))
 				{
 					auto p = mix(p0, p1, nPos); 
-					if(!isnan(nCenter) && sliderStyle==SliderStyle.slider)
+					if(!isnan(nCenter) && type==Type.slider)
 					drawLine(dr, mix(p0, p1, nCenter), p, clThumb); 
 					
 					drawThumb(dr, p, thumbOfs, lwThumb); 
@@ -5667,7 +5619,7 @@ version(/+$DIDE_REGION+/all)
 					if(mod_update)
 					{
 						vec2 thumbHalfSize; 
-						if(sliderStyle==SliderStyle.slider)
+						if(type==Type.slider)
 						{
 							thumbHalfSize = lwThumb * vec2(0.5f, 1.5f); 
 							if(!horz)
@@ -5679,7 +5631,8 @@ version(/+$DIDE_REGION+/all)
 					}
 				}
 				
-			}else if(isRound(actOrientation))
+			}
+			else if(isRound(actOrientation))
 			{
 				//center square
 				bool endless = false; 
@@ -5724,25 +5677,24 @@ version(/+$DIDE_REGION+/all)
 			
 			drawDebug(dr); 
 		} 
-		
 		//Draw Rulers
-		protected void drawStraightRuler(Drawing dr, in bounds2 r, int cnt, int cnt2=-1, bool topleft=true)
+		protected void drawStraightRuler(
+			Drawing dr, in bounds2 r, int cnt, 
+			int cnt2=-1, bool topleft=true
+		)
 		{
 			cnt--; 
-			if(cnt<=0)
-			return; 
-			if(cnt2<0)
-			cnt2 = cnt; 
+			if(cnt<=0) return; 
+			if(cnt2<0) cnt2 = cnt; 
 			dr.color = clRuler; dr.lineWidth = lwRuler; 
 			if(r.height < r.width)
 			{
-				float c = r.center.y,
-							b = r.top,
-							t = r.bottom,
-							j = r.left,
-							ja = r.width/cnt; 
-				if(!topleft)
-				swap(b, t); 
+				float 	c 	= r.center.y,
+					b 	= r.top,
+					t 	= r.bottom,
+					j 	= r.left,
+					ja 	= r.width/cnt; 
+				if(!topleft) swap(b, t); 
 				foreach(i; 0..cnt+1)
 				{
 					dr.vLine(j, b, cnt2 && i%cnt2==0 ? t : c); 
@@ -5750,13 +5702,12 @@ version(/+$DIDE_REGION+/all)
 				}
 			}else
 			{
-				float c = r.center.x,
-							b = r.left,
-							t = r.right,
-							j = r.top,
-							ja = r.height/cnt; 
-				if(!topleft)
-				swap(b, t); 
+				float 	c 	= r.center.x,
+					b 	= r.left,
+					t 	= r.right,
+					j 	= r.top,
+					ja 	= r.height/cnt; 
+				if(!topleft) swap(b, t); 
 				foreach(i; 0..cnt+1)
 				{
 					dr.hLine(b, j, cnt2 && i%cnt2==0 ? t : c); 
@@ -5765,22 +5716,26 @@ version(/+$DIDE_REGION+/all)
 			}
 		} 
 		
-		protected void drawRoundRuler(Drawing dr, in vec2 center, float radius, int cnt, int cnt2=-1, bool endless=false)
+		protected void drawRoundRuler(
+			Drawing dr, in vec2 center, float radius, 
+			int cnt, int cnt2=-1, bool endless=false
+		)
 		{
-				cnt--; 
-				if(cnt<=0)
-			return; 
-				if(cnt2<0)
-			cnt2 = cnt; 
+			cnt--; 
+			if(cnt<=0) return; 
+			if(cnt2<0) cnt2 = cnt; 
 			//radius *= (1/1.25f);
-				dr.color = clRuler; dr.lineWidth = lwRuler; 
-				foreach(i; 0..cnt+1)
+			dr.color = clRuler; dr.lineWidth = lwRuler; 
+			foreach(i; 0..cnt+1)
 			{
-				float a = endless ? 2*PIf*i/cnt
-													: -0.25f*PIf + 1.5f*PIf*i/cnt; 
+				float a = endless 	? 2*PIf*i/cnt
+					: -0.25f*PIf + 1.5f*PIf*i/cnt; 
 				float co = -cos(a), si = -sin(a); 
 				dr.moveTo(center.x+co*radius, center.y+si*radius); 
-				float radius2 = radius*(!endless && (cnt2 && i%cnt2==0) ? 1.25f : 1.125f); 
+				float radius2 = radius*(
+					!endless && (cnt2 && i%cnt2==0) 
+					? 1.25f : 1.125f
+				); 
 				dr.lineTo(center.x+co*radius2, center.y+si*radius2); 
 			}
 		} 
@@ -5923,21 +5878,21 @@ version(/+$DIDE_REGION+/all)
 		} 
 		
 		
+		
 		
-		this(
-			in im.Id id, bool enabled, 	const DateTime tMin_, 	const DateTime tMax_, 
-				ref DateTime t0_, 	ref DateTime t1_, 
-			const ref TextStyle ts, vec2 mousePos, ref bool userModified, out im.HitInfo hit
+		/+Note: Step 1.+/
+		void setup(
+			const 	DateTime tMin_, 	const 	DateTime tMax_, 
+			ref 	DateTime t0_, 	ref 	DateTime t1_, 
+			vec2 mousePos, ref im.HitInfo hit
 		)
 		{
-			this.id = id; 
 			tMin 	= tMin_,
 			tMax 	= tMax_,
 			t0 	= t0_,
 			t1 	= t1_; 
 			sanitizeRanges; 
 			
-			hit = im.hitTest(this, enabled); 
 			hitBounds = hit.hitBounds; 
 			
 			mouseAtTopHalf = !hitBounds || mousePos.y < hitBounds.center.y; 
@@ -5951,20 +5906,15 @@ version(/+$DIDE_REGION+/all)
 			
 			show_highlighted_t = mouseAtBottomHalf; 
 			highlighted_t = t_hovered_bottom; 
-			
-			enum canFocus = true; 
-			if(canFocus)
-			focused = im.focusUpdate
-			(
-				this, id, enabled,
-				hit.pressed || hit.hover && (
-					inputs.RMB.pressed ||
-					inputs.MMB.pressed ||
-					inputs.MW.delta
-				), //when to enter
-				inputs.Esc.pressed, //when to exit
-			); 
-			
+		} 
+		
+		/+Note: Step 2.+/
+		void perform(
+			bool focused_, const ref TextStyle ts, vec2 mousePos, const ref im.HitInfo hit,
+			ref bool userModified, ref 	DateTime t0_, 	ref 	DateTime t1_
+		)
+		{
+			this.focused = focused_; 
 			ref rss = im.dateTimeRulerScrollState; 
 			
 			if(focused && im.canProcessUserInput)
@@ -5976,7 +5926,7 @@ version(/+$DIDE_REGION+/all)
 					nsd.handleKeyboard; 
 					
 					if(hit.pressed && mouseAtBottomHalf)
-					{/+beep; +//+left button pressed at t_hovered_bottom+/}
+					{/+beep; +//+left button pressed at highlighted_t+/}
 					else { nsd.handleMouse(id, hit, mousePos); }
 					
 					if(nsd.changed)
@@ -5986,7 +5936,7 @@ version(/+$DIDE_REGION+/all)
 				//Zooming
 				if(hitBounds && mouseAtBottomHalf && inputs.MW.delta)
 				{
-					if(zoomAround(t_hovered_bottom, inputs.MW.delta))
+					if(zoomAround(highlighted_t, inputs.MW.delta))
 					userModified = true; 
 				}
 				
@@ -6019,7 +5969,7 @@ version(/+$DIDE_REGION+/all)
 			bkColor = ts.bkColor; 
 			clText = ts.fontColor; 
 			
-			hoverOrFocus = enabled ? max(hit.hover_smooth*.33f, focused ? 1.0f : 0) : 0; 
+			hoverOrFocus = hit.enabled ? max(hit.hover_smooth*.33f, focused ? 1.0f : 0) : 0; 
 			
 			clRedText = clRed; 
 			clMajorTick = clText; 
@@ -6039,7 +5989,7 @@ version(/+$DIDE_REGION+/all)
 			
 			const mod_update = !hitBounds.empty && !inputs.LMB.value; 
 			
-			const b = innerBounds + innerPos; 
+			const b = innerBounds/+ + innerPos <- FUUUUUUUUUUUUUUCK!!!!+/; 
 			const fh = b.height/5.625f, rh = fh*5/2; 
 			auto 	bTop 	= bounds2(b.left, b.top, b.right, b.top+rh),
 				bBottom 	= bounds2(b.left, b.bottom-rh, b.right, b.bottom); 
@@ -6047,7 +5997,7 @@ version(/+$DIDE_REGION+/all)
 			float t0x, t1x; 
 			
 			{
-				dr.pushClipBounds(bounds2(vec2(0), outerSize)); scope(exit) dr.popClipBounds; 
+				dr.pushClipBounds(b); scope(exit) dr.popClipBounds; 
 				
 				import het.ui_ruler; 
 				const 	topIsFine 	= drawHRuler(dr, bTop, tMin, tMax, shiftUpwards: true),
@@ -7234,7 +7184,7 @@ struct im
 			struct HitInfo
 			{
 				Id id; 
-				bool enabled = true; 
+				bool enabled; 
 				bool hover, captured, clicked, pressed, released; 
 				float hover_smooth, captured_smooth; 
 				bounds2 hitBounds; //this is in ui coordinates. Problematic with zoomable and GUI views.
@@ -7252,7 +7202,25 @@ struct im
 					return pressed || captured && inputs.LMB.repeated; 
 					//Todo: architectural bug: captured is delayed by 1 frame according to repeated
 				} 
-			} 
+				
+				void simulateKey(bool keyPressed, bool keyDown, bool keyReleased)
+				{
+					if(!enabled) return; 
+					
+					if(keyPressed)	{
+						pressed = hover = captured = clicked = true; 
+						/+hover_smooth = 1; captured_smooth = 1; +/
+					}
+					else if(keyDown)	{
+						hover = captured = true; 
+						/+hover_smooth = 1; captured_smooth = 1; +/
+					}
+					else if(keyReleased)	{ released = true; }
+				} 
+				
+				void simulateKey(KeyCombo key)
+				{ simulateKey(key.pressed, key.down, key.released); } 
+			} 
 			
 			struct HitTestManager
 			{
@@ -7314,7 +7282,7 @@ struct im
 						//Todo: get the mouse state from elsewhere!!!!!!!!!!!!!
 						if(topId && mouse.LMB && mouse.justPressed && canProcessUserInput)
 						{
-							 //Note: isForeground will not work with a toolwindow
+							//Note: isForeground will not work with a toolwindow
 							pressedId = capturedId = topId; 
 						}
 						if(mouse.justReleased)
@@ -7406,7 +7374,9 @@ struct im
 				
 				container.flags.down = res.captured; 
 				return res; 
-			}  auto hitTest(bool enabled=true)
+			} 
+			
+			auto hitTest(bool enabled=true)
 			{ return hitTest(actContainer, enabled); } 
 		}
 		version(/+$DIDE_REGION Focus+/all)
@@ -7590,18 +7560,15 @@ struct im
 				if(hintState != HintState.idle)
 				{
 					//immediately hide on particular user events
-					if(userBlocking)
-					hideHints; 
+					if(userBlocking) hideHints; 
 					
 					//hide after no hints to display for a while
-					if(noHint_secs>HintRelease_sec)
-					hideHints; 
+					if(noHint_secs>HintRelease_sec) hideHints; 
 				}
 				
 				//actual hint generation
 				HintRec lastHint; 
-				if(hints.length)
-				lastHint = hints[$-1]; 
+				if(hints.length) lastHint = hints[$-1]; 
 				auto hintOwner = lastHint.owner; 
 				
 				if(hintState != HintState.idle && hintOwner)
@@ -7611,39 +7578,25 @@ struct im
 					Panel(
 						{
 							hintContainer = actContainer; 
-							padding = "0"; 
-							border.color = clGray; 
+							padding = "0"; border.color = clGray; 
+							
+							void HintRow(RGB clText, RGB clBack, string str)
+							{
+								Row(
+									{
+										padding.set(4); 
+										style.fontColor = clText; 
+										background = style.bkColor = clBack; 
+										flags.rowElasticTabs = true; 
+										Text(str); 
+									}
+								); 
+							} 
 							
 							if(lastHint.markup!="")
-							Row(
-								{
-									//Todo: row kell?
-									padding = "4"; 
-									style.fontColor = clHintText; 
-									background = style.bkColor = clHintBk; 
-									flags.rowElasticTabs = true; 
-									
-									Text(lastHint.markup); 
-								}
-							); 
-							
-							if(
-								hintState == HintState.details 
-								&& lastHint.markupDetails!=""
-							)
-							Row(
-								{
-									padding = "4"; 
-									style.fontColor = clHintDetailsText; 
-									background = style.bkColor = clHintDetailsBk; 
-									flags.rowElasticTabs = true; 
-									//Todo: Why is this redundancy?
-									
-									Text(lastHint.markupDetails); 
-								}
-							); 
-							
-							
+							HintRow(clHintText, clHintBk, lastHint.markup); 
+							if(hintState == HintState.details && lastHint.markupDetails!="")
+							HintRow(clHintDetailsText, clHintDetailsBk, lastHint.markupDetails); 
 						}
 					); 
 					
@@ -7667,24 +7620,28 @@ struct im
 			} 
 		}
 		
-		//Parameter structs ///////////////////////////////////
-		//deprecated struct id      { uint val;  /*private*/ enum M = q{ auto id_ = file.xxh(line)^baseId;                          static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
-		deprecated immutable prepareId = q{auto id_ = combine(imId, srcId!(_M_, _L_)(args)); }; 
+		DateTimeRulerScrollState dateTimeRulerScrollState; 
+		private struct DateTimeRulerScrollState
+		{
+			bool scrolling; 
+			vec2 startMousePos; 
+			DateTime startT0, startT1; 
+			
+			Time pixelDuration /+Must update this regularly+/; 
+			
+			void startScroll(vec2 mousePos, DateTime t0, DateTime t1)
+			{
+				scrolling = true; startMousePos = mousePos; 
+				startT0 = t0; startT1 = t1; 
+			} 
+			
+			void updateScroll(Time pixelDuration)
+			{ this.pixelDuration = pixelDuration; } 
+			@property currentDelta(in vec2 mousePos)
+			=> pixelDuration * (startMousePos.x - mousePos.x); 
+		} 
 		
-		/*
-			struct enable 
-				{ bool val; 	 enum M = q{auto oldEnabled = enabled; scope(exit) enabled = oldEnabled; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled = enabled && a.val; 	}; } 
-		*/
-		
-		deprecated immutable selected_M = q{static foreach(a; args) static if(isGenericArg!(typeof(cast()a), "selected")) imSelected	= a.val; 	}; 
-		
-		
-		/+private enum range_M = q{range _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == range)) _range = a; }; +/
-		deprecated private enum range_M = q{ValueRange _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == ValueRange)) _range = a; }; 
-		
-		
 		SliderState sliderState; 
-		
 		private struct SliderState
 		{
 			//information about the current slider being modified
@@ -7755,7 +7712,7 @@ struct im
 						- ((isEndless)?(1):(0)); 
 				}
 				else { NOTIMPL; }
-			} 
+			} 
 			
 			void mouseAdjust(
 				ref float nPos, in vec2 mousePos, bool isClamped, bool isCircular, bool isEndless, 
@@ -7808,8 +7765,8 @@ struct im
 					//Todo: Ctrl precizitas megoldasa globalisan az inputs.d-ben.
 				}
 				else { raise("Invalid orientation"); }
-			} 
-			
+			} 
+			
 			void mouseAdjust(ref float nPos, in vec2 mousePos, in ValueRange range_, ref int wrapCnt, float adjustSpeed)
 			{ mouseAdjust(nPos, mousePos, range_.isClamped, range_.isCircular, range_.isEndless, wrapCnt, adjustSpeed); } 
 			
@@ -7867,7 +7824,7 @@ struct im
 				
 				return userModified; 
 			} 
-			
+			
 			bool handleMouse(in Id id, in HitInfo hit, ref float nPos, in vec2 mousePos, in ValueRange range_, ref int wrapCnt)
 			{
 				if(nPos.isnan)
@@ -7883,12 +7840,12 @@ struct im
 					onPress(id, nPos, mousePos); 
 					
 					//decide wether the knob has to jump to the mouse position or not
-					const doJump = isLinear(drawn_orientation) && !drawn_thumbRect.contains!"[)"(mousePos); 
+					const doJump = .Slider.isLinear(drawn_orientation) && !drawn_thumbRect.contains!"[)"(mousePos); 
 					if(doJump)
 					{ jumpToPoint(nPos, mousePos, range_.isEndless); }
 					
 					//round knob: lock the mouse and start measuring delta movement
-					if(isRound(drawn_orientation))
+					if(.Slider.isRound(drawn_orientation))
 					{
 						//Todo: "round" knob never jumps
 						mouseLock; /+
@@ -7915,7 +7872,7 @@ struct im
 					pressed_id = Id.init; 
 					
 					//Todo: this isn't safe! what if the control disappears!!!
-					if(isLinear(drawn_orientation))	{ slowMouse(false); }
+					if(.Slider.isLinear(drawn_orientation))	{ slowMouse(false); }
 					else	{ mouseUnlock; }
 				}
 				
@@ -7924,8 +7881,7 @@ struct im
 			
 		} 
 		
-		auto hScrollInfo = ScrollInfo('H'); 
-		auto vScrollInfo = ScrollInfo('V'); 
+		auto hScrollInfo = ScrollInfo('H'), vScrollInfo = ScrollInfo('V'); 
 		
 		struct ScrollInfo
 		{
@@ -7946,6 +7902,12 @@ struct im
 			} 
 			
 			protected ScrollInfoRec[Id] infos; 
+			
+			void dump()
+			{
+				print("-".replicate(40), orientation.to!string.lc~"ScrollInfo dump"); 
+				infos.values.each!print; 
+			} 
 			
 			auto getScrollBar(in Id id)
 			{
@@ -7977,26 +7939,11 @@ struct im
 					})
 				); 
 			} 
-			
-			//optional
-			/*
-				void purge(){  createBars has it.
-							Id[] toRemove;
-							foreach(k, const v; infos) if(v.lastAccess < global_updateTick) toRemove ~= k;
-							foreach(k; toRemove) infos.remove(k);
-							//opt: assocArray.rehash test
-						}
-			*/
-			
-			/+
-				Todo: IDE: nicer error display, and autoSolve: "undefined identifier `global_updateTick`, 
-					did you mean variable `global_UpdateTick`?"
-			+/
-			
+			
 			/+
 				2. called after measure when the final local positions are known. 
 					It creates the bars if needed and registers them with hitTestManager
-			+/
+			+/
 			void createBars(bool doPurge)
 			{
 				assert(orientation.among('H', 'V')); 
@@ -8006,14 +7953,12 @@ struct im
 				{
 					if(info.lastAccess<application.tick)
 					{
-						if(doPurge)
-						toRemove ~= id; 
+						if(doPurge) toRemove ~= id; 
 						continue; 
 					}
 					const exists 	= (orientation=='H' && info.container.flags.hasHScrollBar)
 						|| (orientation=='V' && info.container.flags.hasVScrollBar); 
-					if(!exists)
-					continue; 
+					if(!exists) continue; 
 					
 					bool enabled; 
 					float normValue; 
@@ -8021,11 +7966,7 @@ struct im
 					float activeRange = info.contentSize - info.pageSize; 
 					
 					const flip = orientation=='V'; 
-					void doFlip()
-					{
-						if(flip)
-						normValue = 1-normValue; 
-					} 
+					void doFlip() { if(flip) normValue = 1-normValue; } 
 					
 					if(activeRange > 0.001f)
 					{
@@ -8038,43 +7979,39 @@ struct im
 						normThumbSize = info.pageSize/info.contentSize; 
 						
 						doFlip; 
-					}else
+					}
+					else
 					{
 						info.offset = 0; //no active range, so just reset it to 0
 					}
+					//inherit container's target surface
+					im.selectTargetSurface(info.container.flags.targetSurface); 
 					
-					bool userModified; 
-					HitInfo hit; 
-					/+
-						Todo: scrollbars only work on GUI surface. This flag shlould be inherited automatically, 
-								just like the upcoming enabled flag.
-					+/
-					auto sl = new .Slider
+					const bool userModified = im.Slider
 						(
-						combine(info.container.id, orientation), enabled, normValue, 
-						linRange(0, 1), userModified, view_gui.mousePos.vec2, tsNormal, hit,
-						orientation=='H' ? SliderOrientation.horz : SliderOrientation.vert, 
-						SliderStyle.scrollBar, 1, normThumbSize
+						normValue, linRange(0, 1), ((combine(info.container.id, orientation)).名!q{id}),
+						((orientation=='H')?(SliderOrientation.horz):(SliderOrientation.vert)),
+						SliderType.scrollBar, ((normThumbSize).名!q{normThumbSize}),
+						((
+							{
+								//set the position of the slider.
+								const scrollThickness = DefaultScrollThickness; 
+								with(info.container)
+								if(orientation=='H')
+								{
+									im.outerPos = vec2(0, innerHeight-scrollThickness); 
+									im.outerSize = vec2(innerWidth-((flags.hasVScrollBar) ?(scrollThickness):(0)), scrollThickness); 
+								}
+								else
+								{
+									im.outerPos = vec2(innerWidth-scrollThickness, 0); 
+									im.outerSize = vec2(scrollThickness, innerHeight-((flags.hasHScrollBar) ?(scrollThickness):(0))); 
+								}
+							}
+						).名!q{init})
 					); 
+					info.slider = (cast(.Slider)(im.removeLastContainer)); 
 					
-					info.slider = sl; 
-					
-					//set the position of the slider.
-					//Todo: Because it's after hitTest, interaction will be delayed for 1 frame. But it should not.
-					const scrollThickness = DefaultScrollThickness; //Todo: this is duplicated!!!
-					with(info.container)
-					if(orientation=='H')
-					{
-						sl.outerPos = vec2(0, innerHeight-scrollThickness); 
-						sl.outerSize = vec2(innerWidth-((flags.hasVScrollBar) ?(scrollThickness):(0)), scrollThickness); 
-					}else
-					{
-						sl.outerPos = vec2(innerWidth-scrollThickness, 0); 
-						sl.outerSize = vec2(scrollThickness, innerHeight-((flags.hasHScrollBar) ?(scrollThickness):(0))); 
-					}
-					
-					
-					//Todo: the hitInfo is for the last frame. It should be processed a bit later
 					if(userModified && enabled)
 					{
 						doFlip; 
@@ -8083,17 +8020,32 @@ struct im
 				}
 				
 				//purge old ones
-				foreach(id; toRemove)
-				infos.remove(id); 
-			} 
-			
-			
-			void dump()
-			{
-				print("-".replicate(40), orientation.to!string.lc~"ScrollInfo dump"); 
-				infos.values.each!print; 
+				foreach(id; toRemove) infos.remove(id); 
 			} 
 		} 
+	}
+	version(/+$DIDE_REGION+/all) {
+		//Parameter structs ///////////////////////////////////
+		//deprecated struct id      { uint val;  /*private*/ enum M = q{ auto id_ = file.xxh(line)^baseId;                          static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
+		deprecated immutable prepareId = q{auto id_ = combine(imId, srcId!(_M_, _L_)(args)); }; 
+		
+		/*
+			struct enable 
+				{ bool val; 	 enum M = q{auto oldEnabled = enabled; scope(exit) enabled = oldEnabled; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled = enabled && a.val; 	}; } 
+		*/
+		
+		deprecated immutable selected_M = q{static foreach(a; args) static if(isGenericArg!(typeof(cast()a), "selected")) imSelected	= a.val; 	}; 
+		
+		
+		/+private enum range_M = q{range _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == range)) _range = a; }; +/
+		deprecated private enum range_M = q{ValueRange _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == ValueRange)) _range = a; }; 
+		
+		
+		
+		
+		
+		
+		
 		
 		version(/+$DIDE_REGION internal state+/all)
 		{
@@ -8170,7 +8122,7 @@ struct im
 				bool imSelected(bool a)
 				{ if(actContainer) actContainer.flags.selected = a; return a; } 
 			} 
-			
+			
 			auto lastCell(T:Cell=Cell)()
 			{
 				Cell cell; 
@@ -8202,6 +8154,8 @@ struct im
 			{
 				//Todo: ezt a newId-t ki kell valahogy valtani. im.id-t kell inkabb modositani.
 				c.id = newId; 
+				c.flags.targetSurface = selectedTargetSurface; 
+				
 				stack ~= StackEntry(c, textStyle, theme); 
 				
 				//actContainer is the top of the stack or null
@@ -8229,7 +8183,7 @@ struct im
 			} 
 			
 			public void imPop() { pop; } 
-			
+			
 			void dump()
 			{
 				writeln("---- IM dump --------------------------------"); 
@@ -8249,7 +8203,7 @@ struct im
 					return null; 
 				} 
 			+/
-			
+			
 			private void append(T)(T c)
 			{
 				if(actContainer !is null)	actContainer.append(c); 
@@ -8367,7 +8321,7 @@ struct im
 			=> style.fg; 
 			
 			
-			
+			
 			/+
 				Todo: Play with disabled inlining of Composable functions: /+Code: pragma(inline, false)+/
 				It requires an ASM inspector first.
@@ -8413,11 +8367,6 @@ struct im
 			} 
 		}
 		
-		
-	}
-	version(/+$DIDE_REGION+/all)
-	{
-		
 		enum StdPropertyDefs = 
 		(表([
 			[q{//Properties (set only once at creation)
@@ -8464,7 +8413,7 @@ struct im
 				ASM viewer needed.
 				/+Link: https://www.jmdavisprog.com/articles/why-const-sucks.html+/
 			+/}],
-		])); 
+		])); 
 		
 		mixin template ContainerScript_Init(CType_, string optionsStr_, 表 props, 表 comps)
 		{
@@ -8473,19 +8422,18 @@ struct im
 			enum CustomPropertyDefs = props; 
 			enum CustomCompositionDefs = comps; 
 			/+Statement mixin can't go here, because mixin()  can only emit declarations.+/
-		} 
-		
+		} 
 		template ContainerScript(string optionsStr)
 		{
 			enum ThisStr = "ContainerScript!(`"~optionsStr~"`)"; 
-			enum Option {panelPosition, hit, focus, hint, range} 
+			enum Option {panelPosition, hit, key, focus, hint, range, spaceKey} 
 			
 			enum options = optionsStr.split(' ').map!(to!Option).array; 
 			
 			string OPT(string optionStr)(string sTrue, string sFalse="")
 			{ return ' ' ~ ((options.canFind(optionStr.to!Option))?(sTrue):(sFalse)) ~ ' '; } 
 			
-			string Create()
+			string Create() /+Note: Step 1.+/ /+Use ContainerScript_Init!+/
 			=> iq{
 				auto _id = combine(imId, fetchIncomingId); 
 				static foreach(a; args) static if(isGenericArg!(typeof(cast()a), "id")) _id.appendIdx(a.value); 
@@ -8497,39 +8445,20 @@ struct im
 				imEnabled = parentEnabled; //Inherit `enabled` from parent.
 				_container.bkColor = style.bkColor; //Inherit `bkcolor` from the current fontStyle.
 				
-				$(
-					OPT!"panelPosition"
-					(q{PanelPosition panelPosition; })
-				)
-				$(
-					OPT!"hit"
-					(q{HitInfo hit; })
-				)
-				$(
-					OPT!"focus"
-					(q{bool mustEnterFocus, mustExitFocus; })
-				)
-				$(
-					OPT!"hint"
-					(q{HintRec hintRec; })
-				)
-				$(
-					OPT!"range"
-					(q{ValueRange range; })
-				)
+				$(OPT!"panelPosition"(q{PanelPosition panelPosition; }))
+				$(OPT!"focus"       (q{bool mustEnterFocus, mustExitFocus, focusMMB, focusRMB, focusMW; }))
+				$(OPT!"hint"        (q{HintRec hintRec; }))
+				$(OPT!"range"      (q{ValueRange range; }))
 			}.text; 
+			
+			/+/+Note: Step 2.+/ Declare local variables to load properties into.+/
 			
-			
-			string ProcessProperties()
+			string ProcessProperties() /+Note: Step 3.+/
 			=> iq{
 				enum AllPropertyDefRows = CustomPropertyDefs.rows.array 
+				$(OPT!"panelPosition"(q{~(表([[q{isT!PanelPosition},q{panelPosition = a; }],])).rows.array}))
 				$(
-					OPT!"panelPosition"
-					(q{~(表([[q{isT!PanelPosition},q{panelPosition = a; }],])).rows.array})
-				)
-				$(
-					OPT!"focus"
-					(
+					OPT!"focus"       (
 						q{
 							~(表([
 								[q{isG!"enter"},q{mustEnterFocus |= a; }],
@@ -8538,14 +8467,9 @@ struct im
 						}
 					)
 				)
-				$(
-					OPT!"hint"
-					(q{~(表([[q{isT!HintRec},q{hintRec = cast()a; }],])).rows.array})
-				)
-				$(
-					OPT!"range"
-					(q{~(表([[q{isT!ValueRange},q{range = a; }],])).rows.array})
-				)
+				$(OPT!"hint"        (q{~(表([[q{isT!HintRec},q{hintRec = cast()a; }],])).rows.array}))
+				$(OPT!"range"      (q{~(表([[q{isT!ValueRange},q{range = a; }],])).rows.array}))
+				$(OPT!"key"        (q{~(表([[q{isG!"key" || isT!KeyCombo},q{/+handled after props+/}],])).rows.array}))
 				~ StdPropertyDefs.rows.array; 
 				
 				static foreach(a; args)
@@ -8569,29 +8493,59 @@ struct im
 						}
 					)
 				)
+				$(OPT!"hit"(q{auto hit = hitTest(_container, imEnabled); }))
 				$(
-					OPT!"hit"
-					(q{hit = hitTest(_container, imEnabled); })
+					OPT!"key" /+Must be after `hit` and before `focus`.+/
+					(
+						q{
+							static foreach(a; args)
+							{
+								{
+									alias T = typeof(cast()a); enum isT(Type) 	= is(T == Type),
+									isG(string Name) 	= isGenericArg!(T, Name); 
+									static if(isG!"key" || isT!KeyCombo)
+									{ if(canProcessUserInput) hit.simulateKey(KeyCombo(cast()a)); }
+								}
+							}
+						}
+					)
 				)
 				$(
 					OPT!"focus"
 					(
 						q{
+							mustEnterFocus |= (
+								imEnabled && canProcessUserInput && hit.hover &&
+								(
+									(focusRMB && inputs.RMB.pressed) ||
+									(focusMMB && inputs.MMB.pressed) ||
+									(focusMW && inputs.MW.delta)
+								)
+							); 
 							const focused = focusUpdate(
-								_container, _id, imEnabled,
+								_container, _id, 
+								imEnabled && canProcessUserInput,
 								mustEnterFocus || hit.pressed,
 								mustExitFocus || inputs.Esc.pressed
 							); 
 						}
 					)
 				)
+				$(OPT!"hint"(q{handleHint(_container, hintRec, hit); }))
 				$(
-					OPT!"hint"
-					(q{handleHint(_container, hintRec, hit); })
+					OPT!"spaceKey" /+Must be after `hit` and `focus`.+/
+					(
+						q{
+							if(canProcessUserInput && focused)
+							hit.simulateKey(KeyCombo("Space")); 
+						}
+					)
 				)
 			}.text; 
+			
+			/+/+Note: Step 4.+/ Implement custom behavior based on properties.+/
 			
-			string ProcessComposition()
+			string ProcessComposition() /+Note: Step 5.+/
 			=> iq{
 				enum AllCompositionDefRows = CustomCompositionDefs.rows.array ~ StdCompositionDefs.rows.array; 
 				static foreach(a; args)
@@ -8610,7 +8564,14 @@ struct im
 					}
 				}
 			}.text; 
+			
+			/+/+Note: Step 6.+/ Finalize/deallocate temporary things, measure nested content, etc.+/
 		} 
+	}
+	version(/+$DIDE_REGION+/all)
+	{
+		
+		
 		
 		
 		
@@ -8659,208 +8620,6 @@ struct im
 		
 		void Flex(float value = 1)
 		{ Row(((value).名!q{flex})); } 
-		
-		void Text(Args...)(in Args args)
-		{
-			//Todo: not multiline yet
-			
-			/+
-				multiline behaviour:
-					parent is Row: if multiline -> make a column around it
-					parent is column: multiline is ok. Multiple row emit
-					actContainer is null: root level gets a lot of rows
-					
-					Text is always making one line, even in a container. Use \n for multiple rows
-			+/
-			
-			if(Args.length>1 &&(actContainer is null || (cast(.Column)(actContainer)) !is null))
-			{/*implicit row*/Row({ Text(args); }); return; }
-			
-			bool restoreTextStyle = false; 
-			TextStyle oldTextStyle; 
-			void saveTextStyle() { if(restoreTextStyle.chkSet) oldTextStyle = textStyle; } 
-			scope(exit) if(restoreTextStyle) textStyle = oldTextStyle; 
-			
-			void emitStr(string s)
-			{
-				if(.Column col = (cast(.Column)(actContainer)))
-				{
-					//implicit Rows for Column
-					Row(
-						{
-							/+before 260812: Text(s); +/
-							actContainer.appendMarkupLine(s, textStyle); 
-							//Difference: the new version can alter the style
-						}
-					); 
-				}
-				else if(.Row row = (cast(.Row)(actContainer)))
-				{ row.appendMarkupLine(s, textStyle); }
-				else
-				{ actContainer.appendMarkupLine(s, textStyle); }
-			} 
-			
-			static foreach(a; args)
-			{
-				{
-					alias T = typeof(cast()a); 
-					enum isT(Type) 	= is(T == Type),
-					isG(string Name) 	= isGenericArg!(T, Name); 
-					
-					/+
-						static if(isG!"flex")	{ Flex(a); }
-						else static if(isT!TextStyle)	{ saveTextStyle; textStyle = a; }
-						else static if(isT!RGB)	{ saveTextStyle; textStyle.fontColor = a; }
-						else static if(isT!SyntaxKind)	{ saveTextStyle; textStyle.applySyntax(a); }
-						else static if(__traits(compiles, a()))	{ a(); }
-						else	{ emitStr(a.text); /+general case+/}
-					+/
-					
-					mixin((
-						(表([
-							[q{isG!"flex"},q{Flex(a); }],
-							[q{isT!TextStyle},q{saveTextStyle; textStyle = a; }],
-							[q{isG!"style"},q{saveTextStyle; textStyle.modify(a); }],
-							[q{
-								isG!"fontColor" || isT!RGB
-								
-							},q{saveTextStyle; textStyle.fontColor = a; }],
-							[q{isG!"bkColor"},q{saveTextStyle; style.bkColor = a; }],
-							[q{isG!"syntax" || isT!SyntaxKind},q{saveTextStyle; textStyle.applySyntax(a); }],
-							[q{isG!"bold"},q{saveTextStyle; style.bold = a; }],
-							[q{isG!"italic"},q{saveTextStyle; style.italic = a; }],
-							[q{isG!"underline"},q{saveTextStyle; style.underline = a; }],
-							[q{__traits(compiles, a())},q{a(); }],
-							[q{true},q{emitStr(a.text); /+general case+/}],
-						]))
-					) .GEN!q{
-						rows.map!((r)=>(iq{static if($(r[0])) {$(r[1])}}.text))
-						.join(q{ else })
-					}); 
-				}
-			}
-		} 
-		
-		
-		
-		
-		
-		
-		string symbolStr(string def)
-		{ return tag(`symbol `~def); }  void Symbol(string def)
-		{ Text(symbolStr(def)); } 
-		
-		string boldStr(string s)	
-		=> tag("style bold=1"	  )~s~tag("style bold=0"	  ); 
-		string italicStr(string s)
-		=> tag("style italic=1"	  )~s~tag("style italic=0"	  ); 
-		string underlineStr(string s)
-		=> tag("style underline=1")~s~tag("style underline=0"); 
-		string strikeoutStr(string s)
-		=> tag("style strikeout=1")~s~tag("style strikeout=0"); 
-		
-		string progressSpinnerStr(int progressStyle=0)
-		{
-			int t(int n)
-			{ return ((QPS.value(second)*n*1.5).ifloor)%n; } 
-			auto ch(int i)
-			{ return [cast(dchar)i].to!string; } 
-			
-			switch(progressStyle)
-			{
-				case 0: 	return ch(0x25f4+3-t(4)); 	//◴ circle 90deg lines
-				case 1: 	return ch(0x25d0+3-[0, 2, 1, 3][t(4)]); 	//◐ circle 180deg filled
-				case 2: 	return ch(0x1f550+t(12)); 	//🕐 clock
-				default: 	return "..."; 
-			}
-		} 
-		
-		void ProgressSpinner(int progressStyle = 0)
-		{
-			Row(
-				{
-					style.fontColor = mix(style.bkColor, style.fontColor, .66f); 
-					Text(" "~progressSpinnerStr(progressStyle)~" "); 
-				}
-			); 
-		} 
-		
-		void TAB()
-		{ Text("\t"); } 	void NL()
-		{ Text("\n"); } 
-		
-		void Comment(Args...)(in Args args)
-		{ Text(tsComment, args); } 
-		
-		void Bullet()
-		{
-			Row({ outerWidth = fh*2; Flex; Text(tag("char 0x2022")); Flex; }); 
-			/+
-				Todo: no flex needed, -> center aligned. 
-				Constant width is needed however, for different bullet styles.
-			+/
-		} 
-		
-		void Bullet(void delegate() contents)
-		{ Row({ Bullet; if(contents) contents(); }); } 
-		
-		void Bullet(string text)
-		{ Bullet({ Text(text); }); } 
-		
-		void Img(File f)
-		{
-			//Text(tag(`img ` ~ f.fullName.optionallyQuotedFileName));
-			//Todo: Markup thing is broken with complicated filenames. Quoted filename not works: range error.
-			//Todo: The Id is not specifiable.
-			//Todo: This should be a fully customizable container. Img is in fact a container.
-			
-			version(VulkanUI) {
-				bitmaps[f]; 
-				/+
-					Todo: 260812 This is not necessary, inside Img there is a cached bitmaps[f] call.
-					But for safety I'm not commenting it out.
-				+/
-			}
-			else { bitmaps(f); }
-			/+
-				Todo: In vulkan there is no delayed refresh of images.
-				All this have to be solved! 
-				26.02.03 It is temporarily fixed.
-			+/
-			
-			im.append(new .Img(f)); 
-		} 
-		
-		void Img(string def)
-		{ Img(File(def)); } 
-		
-		auto Led(string _M_=__MODULE__, size_t _L_=__LINE__, T, Ta...)(in T param, Ta args)
-		{
-			float state = 0; 
-			
-			static if(is(T==bool))	state = param ? 1 : 0; 
-			else static if(isIntegral!T)	state = param ? 1 : 0; 
-			else static if(isFloatingPoint!T)	state = param.clamp(0, 1); 
-			else enforce(0, "im.Led() Unhandled param type: " ~ T.stringof); 
-			
-			auto shp = new .Shape; 
-			//set defaults
-			shp.innerSize = vec2(0.7, 1)*style.fontHeight; 
-			shp.color = clRainbowRed; 
-			
-			static foreach(a; args)
-			{
-				{
-					alias t = Unqual!(typeof(a)); 
-					static if(is(t==RGB))	shp.color = a; 
-					else static if(is(t==vec2))	shp.outerSize = a; 
-				}
-			}
-			
-			shp.color = mix(clBlack, shp.color, state.remap(0, 1, 0.2f, 1)); 
-			
-			imAppend(cast(.Cell)shp); 
-		} 
 		
 		private void SpacerRow(Args...)(float size, in Args args)
 		{
@@ -8953,6 +8712,204 @@ struct im
 			); 
 		} 
 		
+		
+		void Text(Args...)(in Args args)
+		{
+			//Todo: not multiline yet
+			
+			/+
+				multiline behaviour:
+					parent is Row: if multiline -> make a column around it
+					parent is column: multiline is ok. Multiple row emit
+					actContainer is null: root level gets a lot of rows
+					
+					Text is always making one line, even in a container. Use \n for multiple rows
+			+/
+			
+			if(Args.length>1 &&(actContainer is null || (cast(.Column)(actContainer)) !is null))
+			{/*implicit row*/Row({ Text(args); }); return; }
+			
+			bool restoreTextStyle = false; 
+			TextStyle oldTextStyle; 
+			void saveTextStyle() { if(restoreTextStyle.chkSet) oldTextStyle = textStyle; } 
+			scope(exit) if(restoreTextStyle) textStyle = oldTextStyle; 
+			
+			void emitStr(string s)
+			{
+				if(.Column col = (cast(.Column)(actContainer)))
+				{
+					//implicit Rows for Column
+					Row(
+						{
+							/+before 260812: Text(s); +/
+							actContainer.appendMarkupLine(s, textStyle); 
+							//Difference: the new version can alter the style
+						}
+					); 
+				}
+				else if(.Row row = (cast(.Row)(actContainer)))
+				{ row.appendMarkupLine(s, textStyle); }
+				else
+				{ actContainer.appendMarkupLine(s, textStyle); }
+			} 
+			
+			static foreach(a; args)
+			{
+				{
+					alias T = typeof(cast()a); 
+					enum isT(Type) 	= is(T == Type),
+					isG(string Name) 	= isGenericArg!(T, Name); 
+					
+					/+
+						static if(isG!"flex")	{ Flex(a); }
+						else static if(isT!TextStyle)	{ saveTextStyle; textStyle = a; }
+						else static if(isT!RGB)	{ saveTextStyle; textStyle.fontColor = a; }
+						else static if(isT!SyntaxKind)	{ saveTextStyle; textStyle.applySyntax(a); }
+						else static if(__traits(compiles, a()))	{ a(); }
+						else	{ emitStr(a.text); /+general case+/}
+					+/
+					
+					mixin((
+						(表([
+							[q{isG!"flex"},q{Flex(a); }],
+							[q{isT!TextStyle},q{saveTextStyle; textStyle = a; }],
+							[q{isG!"style"},q{saveTextStyle; textStyle.modify(a); }],
+							[q{
+								isG!"fontColor" || isT!RGB
+								
+							},q{saveTextStyle; textStyle.fontColor = a; }],
+							[q{isG!"bkColor"},q{saveTextStyle; style.bkColor = a; }],
+							[q{isG!"syntax" || isT!SyntaxKind},q{saveTextStyle; textStyle.applySyntax(a); }],
+							[q{isG!"bold"},q{saveTextStyle; style.bold = a; }],
+							[q{isG!"italic"},q{saveTextStyle; style.italic = a; }],
+							[q{isG!"underline"},q{saveTextStyle; style.underline = a; }],
+							[q{__traits(compiles, a())},q{a(); }],
+							[q{true},q{emitStr(a.text); /+general case+/}],
+						]))
+					) .GEN!q{
+						rows.map!((r)=>(iq{static if($(r[0])) {$(r[1])}}.text))
+						.join(q{ else })
+					}); 
+				}
+			}
+		} 
+		
+		auto Led(string _M_=__MODULE__, size_t _L_=__LINE__, T, Ta...)(in T param, Ta args)
+		{
+			float state = 0; 
+			
+			static if(is(T==bool))	state = param ? 1 : 0; 
+			else static if(isIntegral!T)	state = param ? 1 : 0; 
+			else static if(isFloatingPoint!T)	state = param.clamp(0, 1); 
+			else enforce(0, "im.Led() Unhandled param type: " ~ T.stringof); 
+			
+			auto shp = new .Shape; 
+			//set defaults
+			shp.innerSize = vec2(0.7, 1)*style.fontHeight; 
+			shp.color = clRainbowRed; 
+			
+			static foreach(a; args)
+			{
+				{
+					alias t = Unqual!(typeof(a)); 
+					static if(is(t==RGB))	shp.color = a; 
+					else static if(is(t==vec2))	shp.outerSize = a; 
+				}
+			}
+			
+			shp.color = mix(clBlack, shp.color, state.remap(0, 1, 0.2f, 1)); 
+			
+			imAppend(cast(.Cell)shp); 
+		} 
+		
+		string symbolStr(string def)
+		{ return tag(`symbol `~def); }  void Symbol(string def)
+		{ Text(symbolStr(def)); } 
+		
+		string boldStr(string s)	
+		=> tag("style bold=1"	  )~s~tag("style bold=0"	  ); 
+		string italicStr(string s)
+		=> tag("style italic=1"	  )~s~tag("style italic=0"	  ); 
+		string underlineStr(string s)
+		=> tag("style underline=1")~s~tag("style underline=0"); 
+		string strikeoutStr(string s)
+		=> tag("style strikeout=1")~s~tag("style strikeout=0"); 
+		
+		string progressSpinnerStr(int progressStyle=0)
+		{
+			int t(int n)
+			{ return ((QPS.value(second)*n*1.5).ifloor)%n; } 
+			auto ch(int i)
+			{ return [cast(dchar)i].to!string; } 
+			
+			switch(progressStyle)
+			{
+				case 0: 	return ch(0x25f4+3-t(4)); 	//◴ circle 90deg lines
+				case 1: 	return ch(0x25d0+3-[0, 2, 1, 3][t(4)]); 	//◐ circle 180deg filled
+				case 2: 	return ch(0x1f550+t(12)); 	//🕐 clock
+				default: 	return "..."; 
+			}
+		} 
+		
+		void ProgressSpinner(int progressStyle = 0)
+		{
+			Row(
+				{
+					style.fontColor = mix(style.bkColor, style.fontColor, .66f); 
+					Text(" "~progressSpinnerStr(progressStyle)~" "); 
+				}
+			); 
+		} 
+		
+		void TAB()
+		{ Text("\t"); } 	void NL()
+		{ Text("\n"); } 
+		
+		void Comment(Args...)(in Args args)
+		{ Text(tsComment, args); } 
+		
+		void Bullet()
+		{
+			Row({ outerWidth = fh*2; Flex; Text(tag("char 0x2022")); Flex; }); 
+			/+
+				Todo: no flex needed, -> center aligned. 
+				Constant width is needed however, for different bullet styles.
+			+/
+		} 
+		
+		void Bullet(void delegate() contents)
+		{ Row({ Bullet; if(contents) contents(); }); } 
+		
+		void Bullet(string text)
+		{ Bullet({ Text(text); }); } 
+		
+		void Img(File f)
+		{
+			//Text(tag(`img ` ~ f.fullName.optionallyQuotedFileName));
+			//Todo: Markup thing is broken with complicated filenames. Quoted filename not works: range error.
+			//Todo: The Id is not specifiable.
+			//Todo: This should be a fully customizable container. Img is in fact a container.
+			
+			version(VulkanUI) {
+				bitmaps[f]; 
+				/+
+					Todo: 260812 This is not necessary, inside Img there is a cached bitmaps[f] call.
+					But for safety I'm not commenting it out.
+				+/
+			}
+			else { bitmaps(f); }
+			/+
+				Todo: In vulkan there is no delayed refresh of images.
+				All this have to be solved! 
+				26.02.03 It is temporarily fixed.
+			+/
+			
+			im.append(new .Img(f)); 
+		} 
+		
+		void Img(string def)
+		{ Img(File(def)); } 
+		
 		version(/+$DIDE_REGION Styling+/all)
 		{
 			void applyBtnBorder(in RGB bColor = clWinBtn)
@@ -9335,15 +9292,15 @@ struct im
 		auto WhiteBtn(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
 		=> Btn!(_M_, _L_)(args, Theme.white); 
 		
+		auto ToolBtn(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
+		=> Btn!(_M_, _L_)(args, Theme.tool); 
+		
 		private HitInfo _Btn(Args...)(in Args args)
 		{
 			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
 			{
 				mixin ContainerScript_Init!
-				(
-					.Row, q{hit focus hint}, (表([[],])),
-					(表([[q{isT!KeyCombo || isG!"key"},q{handleKey(KeyCombo(cast()a)); }],]))
-				); 
+				(.Row, q{hit focus hint key spaceKey}, (表([[],])), (表([[],]))); 
 				mixin(SCR.Create); 
 			}
 			
@@ -9365,12 +9322,7 @@ struct im
 			}
 			
 			version(/+$DIDE_REGION Handle the recursive composition+/all)
-			{
-				void handleKey(KeyCombo key)
-				{ if(canProcessUserInput && key.pressed) hit.clicked = true; } 
-				
-				mixin(SCR.ProcessComposition); 
-			}
+			{ mixin(SCR.ProcessComposition); }
 			
 			version(/+$DIDE_REGION Return custom results+/all)
 			{ return hit; }
@@ -9448,7 +9400,86 @@ struct im
 			return res; 
 		} 
 		
+		HitInfo Link(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
+		{ setIncomingId!(_M_, _L_)(); return _Link(args); } 
 		
+		private HitInfo _Link(Args...)(in Args args)
+		{
+			mixin ContainerScript_Init!(.Row, q{hit focus hint key spaceKey}, (表([[],])), (表([[],]))); 
+			mixin(SCR.Create); mixin(SCR.ProcessProperties); 
+			applyLinkStyle(imEnabled, focused, hit.captured, hit.hover_smooth); 
+			mixin(SCR.ProcessComposition); return hit; 
+			
+			//Todo: set the mouse cursor!!!
+			/+Todo: Underline is broken in Vulkan...+/
+		} 
+		
+		HitInfo ChkBox(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(ref bool state, in Args args)
+		{ setIncomingId!(_M_, _L_)(); return _ChkBox!"chk"(state, args); } 
+		
+		HitInfo RadioBtn(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(ref bool state, in Args args)
+		{ setIncomingId!(_M_, _L_)(); return _ChkBox!"radio"(state, args); } 
+		
+		auto ChkBox(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)
+			(Property prop, string caption, in Args args)
+		{
+			auto bp = cast(BoolProperty)prop; 
+			enforce(bp !is null); 
+			auto last = bp.act; 
+			auto res = ChkBox!(_M_, _L_)(
+				bp.act, caption.empty ? prop.caption : caption, 
+				((prop.name).名!q{id}), hint(prop.hint), args
+			); 
+			bp.uiChanged |= last != bp.act; 
+			return res; 
+		} 
+		
+		private HitInfo _ChkBox(string chkBoxStyle, Args...)(ref bool state, in Args args)
+		{
+			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
+			{
+				mixin ContainerScript_Init!
+				(.Row, q{hit focus key hint spaceKey}, (表([[],])), (表([[],]))); 
+				mixin(SCR.Create); 
+			}
+			
+			version(/+$DIDE_REGION Local variable declarations+/all)
+			{
+				/+flags.wordWrap = false; +/
+				margin.left = margin.right = 2; 
+			}
+			
+			version(/+$DIDE_REGION Load all properties+/all)
+			{ mixin(SCR.ProcessProperties); }
+			
+			version(/+$DIDE_REGION Do custom behavior+/all)
+			{
+				if(imEnabled && hit.clicked) { state.toggle; }//update checkbox state
+				
+				RGB hoverColor(RGB baseColor, RGB bkColor)
+				{
+					return !imEnabled ? clWinBtnDisabledText
+						: mix(baseColor, bkColor, hit.captured ? 0.5f : hit.hover_smooth*0.3f); 
+				} 
+				
+				const markColor = hoverColor(state ? clAccent : style.fontColor, style.bkColor); 
+				const textColor = hoverColor(style.fontColor, style.bkColor); 
+				
+				const bullet = ((chkBoxStyle=="radio") ?(symbolStr(`RadioBtn`~(state?"On":"Off"))) :(symbolStr(`Checkbox`~(state?"CompositeReversed":"")))); 
+				
+				style.fg = markColor; 
+				Text(bullet, ` `); 
+				style.fg = textColor; 
+			}
+			
+			version(/+$DIDE_REGION Handle the recursive composition+/all)
+			{ mixin(SCR.ProcessComposition); }
+			
+			version(/+$DIDE_REGION Return custom results+/all)
+			{ return hit; }
+		} 
+		
+		
 		bool IncBtn(string _M_=__MODULE__, size_t _L_=__LINE__, Value, Args...)
 			(ref Value value, in Args args)
 		{ setIncomingId!(_M_, _L_)(); return _IncBtn!(+1)(value, args, ((+1).名!q{id})); } 
@@ -9463,10 +9494,7 @@ struct im
 			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
 			{
 				mixin ContainerScript_Init!
-				(
-					.Row, q{hit focus hint range}, (表([[],])),
-					(表([[q{isT!KeyCombo || isG!"key"},q{handleKey(KeyCombo(cast()a)); }],]))
-				); 
+				(.Row, q{hit hint focus range}, (表([[],])), (表([[],]))); 
 				mixin(SCR.Create); 
 			}
 			
@@ -9504,9 +9532,6 @@ struct im
 				} 
 				
 				if(hit.repeated) increment; 
-				
-				void handleKey(KeyCombo key)
-				{ if(canProcessUserInput && key.typed) increment; } 
 				
 				mixin(SCR.ProcessComposition); 
 			}
@@ -9663,8 +9688,6 @@ struct im
 			string _M_=__MODULE__, size_t _L_=__LINE__, A...
 		)(R r, ref I idx, A args)
 		{
-			mixin(prepareId); 
-			
 			bool includeAll = false; 
 			static foreach(a; args)
 			{
@@ -9685,82 +9708,161 @@ struct im
 			TabsPage!(_M_, _L_)
 			(
 				{
-					if(idx>=0 && idx<len)
-					{
+					if(mixin(界1(q{0},q{idx},q{len})))	{
 						auto r2 = r.drop(idx); 
-						if(!r2.empty)
-						r2.front.unaryFun!mapUI(); 
-					}else
-					{
+						if(!r2.empty) r2.front.unaryFun!mapUI(); 
+					}
+					else	{
 						if(includeAll && idx==len)
-						foreach(a; r)
-						a.unaryFun!mapUI; 
+						foreach(a; r) a.unaryFun!mapUI; 
 					}
 				}
 			); 
 		} 
+		
+		
+		
+		auto Slider(string _M_=__MODULE__, size_t _L_=__LINE__, Value, Args...)
+			(ref Value value, in Args args)
+			if(isFloatingPoint!Value || isIntegral!Value)
+		{ setIncomingId!(_M_, _L_)(); return _Slider(value, args); } 
+		
+		private auto _Slider(Value, Args...)(ref Value value, in Args args)
+		{
+			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
+			{
+				mixin ContainerScript_Init!
+				(
+					.Slider, q{hit focus range hint}, 
+					(表([
+						[q{isT!SliderOrientation},q{slider.orientation = a; }],
+						[q{isT!SliderType},q{slider.type = a; }],
+						[q{isG!"normThumbSize"},q{slider.normThumbSize = a; }],
+					])), (表([[],]))
+				); 
+				mixin(SCR.Create); 
+				focusRMB = true; //Todo: mosude wheel support
+			}
+			
+			version(/+$DIDE_REGION Local variable declarations+/all)
+			{
+				auto slider = (cast(.Slider)(_container)); 
+				
+				//set some defaults
+				slider.orientation 	= SliderOrientation.auto_,
+				slider.type 	= SliderType.slider; 
+			}
+			
+			version(/+$DIDE_REGION Load all properties+/all)
+			{ mixin(SCR.ProcessProperties); }
+			
+			version(/+$DIDE_REGION Do custom behavior+/all)
+			{
+				slider.hitBounds = hit.hitBounds; 
+				slider.setupAppearance(
+					imEnabled, focused, hit.hover_smooth, hit.captured_smooth, 
+					fh*(((theme.isTool)?(1):(1.4f))*0.8f)
+				); 
+				
+				//flipped range interval. Needed for vertical scrollbar
+				const flipped = !range.isOrdered; 
+				if(flipped) swap(range.min, range.max); 
+				
+				slider.nPos = range.normalize(flipped ? range.max-value : value); //FLIP
+				
+				int wrapCnt; 
+				if(range.isEndless)
+				{
+					wrapCnt = slider.nPos.floor.iround;  /+Todo: refactor endless wrapCnt stuff+/
+					slider.nPos = slider.nPos - slider.nPos.floor; 
+				}
+				
+				if(slider.type==SliderType.scrollBar) padding.set(2); 
+				
+				bool userModified; 
+				if(focused && im.canProcessUserInput)
+				{
+					if(im.sliderState.handleKeyboard(slider.nPos, range, 8))
+					userModified = true; 
+					if(
+						im.sliderState.handleMouse(
+							slider.id, hit, slider.nPos, 
+							targetView.mousePos.vec2, range, wrapCnt
+						)
+					)
+					userModified = true; 
+				}
+				
+				if(userModified)
+				{
+					if(range.isEndless) slider.nPos += wrapCnt - slider.wrapCnt; 
+					
+					float f = range.denormalize(slider.nPos); 
+					static if(isIntegral!Value) f = round(f); 
+					value = f.to!Value; 
+					if(flipped) value = (range.max - value).to!Value; //UNFLIP
+				}
+			}
+			
+			version(/+$DIDE_REGION Handle the recursive composition+/all)
+			{ mixin(SCR.ProcessComposition); }
+			
+			version(/+$DIDE_REGION Return custom results+/all)
+			{ return userModified; }
+		} 
+		
+		auto HRuler(string _M_=__MODULE__, size_t _L_=__LINE__, T : DateTime, Args...)
+			(
+			in 	T tMin	, in 	T tMax, 
+			ref 	T t0	, ref 	T t1, 
+			ref 	T t0_smooth 	, ref 	T t1_smooth, in Args args
+		)
+		{ setIncomingId!(_M_, _L_)(); return _HRuler(__traits(parameters)); } 
+		
+		auto _HRuler(T : DateTime, Args...)(
+			in 	T tMin	, in 	T tMax, 
+			ref 	T t0	, ref 	T t1, 
+			ref 	T t0_smooth 	, ref 	T t1_smooth, in Args args
+		)
+		{
+			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
+			{
+				mixin ContainerScript_Init!
+				(.DateTimeRuler, q{hit focus hint}, (表([[],])), (表([[],]))); 
+				mixin(SCR.Create); 
+				focusRMB = focusMMB, focusMW = true; 
+			}
+			
+			version(/+$DIDE_REGION Local variable declarations+/all)
+			{ auto ruler = (cast(.DateTimeRuler)(_container)); }
+			
+			version(/+$DIDE_REGION Load all properties+/all)
+			{ mixin(SCR.ProcessProperties); }
+			
+			version(/+$DIDE_REGION Do custom behavior+/all)
+			{
+				bool userModified; 
+				ref rangeFollower = ImStorage!(RangeFollower!DateTime).access(_id); 
+				rangeFollower.beforeUpdate(false, t0, t1, tMin, tMax); 
+				
+				ruler.setup(tMin, tMax, t0, t1, targetView.mousePos.vec2, hit); 
+				ruler.perform(focused, textStyle, targetView.mousePos.vec2, hit, userModified, t0, t1); 
+				
+				rangeFollower.afterUpdate(userModified, t0, t1, calcAnimationT(deltaTime, .7)); 
+				ruler.t0_draw = t0_smooth = rangeFollower.smooth[0],
+				ruler.t1_draw = t1_smooth = rangeFollower.smooth[1]; 
+			}
+			
+			version(/+$DIDE_REGION Handle the recursive composition+/all)
+			{ mixin(SCR.ProcessComposition); }
+			
+			version(/+$DIDE_REGION Return custom results+/all)
+			{ return userModified; }
+		} 
+		
+		
 	}
 	version(/+$DIDE_REGION+/all) {
-		auto Link(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(T0 text, T args)
-			if(isSomeString!T0 || __traits(compiles, text()) )
-		{
-			mixin(prepareId); 
-			
-			HitInfo hit; 
-			
-			Row(
-				{
-					actContainer.id = id_; 
-					hit = hitTest(imEnabled); 
-					
-					mixin(hintHandler); 
-					
-					bool focused = focusUpdate	(
-						actContainer, id_, imEnabled, 
-						hit.pressed, inputs.Esc.pressed
-					); 
-					
-					//handle the space key when focused
-					if(focused)
-					{
-						with(inputs.Space)
-						{
-							if(down)
-							hit.captured	= true; 
-							if(pressed)
-							hit.clicked	= true; 
-						}
-					}
-					
-					applyLinkStyle(imEnabled, focused, hit.captured, hit.hover_smooth); 
-					
-					static if(isSomeString!T0)
-					Text(text); 
-					else text(); 
-					 //delegate
-					
-					static foreach(a; args)
-					static if(__traits(compiles, a()))
-					a(); 
-				}
-			); 
-			
-			//KeyCombo in click mode.
-			static foreach(a; args)
-			static if(is(typeof(a) == KeyCombo))
-			if(canProcessUserInput && a.pressed)
-			hit.clicked = true; 
-			
-			return hit; 
-		} 
-		
-		auto ToolBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(T0 text, T args)
-		{
-			 //shorthand for tool theme
-			auto old = theme; theme = "tool"; scope(exit) theme = old; 
-			return Btn!(_M_, _L_)(text, args); 
-		} 
-		
 		auto OldListItem(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(T0 text, T args)
 			if(isSomeString!T0 || __traits(compiles, text()) )
 		{
@@ -9809,70 +9911,6 @@ struct im
 			
 			return hit; 
 		} 
-		
-		
-		//ChkBox //////////////////////////////
-		auto ChkBox(string _M_=__MODULE__, size_t _L_=__LINE__, string chkBoxStyle="chk", C, T...)(ref bool state, C caption, T args)
-		{
-			mixin(prepareId); 
-			
-			HitInfo hit; 
-			Row(
-				{
-					flags.wordWrap = false; 
-					margin.left = margin.right = 2; 
-					
-					actContainer.id = id_; 
-					hit = hitTest(imEnabled); 
-					mixin(hintHandler); 
-					
-					//update checkbox state
-					if(imEnabled && hit.clicked)
-					state.toggle; 
-					
-					//mixin GetChkBoxColors;
-					RGB hoverColor(RGB baseColor, RGB bkColor)
-					{
-						return !imEnabled 	? clWinBtnDisabledText
-							: mix(baseColor, bkColor, hit.captured ? 0.5f : hit.hover_smooth*0.3f); 
-					} 
-					
-					auto markColor = hoverColor(state ? clAccent : style.fontColor, style.bkColor); 
-					auto textColor = hoverColor(style.fontColor, style.bkColor); 
-					
-					auto bullet = chkBoxStyle=="radio" 	? tag(`symbol RadioBtn`~(state?"On":"Off"))
-						: tag(`symbol Checkbox`~(state?"CompositeReversed":"")); 
-					
-					//Text(format(tag("style fontColor=\"%s\"")~bullet~" "~tag("style fontColor=\"%s\"")~caption, markColor, textColor));
-					
-					static if(__traits(compiles, caption==""))	const captionIsEmpty = caption==""; 
-					else	enum captionIsEmpty = false; 
-					
-					if(captionIsEmpty)	Text(markColor, bullet); 
-					else	Text(markColor, bullet, " ", textColor, caption); 
-					
-					static foreach(a; args) static if(__traits(compiles, a())) a(); 
-				}
-			); 
-			
-			return hit; 
-		} 
-		
-		auto ChkBox(string _M_=__MODULE__, size_t _L_=__LINE__, string chkBoxStyle="chk", T...)(Property prop, string caption, T args)
-		{
-			auto bp = cast(BoolProperty)prop; 
-			enforce(bp !is null); 
-			auto last = bp.act; 
-			auto res = ChkBox!(_M_, _L_)(bp.act, caption.empty ? prop.caption : caption, genericId(prop.name), hint(prop.hint), args); 
-			bp.uiChanged |= last != bp.act; 
-			return res; 
-		} 
-		
-		auto RadioBtn(string _M_=__MODULE__, size_t _L_=__LINE__, C, T...)(ref bool state, C caption, T args)
-		{ return ChkBox!(_M_, _L_, "radio")(state, caption, args); } 
-		
-		
-		
 		
 		auto ListBoxItem(string _M_=__MODULE__, size_t _L_=__LINE__, C, Args...)
 			(ref bool isSelected, C s, in Args args)
@@ -10255,73 +10293,6 @@ struct im
 		} 
 		version(/+$DIDE_REGION+/all)
 		{
-			auto Slider(string _M_=__MODULE__, size_t _L_=__LINE__, V, T...)(ref V value, T args)
-				if(isFloatingPoint!V || isIntegral!V)
-			{
-				mixin(prepareId, selected_M, range_M);  //Todo: selected???
-				
-				//flipped range interval. Needed for vertical scrollbar
-				const flipped = !_range.isOrdered; 
-				if(flipped)
-				swap(_range.min, _range.max); 
-				
-				//string props;
-				static foreach(a; args)
-				{
-					{
-						alias t = Unqual!(typeof(a)); 
-						static if(isSomeString!t)
-						{
-							//props = a; //todo: ennek is
-							static assert(0, "string parameter in Slider is deprecated. Use {} delegate instead!"); 
-						}
-					}
-				}
-				
-				float normValue = _range.normalize(flipped ? _range.max-value : value); //FLIP
-				
-				int wrapCnt; 
-				if(_range.isEndless)
-				{
-					wrapCnt = normValue.floor.iround;  //Todo: refactor endless wrapCnt stuff
-					normValue = normValue-normValue.floor; 
-				}
-				
-				bool userModified; 
-				HitInfo hit; 
-				auto sl = new .Slider(
-					id_, imEnabled, normValue, _range, userModified, targetView.mousePos.vec2, 
-					style, hit, getStaticParamDef(SliderOrientation.auto_, args), 
-					getStaticParamDef(SliderStyle.slider, args), theme.isTool ? 1 : 1.4f
-				); 
-				
-				append(sl); push(sl, id_); scope(exit) pop; 
-				
-				mixin(hintHandler); 
-				static foreach(a; args)
-				static if(__traits(compiles, a()))
-				a(); 
-				
-				//Todo: args hanfling is bad here! only handles delegates. Ignored named parameters!
-				
-				if(userModified && imEnabled)
-				{
-					
-					if(_range.isEndless)
-					normValue += wrapCnt-sl.wrapCnt; 
-					
-					float f = _range.denormalize(normValue); 
-					static if(isIntegral!V)
-					f = round(f); 
-					value = f.to!V; 
-					if(flipped)
-					value = (_range.max-value).to!V; //UNFLIP
-				}
-				
-				//Todo: what to return on from slider
-				return userModified; 
-			} 
-			
 			//AdvancedSlider //////////////////////////////
 			void AdvancedSlider_impl(T)(T prop, void delegate() fun=null) if(is(T==FloatProperty) || is(T==IntProperty))
 			{
@@ -10404,123 +10375,6 @@ struct im
 			
 			void AdvancedSliderChkBox(Property p, Property pBool, string capt="")
 			{ AdvancedSlider(p, { ChkBox(pBool, capt); }); } 
-			version(/+$DIDE_REGION+/all) {
-				struct DateTimeRulerScrollState
-				{
-					bool scrolling; 
-					vec2 startMousePos; 
-					DateTime startT0, startT1; 
-					
-					Time pixelDuration /+Must update this regularly+/; 
-					
-					
-					void startScroll(vec2 mousePos, DateTime t0, DateTime t1)
-					{
-						scrolling = true; startMousePos = mousePos; 
-						startT0 = t0; startT1 = t1; 
-					} 
-					
-					void updateScroll(Time pixelDuration)
-					{ this.pixelDuration = pixelDuration; } 
-					
-					@property currentDelta(in vec2 mousePos)
-					=> pixelDuration * (startMousePos.x - mousePos.x); 
-				} 
-				DateTimeRulerScrollState dateTimeRulerScrollState; 
-				
-				struct RangeFollower(T)
-				{
-					T[2] act, last, smooth, target, bounds; 
-					bool started, chg_app, chg_user; 
-					
-					void follow(float rate)
-					{
-						void clamp(ref T t) { t = t.clamp(bounds[0], bounds[1]); } 
-						clamp(target[0]); clamp(target[1]); 
-						clamp(smooth[0]); clamp(smooth[1]); 
-						
-						smooth[0].follow(target[0], rate); 
-						smooth[1].follow(target[1], rate); 
-					} 
-					
-					void beforeUpdate(bool appChanged, T t0, T t1, T tMin, T tMax)
-					{
-						act 	= [t0, t1], 
-						bounds 	= [tMin, tMax]; 
-						
-						chg_app = appChanged || last!=act || !started; 
-						
-						if(chg_app) target = smooth = act; 
-						
-						last = act; started = true; 
-					} 
-					
-					void afterUpdate(bool userChanged, T t0, T t1, float rate)
-					{
-						act = [t0, t1]; 
-						
-						chg_user = userChanged || act!=last; 
-						
-						if(chg_user) target = act; 
-						
-						follow(rate); 
-						
-						last = act; 
-					} 
-				} 
-				
-				auto HRuler_smooth(string _M_=__MODULE__, size_t _L_=__LINE__, T, Args...)
-					(
-					const T tMin, const T tMax, ref T t0, ref T t1,
-					Args args /+optional: /+Structured: &t0_smooth, &t1_smooth+/+/
-				)
-				{
-					mixin(prepareId, enable.M); bool userModified; 
-					
-					static if(is(T==DateTime))
-					{
-						{
-							HitInfo hit; 
-							
-							enum isSmooth = Args.length>=2 	&& is(Args[0]==DateTime*) 
-								&& is(Args[1]==DateTime*); 
-							
-							static if(isSmooth)
-							{
-								ref rangeFollower = ImStorage!(RangeFollower!DateTime).access(id_); 
-								rangeFollower.beforeUpdate(false, t0, t1, tMin, tMax); 
-							}
-							
-							auto ruler = new DateTimeRuler(
-								id_, enabled, tMin, tMax, t0, t1,
-								style, targetView.mousePos.vec2, userModified, hit
-							); 
-							
-							static if(isSmooth)
-							{
-								rangeFollower.afterUpdate(userModified, t0, t1, calcAnimationT(deltaTime, .7)); 
-								ruler.t0_draw = *(args[0]) = rangeFollower.smooth[0],
-								ruler.t1_draw = *(args[1]) = rangeFollower.smooth[1]; 
-							}
-							else
-							{
-								ruler.t0_draw = t0,
-								ruler.t1_draw = t1; 
-							}
-							
-							append(ruler); push(ruler, id_); scope(exit) pop; 
-							
-							static foreach(a; args) static if(__traits(compiles, a())) a(); 
-						}
-					}
-					else static assert(0, "Unsupported type: "~T.stringof); 
-					
-					return userModified; 
-				} 
-			}
-			
-			
-			
 			auto Node(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(ref bool state, void delegate() title, void delegate() contents, Args args)
 			{
 				 //Node ////////////////////////////
@@ -11775,10 +11629,10 @@ version(/+$DIDE_REGION Dead code 260813+/all)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x51685EB16D5C4).檢(hit.toJson)); 
+					((0x5102BEB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x516BFEB16D5C4).檢(localMouse)); 
+					((0x51065EB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
@@ -11875,5 +11729,464 @@ version(/+$DIDE_REGION Dead code 260813+/all)
 		); 
 	} 
 	
+	auto Link(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(T0 text, T args)
+		if(isSomeString!T0 || __traits(compiles, text()) )
+	{
+		mixin(prepareId); 
+		
+		HitInfo hit; 
+		
+		Row(
+			{
+				actContainer.id = id_; 
+				hit = hitTest(imEnabled); 
+				
+				mixin(hintHandler); 
+				
+				bool focused = focusUpdate	(
+					actContainer, id_, imEnabled, 
+					hit.pressed, inputs.Esc.pressed
+				); 
+				
+				//handle the space key when focused
+				if(focused)
+				{
+					with(inputs.Space)
+					{
+						if(down)
+						hit.captured	= true; 
+						if(pressed)
+						hit.clicked	= true; 
+					}
+				}
+				
+				applyLinkStyle(imEnabled, focused, hit.captured, hit.hover_smooth); 
+				
+				static if(isSomeString!T0)
+				Text(text); 
+				else text(); 
+				 //delegate
+				
+				static foreach(a; args)
+				static if(__traits(compiles, a()))
+				a(); 
+			}
+		); 
+		
+		//KeyCombo in click mode.
+		static foreach(a; args)
+		static if(is(typeof(a) == KeyCombo))
+		if(canProcessUserInput && a.pressed)
+		hit.clicked = true; 
+		
+		return hit; 
+	} 
+	
+	auto ChkBox(string _M_=__MODULE__, size_t _L_=__LINE__, string chkBoxStyle="chk", C, T...)(ref bool state, C caption, T args)
+	{
+		mixin(prepareId); 
+		
+		HitInfo hit; 
+		Row(
+			{
+				flags.wordWrap = false; 
+				margin.left = margin.right = 2; 
+				
+				actContainer.id = id_; 
+				hit = hitTest(imEnabled); 
+				mixin(hintHandler); 
+				
+				//update checkbox state
+				if(imEnabled && hit.clicked)
+				state.toggle; 
+				
+				//mixin GetChkBoxColors;
+				RGB hoverColor(RGB baseColor, RGB bkColor)
+				{
+					return !imEnabled 	? clWinBtnDisabledText
+						: mix(baseColor, bkColor, hit.captured ? 0.5f : hit.hover_smooth*0.3f); 
+				} 
+				
+				auto markColor = hoverColor(state ? clAccent : style.fontColor, style.bkColor); 
+				auto textColor = hoverColor(style.fontColor, style.bkColor); 
+				
+				auto bullet = chkBoxStyle=="radio" 	? tag(`symbol RadioBtn`~(state?"On":"Off"))
+					: tag(`symbol Checkbox`~(state?"CompositeReversed":"")); 
+				
+				//Text(format(tag("style fontColor=\"%s\"")~bullet~" "~tag("style fontColor=\"%s\"")~caption, markColor, textColor));
+				
+				static if(__traits(compiles, caption==""))	const captionIsEmpty = caption==""; 
+				else	enum captionIsEmpty = false; 
+				
+				if(captionIsEmpty)	Text(markColor, bullet); 
+				else	Text(markColor, bullet, " ", textColor, caption); 
+				
+				static foreach(a; args) static if(__traits(compiles, a())) a(); 
+			}
+		); 
+		
+		return hit; 
+	} 
 	
+	auto ChkBox(string _M_=__MODULE__, size_t _L_=__LINE__, string chkBoxStyle="chk", T...)(Property prop, string caption, T args)
+	{
+		auto bp = cast(BoolProperty)prop; 
+		enforce(bp !is null); 
+		auto last = bp.act; 
+		auto res = ChkBox!(_M_, _L_)(bp.act, caption.empty ? prop.caption : caption, genericId(prop.name), hint(prop.hint), args); 
+		bp.uiChanged |= last != bp.act; 
+		return res; 
+	} 
+	
+	auto RadioBtn(string _M_=__MODULE__, size_t _L_=__LINE__, C, T...)(ref bool state, C caption, T args)
+	{ return ChkBox!(_M_, _L_, "radio")(state, caption, args); } 
+	
+	version(/+$DIDE_REGION+/none) {
+		auto Slider_old(string _M_=__MODULE__, size_t _L_=__LINE__, V, T...)(ref V value, T args)
+			if(isFloatingPoint!V || isIntegral!V)
+		{
+			mixin(prepareId, selected_M, range_M);  //Todo: selected???
+			
+			//flipped range interval. Needed for vertical scrollbar
+			const flipped = !_range.isOrdered; 
+			if(flipped)
+			swap(_range.min, _range.max); 
+			
+			//string props;
+			static foreach(a; args)
+			{
+				{
+					alias t = Unqual!(typeof(a)); 
+					static if(isSomeString!t)
+					{
+						//props = a; //todo: ennek is
+						static assert(0, "string parameter in Slider is deprecated. Use {} delegate instead!"); 
+					}
+				}
+			}
+			
+			float normValue = _range.normalize(flipped ? _range.max-value : value); 
+			
+			int wrapCnt; 
+			if(_range.isEndless)
+			{
+				wrapCnt = normValue.floor.iround;  //Todo: refactor endless wrapCnt stuff
+				normValue = normValue-normValue.floor; 
+			}
+			
+			bool userModified; 
+			HitInfo hit; 
+			auto sl = new .Slider(
+				id_, imEnabled, normValue, _range, userModified, targetView.mousePos.vec2, 
+				style, hit, getStaticParamDef(SliderOrientation.auto_, args), 
+				getStaticParamDef(SliderType.slider, args), theme.isTool ? 1 : 1.4f
+			); 
+			
+			append(sl); push(sl, id_); scope(exit) pop; 
+			
+			mixin(hintHandler); 
+			static foreach(a; args)
+			static if(__traits(compiles, a()))
+			a(); 
+			
+			//Todo: args hanfling is bad here! only handles delegates. Ignored named parameters!
+			
+			if(userModified && imEnabled)
+			{
+				
+				if(_range.isEndless)
+				normValue += wrapCnt-sl.wrapCnt; 
+				
+				float f = _range.denormalize(normValue); 
+				static if(isIntegral!V)
+				f = round(f); 
+				value = f.to!V; 
+				if(flipped)
+				value = (_range.max-value).to!V; //UNFLIP
+			}
+			
+			return userModified; 
+		} 
+	}
+	
+	version(/+$DIDE_REGION+/none) {
+		this(
+			in im.Id id, bool enabled, ref float nPos_, in ValueRange range_, ref bool userModified, vec2 mousePos, 
+			TextStyle ts, out im.HitInfo hit, Orientation orientation, Type type, float fhScale, float normThumbSize=float.init
+		)
+		{
+			this.id = id; 
+			this.orientation = orientation; 
+			this.type = type; 
+			this.nPos = enabled ? nPos_ : nPos_/+float.init+//+Todo: hideThumb option+/; 
+			this.normThumbSize = normThumbSize; 
+			
+			if(type==Type.scrollBar) padding = "2"; 
+			
+			hit = im.hitTest(this, enabled); 
+			hitBounds = hit.hitBounds; 
+			
+			if(1 || type==Type.slider)
+			focused = im.focusUpdate(
+				this, id, enabled,
+				hit.pressed || hit.hover && inputs.RMB.pressed, //when to enter
+				inputs.Esc.pressed,  //when to exit
+			); 
+			
+			//res.focused = focused;
+			
+			if(focused && im.canProcessUserInput)
+			userModified |= im.sliderState.handleKeyboard(nPos, range_, 8); 
+			
+			bkColor = ts.bkColor; 
+			const hoverOrFocus = enabled ? max(hit.hover_smooth*.5f, focused ? 1.0f : 0) : 0; 
+			
+			final switch(type)
+			{
+				case Type.slider: 
+					clThumb =	mix(mix(clSliderThumb, clSliderThumbHover, hoverOrFocus), clSliderThumbPressed, hit.captured_smooth); 
+					clLine =	mix(mix(clSliderLine , clSliderLineHover , hoverOrFocus), clSliderLinePressed , hit.captured_smooth); 
+					clRuler = clGray/+mix(bkColor, ts.fontColor, 0.5)+/; //disable ruler for now
+					
+					if(focused) { clThumb = clBlack; clLine = clBlack; }//Todo: lame logic
+					
+					rulerSides = 0; 
+				break; 
+				case Type.scrollBar: 
+					clThumb = mix(clScrollThumb, clScrollThumbPressed, hoverOrFocus); 
+					bkColor = mix(clScrollBk, clScrollThumb, min(hoverOrFocus, .5f)); 
+					
+					if(focused) { clThumb = clBlack; }//Todo: lame logic
+					
+					//clThumb = mix(clWinBtn, clWinBtnPressed, max(hit.hover_smooth*.5f, sliderState.pressed_id==id ? 1 : 0));
+					rulerSides = 0; 
+				break; 
+			}
+			
+			if(!enabled)
+			clLine = clThumb = clGray; //Todo: nem clGray ez, hanem clDisabledText vagy ilyesmi
+			
+			baseSize = ts.fontHeight*fhScale*0.8f; 
+			outerSize = vec2(baseSize*6, baseSize); //default size
+			
+			userModified |= im.sliderState.handleMouse(id, hit, nPos, mousePos, range_, wrapCnt); 
+			
+			if(userModified)
+			nPos_ = nPos; 
+		} 
+		
+		this(
+			in im.Id id, bool enabled, ref float nPos_, in ValueRange range_, ref bool userModified, vec2 mousePos, 
+			TextStyle ts, out im.HitInfo hit, Orientation orientation, Type type, float fhScale, float normThumbSize=float.init
+		)
+		{
+			this.id = id; 
+			this.orientation = orientation; 
+			this.type = type; 
+			this.nPos = enabled ? nPos_ : nPos_/+float.init+//+Todo: hideThumb option+/; 
+			this.normThumbSize = normThumbSize; 
+			
+			if(type==Type.scrollBar) padding = "2"; 
+			
+			hit = im.hitTest(this, enabled); 
+			hitBounds = hit.hitBounds; 
+			
+			bool focused; 
+			if(1 || type==Type.slider)
+			focused = im.focusUpdate(
+				this, id, enabled,
+				hit.pressed || hit.hover && inputs.RMB.pressed, //when to enter
+				inputs.Esc.pressed,  //when to exit
+			); 
+			
+			//res.focused = focused;
+			
+			if(focused && im.canProcessUserInput)
+			userModified |= im.sliderState.handleKeyboard(nPos, range_, 8); 
+			
+			bkColor = ts.bkColor; 
+			setupAppearance(enabled, focused, hit.hover_smooth, hit.captured_smooth, ts.fontHeight*fhScale*0.8f); 
+			
+			userModified |= im.sliderState.handleMouse(id, hit, nPos, mousePos, range_, wrapCnt); 
+			
+			if(userModified)
+			nPos_ = nPos; 
+		} 
+	}
+	version(/+$DIDE_REGION+/none) {
+		void createBars(bool doPurge)
+		{
+			assert(orientation.among('H', 'V')); 
+			
+			Id[] toRemove; 
+			foreach(id, ref info; infos)
+			{
+				if(info.lastAccess<application.tick)
+				{
+					if(doPurge) toRemove ~= id; 
+					continue; 
+				}
+				const exists 	= (orientation=='H' && info.container.flags.hasHScrollBar)
+					|| (orientation=='V' && info.container.flags.hasVScrollBar); 
+				if(!exists) continue; 
+				
+				bool enabled; 
+				float normValue; 
+				float normThumbSize; 
+				float activeRange = info.contentSize - info.pageSize; 
+				
+				const flip = orientation=='V'; 
+				void doFlip()
+				{ if(flip) normValue = 1-normValue; } 
+				
+				if(activeRange > 0.001f)
+				{
+					//restrict range
+					info.offset.minimize(activeRange); 
+					info.offset.maximize(0); 
+					
+					enabled = true; 
+					normValue = info.offset/activeRange; 
+					normThumbSize = info.pageSize/info.contentSize; 
+					
+					doFlip; 
+				}else
+				{
+					info.offset = 0; //no active range, so just reset it to 0
+				}
+				
+				bool userModified; 
+				HitInfo hit; 
+				/+
+					Todo: scrollbars only work on GUI surface. This flag shlould be inherited automatically, 
+							just like the upcoming enabled flag.
+				+/
+				auto sl = new .Slider
+					(
+					combine(info.container.id, orientation), enabled, normValue, 
+					linRange(0, 1), userModified, view_gui.mousePos.vec2, tsNormal, hit,
+					orientation=='H' ? SliderOrientation.horz : SliderOrientation.vert, 
+					SliderType.scrollBar, 1, normThumbSize
+				); 
+				/+
+					Code: this(
+						in im.Id id, bool enabled, ref float nPos_, in ValueRange range_, ref bool userModified, vec2 mousePos, 
+						TextStyle ts, out im.HitInfo hit, Orientation orientation, Type type, float fhScale, float normThumbSize=float.init
+					)
+					{
+						this.id = id; 
+						this.orientation = orientation; 
+						this.type = type; 
+						this.nPos = enabled ? nPos_ : nPos_/+float.init+//+Todo: hideThumb option+/; 
+						this.normThumbSize = normThumbSize; 
+						
+						if(type==Type.scrollBar) padding = "2"; 
+						
+						hit = im.hitTest(this, enabled); 
+						hitBounds = hit.hitBounds; 
+						
+						bool focused; 
+						if(1 || type==Type.slider)
+						focused = im.focusUpdate(
+							this, id, enabled,
+							hit.pressed || hit.hover && inputs.RMB.pressed, //when to enter
+							inputs.Esc.pressed,  //when to exit
+						); 
+						
+						//res.focused = focused;
+						
+						if(focused && im.canProcessUserInput)
+						userModified |= im.sliderState.handleKeyboard(nPos, range_, 8); 
+						
+						bkColor = ts.bkColor; 
+						setupAppearance(enabled, focused, hit.hover_smooth, hit.captured_smooth, ts.fontHeight*fhScale*0.8f); 
+						
+						userModified |= im.sliderState.handleMouse(id, hit, nPos, mousePos, range_, wrapCnt); 
+						
+						if(userModified)
+						nPos_ = nPos; 
+					} 
+				+/
+				
+				info.slider = sl; 
+				
+				//set the position of the slider.
+				//Todo: Because it's after hitTest, interaction will be delayed for 1 frame. But it should not.
+				const scrollThickness = DefaultScrollThickness; //Todo: this is duplicated!!!
+				with(info.container)
+				if(orientation=='H')
+				{
+					sl.outerPos = vec2(0, innerHeight-scrollThickness); 
+					sl.outerSize = vec2(innerWidth-((flags.hasVScrollBar) ?(scrollThickness):(0)), scrollThickness); 
+				}
+				else
+				{
+					sl.outerPos = vec2(innerWidth-scrollThickness, 0); 
+					sl.outerSize = vec2(scrollThickness, innerHeight-((flags.hasHScrollBar) ?(scrollThickness):(0))); 
+				}
+				
+				
+				
+				//Todo: the hitInfo is for the last frame. It should be processed a bit later
+				if(userModified && enabled)
+				{
+					doFlip; 
+					info.offset = normValue*activeRange; 
+				}
+			}
+			
+			//purge old ones
+			foreach(id; toRemove) infos.remove(id); 
+		} 
+		/+
+			Code: auto HRuler(string _M_=__MODULE__, size_t _L_=__LINE__, T, Args...)
+				(
+				const T tMin, const T tMax, ref T t0, ref T t1,
+				Args args /+optional: /+Structured: &t0_smooth, &t1_smooth+/+/
+			)
+			{
+				mixin(prepareId); bool userModified; 
+				
+				static if(is(T==DateTime))
+				{
+					{
+						HitInfo hit; 
+						
+						enum isSmooth = Args.length>=2 	&& is(Args[0]==DateTime*) 
+							&& is(Args[1]==DateTime*); 
+						
+						static if(isSmooth)
+						{
+							ref rangeFollower = ImStorage!(RangeFollower!DateTime).access(id_); 
+							rangeFollower.beforeUpdate(false, t0, t1, tMin, tMax); 
+						}
+						
+						auto ruler = new DateTimeRuler(
+							id_, imEnabled, tMin, tMax, t0, t1,
+							style, targetView.mousePos.vec2, userModified, hit
+						); 
+						
+						static if(isSmooth)
+						{
+							rangeFollower.afterUpdate(userModified, t0, t1, calcAnimationT(deltaTime, .7)); 
+							ruler.t0_draw = *(args[0]) = rangeFollower.smooth[0],
+							ruler.t1_draw = *(args[1]) = rangeFollower.smooth[1]; 
+						}
+						else
+						{
+							ruler.t0_draw = t0,
+							ruler.t1_draw = t1; 
+						}
+						
+						append(ruler); push(ruler, id_); scope(exit) pop; 
+						
+						static foreach(a; args) static if(__traits(compiles, a())) a(); 
+					}
+				}
+				else static assert(0, "Unsupported type: "~T.stringof); 
+				
+				return userModified; 
+			} 
+		+/
+	}
 }

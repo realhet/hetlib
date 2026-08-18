@@ -13351,7 +13351,54 @@ version(/+$DIDE_REGION Date Time handling+/all)
 				*/
 						
 			} 
-		} 
+		} 
+		
+		struct RangeFollower(T)
+		{
+			/+
+				This can be used for anything that can be called with `follow()`.
+				The `snapDist` parameter is optional.
+			+/
+			
+			T[2] act, last, smooth, target, bounds; 
+			bool started, chg_app, chg_user; 
+			
+			private void follow(Args...)(float rate, in Args args)
+			{
+				void clamp(ref T t) { t = t.clamp(bounds[0], bounds[1]); } 
+				clamp(target[0]); clamp(target[1]); 
+				clamp(smooth[0]); clamp(smooth[1]); 
+				
+				smooth[0].follow(target[0], rate, args); 
+				smooth[1].follow(target[1], rate, args); 
+			} 
+			
+			void beforeUpdate(bool appChanged, T t0, T t1, T tMin, T tMax)
+			{
+				act 	= [t0, t1], 
+				bounds 	= [tMin, tMax]; 
+				
+				chg_app = appChanged || last!=act || !started; 
+				
+				if(chg_app) target = smooth = act; 
+				
+				last = act; started = true; 
+			} 
+			
+			void afterUpdate(Args...)(bool userChanged, T t0, T t1, float rate, in Args args)
+			{
+				act = [t0, t1]; 
+				
+				chg_user = userChanged || act!=last; 
+				
+				if(chg_user) target = act; 
+				
+				follow(rate, args); 
+				
+				last = act; 
+			} 
+		} 
+		
 		
 		struct LocalDateTime
 		{
