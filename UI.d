@@ -1158,7 +1158,7 @@ version(/+$DIDE_REGION+/all)
 		)() inout
 		{
 			
-			struct ParentRange
+			static struct ParentRange
 			{
 				private Cell act; 
 				
@@ -1903,7 +1903,7 @@ version(/+$DIDE_REGION+/all)
 		*/
 		
 		/// TextPos marks a specific place inside a text.
-		struct TextPos
+		static struct TextPos
 		{
 			enum Type
 			{ none, idx, lc, xy} 
@@ -1966,10 +1966,10 @@ version(/+$DIDE_REGION+/all)
 		} 
 		
 		/// a linearly selected range of text.
-		struct TextRange
+		static struct TextRange
 		{ TextPos st, en; } 
 		
-		struct EditCmd
+		static struct EditCmd
 		{
 			private enum _intParamDefault 	= int.min+1,
 			_pointParamDefault 	= vec2(-1e30, -1e30); 
@@ -6967,6 +6967,8 @@ struct im
 				
 				selectTargetSurface(TargetSurface.gui); //GUI surface by default
 				
+				if(popupState.cell) append(popupState.cell); 
+				
 				auto rc = rootContainers(true); 
 				
 				//it's not sorted in DIDE... It's a problem...
@@ -7181,7 +7183,7 @@ struct im
 		{
 			HitTestManager hitTestManager; 
 			
-			struct HitInfo
+			static struct HitInfo
 			{
 				Id id; 
 				bool enabled; 
@@ -7222,10 +7224,10 @@ struct im
 				{ simulateKey(key.pressed, key.down, key.released); } 
 			} 
 			
-			struct HitTestManager
+			static struct HitTestManager
 			{
 				
-				struct HitTestRec
+				static struct HitTestRec
 				{
 					Id id; 	//in the	next frame this must be the isSame
 					bounds2 hitBounds; 	/+
@@ -7381,7 +7383,7 @@ struct im
 		}
 		version(/+$DIDE_REGION Focus+/all)
 		{
-			struct FocusedState
+			static struct FocusedState
 			{
 				Id id; 	//globally store the current hash
 				.Container container;  	//this is sent to the Selection/Draw routines. If it is null, then the focus is lost.
@@ -7404,7 +7406,7 @@ struct im
 			
 			/// internal use only
 			
-			struct FocusState
+			static struct FocusState
 			{
 				mixin((
 					(表([
@@ -7479,7 +7481,7 @@ struct im
 				HintDetails_sec	 = 2.5,
 				HintRelease_sec	 = 1; 
 			
-			struct HintRec
+			static struct HintRec
 			{
 				.Container owner; 
 				bounds2 bounds; 
@@ -7621,7 +7623,7 @@ struct im
 		}
 		
 		DateTimeRulerScrollState dateTimeRulerScrollState; 
-		private struct DateTimeRulerScrollState
+		private static struct DateTimeRulerScrollState
 		{
 			bool scrolling; 
 			vec2 startMousePos; 
@@ -7642,7 +7644,7 @@ struct im
 		} 
 		
 		SliderState sliderState; 
-		private struct SliderState
+		private static struct SliderState
 		{
 			//information about the current slider being modified
 			
@@ -7883,11 +7885,11 @@ struct im
 		
 		auto hScrollInfo = ScrollInfo('H'), vScrollInfo = ScrollInfo('V'); 
 		
-		struct ScrollInfo
+		static struct ScrollInfo
 		{
 			char orientation; 
 			
-			struct ScrollInfoRec
+			static struct ScrollInfoRec
 			{
 				Id id; 
 				.Container container; //contains id
@@ -8023,30 +8025,155 @@ struct im
 				foreach(id; toRemove) infos.remove(id); 
 			} 
 		} 
+		
+		version(/+$DIDE_REGION Flash meggages+/all)
+		{
+			///Brings up an error message on the center of the screen for a short duration
+			static struct FlashMessage
+			{
+				DateTime when; 
+				enum Type { info, warning, error, exception} 
+				Type type; 
+				string msg; 
+				int count=1; 
+				
+				RGB color() const
+				{
+					with(Type)
+					final switch(type)
+					{
+						case info: 	return clWhite; 
+						case warning: 	return clYellow; 
+						case error, exception: 	return clRed; 
+					}
+				} 
+				
+				RGB fontColor() const
+				{
+					if(type==Type.exception) return clYellow; 
+					return blackOrWhiteFor(color); 
+				} 
+			} 
+			
+			FlashMessage[] flashMessages; 
+			
+			protected void appendMessage(FlashMessage.Type type, string msg, int count)
+			{
+				enum maxLen = 10; 
+				if(flashMessages.length>maxLen)
+				flashMessages = flashMessages[$-maxLen..$]; 
+				flashMessages ~= FlashMessage(now, type, msg, count); 
+				
+				with(FlashMessage.Type)
+				final switch(type)
+				{
+					case error, exception: 	winSnd("Windows Critical Stop"); 	break; 
+					case warning: 	if(count==1) winSnd("Windows Default"); 	break; 
+					case info: 	if(count==1) winSnd("Windows Information Bar"); 	
+				}
+			} 
+			
+			void flashMessage(FlashMessage.Type type, string msg)
+			{
+				if(msg=="") return; 
+				
+				//duplicated item
+				auto count = 1; 
+				
+				const duplicatedIdx = flashMessages.countUntil!((m)=>(m.type==type && m.msg==msg)); 
+				if(duplicatedIdx>=0)
+				{
+					auto duplicatedItem = flashMessages[duplicatedIdx]; 
+					count = duplicatedItem.count+1; 
+					flashMessages = flashMessages.remove(duplicatedIdx); 
+				}
+				
+				appendMessage(type, msg, count); 
+			} 
+			
+			void flashMessage(FlashMessage.Type type, string prefix, string msg)
+			{
+				if(prefix=="") return; 
+				
+				const duplicatedIdx = flashMessages.countUntil!((m)=>(m.msg.startsWith(prefix))); 
+				DateTime when = now; 
+				if(duplicatedIdx>=0)
+				{
+					when = flashMessages[duplicatedIdx].when; 
+					flashMessages = flashMessages.remove(duplicatedIdx); 
+				}
+				
+				appendMessage(type, prefix~msg, 0/+clear counter, the status itself will be the signal.+/); 
+				
+				if(flashMessages.length) flashMessages.back.when = when; 
+			} 
+			
+			void flashInfo(string msg)
+			{ flashMessage(FlashMessage.Type.info, msg); } 	void flashInfo(string prefix, string msg)
+			{ flashMessage(FlashMessage.Type.info, prefix, msg); } 
+			void flashWarning(string msg)
+			{ flashMessage(FlashMessage.Type.warning, msg); } 	void flashWarning(string prefix, string msg)
+			{ flashMessage(FlashMessage.Type.warning, prefix, msg); } 
+			void flashError(string msg)
+			{ flashMessage(FlashMessage.Type.error, msg); } 	void flashError(string prefix, string msg)
+			{ flashMessage(FlashMessage.Type.error, prefix, msg); } 
+			
+			void flashException(string msg)
+			{ flashMessage(FlashMessage.Type.exception, msg); } 
+			
+			enum flashMessageDuration = 4*second; 
+			
+			private bool flashMessagesInvoked; 
+			
+			private void updateFlashMessages_internal_onEndFrame()
+			{
+				const t = now-flashMessageDuration; 
+				flashMessages = flashMessages.remove!(a => a.when<t); 
+				
+				if(!flashMessagesInvoked)
+				UI_FlashMessages; 
+				flashMessagesInvoked = false; 
+			} 
+			
+			void UI_FlashMessages()
+			{
+				flashMessagesInvoked = true; 
+				//Note: User can call it wherever, but if not, it will drawn automatically.
+				with(im) {
+					if(flashMessages.empty) return; 
+					Panel(
+						PanelPosition.bottomCenter, 
+						{
+							background = clWhite; 
+							style.bold = true; 
+							foreach(m; flashMessages)
+							Row(
+								{
+									style.bkColor = m.color; 
+									style.fontColor = m.fontColor; 
+									
+									if(m.type == FlashMessage.Type.error)
+									style.fontColor = mix(style.fontColor, style.bkColor, blink^^2); 
+									
+									padding = "4 24"; 
+									flags.hAlign = HAlign.center; 
+									const 	tIn = (now-m.when).value(.5f*second),
+										tOut = (m.when+flashMessageDuration-now).value(.25f*second); 
+									
+									fh = DefaultFontHeight*1.68f 	* (tIn<1 ? easeOutElastic(tIn.clamp(0, 1), 0, 1, 1) : 1)
+										* (tOut<1 ? easeOutQuad(tOut.clamp(0, 1), 0, 1, 1) : 1); 
+									
+									const s = m.msg ~ (m.count>1 ? m.count.format!" (x%d)" : ""); 
+									Text(s); 
+								}
+							); 
+						}
+					); 
+				}
+			} 
+		}
 	}
 	version(/+$DIDE_REGION+/all) {
-		//Parameter structs ///////////////////////////////////
-		//deprecated struct id      { uint val;  /*private*/ enum M = q{ auto id_ = file.xxh(line)^baseId;                          static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
-		deprecated immutable prepareId = q{auto id_ = combine(imId, srcId!(_M_, _L_)(args)); }; 
-		
-		/*
-			struct enable 
-				{ bool val; 	 enum M = q{auto oldEnabled = enabled; scope(exit) enabled = oldEnabled; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled = enabled && a.val; 	}; } 
-		*/
-		
-		deprecated immutable selected_M = q{static foreach(a; args) static if(isGenericArg!(typeof(cast()a), "selected")) imSelected	= a.val; 	}; 
-		
-		
-		/+private enum range_M = q{range _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == range)) _range = a; }; +/
-		deprecated private enum range_M = q{ValueRange _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == ValueRange)) _range = a; }; 
-		
-		
-		
-		
-		
-		
-		
-		
 		version(/+$DIDE_REGION internal state+/all)
 		{
 			Cell[] rootCells; //when containerStack is empty, this is the container
@@ -8073,7 +8200,7 @@ struct im
 				noWhite, 	white
 			} 
 			
-			struct ThemeState
+			static struct ThemeState
 			{
 				mixin((
 					(表([
@@ -8131,7 +8258,7 @@ struct im
 				return cast(T)cell; 
 			} 
 			
-			private struct StackEntry
+			private static struct StackEntry
 			{ .Container container; TextStyle textStyle; ThemeState theme; } 
 			private StackEntry[] stack; 
 			
@@ -8575,7 +8702,6 @@ struct im
 		
 		
 		
-		
 		private void _Container(CType_, Args...)(in Args args)
 		{
 			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
@@ -9860,192 +9986,110 @@ struct im
 			{ return userModified; }
 		} 
 		
+		bool ListBoxItem(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
+		{ setIncomingId!(_M_, _L_)(); return _ListBoxItem(args); } 
 		
-	}
-	version(/+$DIDE_REGION+/all) {
-		auto OldListItem(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(T0 text, T args)
-			if(isSomeString!T0 || __traits(compiles, text()) )
+		private auto _ListBoxItem(Args...)(in Args args)
 		{
-			mixin(prepareId, enable.M, selected_M); 
+			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
+			{
+				mixin ContainerScript_Init!(.Row, q{hit}, (表([[],])), (表([[],]))); 
+				mixin(SCR.Create); 
+			}
 			
-			//Todo: This is only the base of a listitem. Later it must communicate with a container
+			version(/+$DIDE_REGION Local variable declarations, initialize default properties+/all)
+			{ padding.set(2); }
 			
-			HitInfo hit; 
-			Row(
-				{
-					actContainer.id = id_; 
-					hit = hitTest(enabled); 
-					
-					style = tsNormal; //!!! na ez egy gridbol kell, hogy jojjon!
-					
-					margin = "0"; 
-					auto bcolor = mix(style.fontColor, style.bkColor, .5f); 
-					border	= Border(1, BorderStyle.normal, mix(bcolor, style.fontColor, hit.hover_smooth)); 
-					border.inset	= true; 
-					border.extendBottomRight = true; 
-					padding = Padding(0, 2, 0, 2); 
-					
-					style.bkColor = mix(style.bkColor, clGray, hit.hover_smooth*.16f); 
-					
-					if(!enabled)
-					{
-						style.fontColor = mix(style.fontColor, clGray, 0.5f); 
-						//Todo: rather use an 50% overlay for disabled?
-					}
-					
-					if(_selected)
-					{
-						style.bkColor	= mix(style.bkColor, clAccent, .5f); 
-						border.color	= mix(border.color , clAccent, .5f); 
-					}
-					
-					bkColor = style.bkColor; 
-					//Todo: update the backgroundColor of the container. Should be automatic, but how?...
-					
-					static if(isSomeString!T0)
-					Text(text); 
-					else text(); 
-					 //delegate
-				}
-			); 
+			version(/+$DIDE_REGION Load all properties+/all)
+			{ mixin(SCR.ProcessProperties); }
 			
-			return hit; 
-		} 
-		
-		auto ListBoxItem(string _M_=__MODULE__, size_t _L_=__LINE__, C, Args...)
-			(ref bool isSelected, C s, in Args args)
-		{
-			HitInfo hit; 
-			Row!(_M_, _L_)
-			(
-				{
-					hit = hitTest(imEnabled); 
-					
-					if(
-						!isSelected && hit.hover && (
-							inputs.LMB.down || inputs.RMB.down
-							/+mosue down left or right+/
-						)
-					)
-					isSelected = true; 
-					
-					padding = "2 2"; 
-					background = mix(background, clAccent, max(isSelected ? 0.66f:0, hit.hover_smooth*0.33f)); 
-					style.bkColor = background; 
-					
-					static if(__traits(compiles, s()))
-					s(); 
-					else Text(s.text); 
-				}, args
-			); 
+			version(/+$DIDE_REGION Do custom behavior+/all)
+			{
+				bool haveSelected; 
+				if(
+					canProcessUserInput && imEnabled && !imSelected 
+					&& hit.hover && (inputs.LMB.down || inputs.RMB.down)
+				)
+				{ imSelected = haveSelected = true; }
+				
+				background = mix(background, clAccent, max(imSelected ? 0.66f:0, hit.hover_smooth*0.33f)); 
+				style.bkColor = background; 
+			}
 			
-			return hit; 
+			version(/+$DIDE_REGION Handle the recursive composition+/all)
+			{ mixin(SCR.ProcessComposition); }
+			
+			version(/+$DIDE_REGION Return custom results+/all)
+			{ return haveSelected; }
 		} 
 		
 		
-		struct ListBoxResult
+		static struct ListBoxResult
+		{ HitInfo hit; bool changed; alias changed this; } 
+		
+		auto ListBox(
+			alias translator = "a.text", string _M_=__MODULE__, size_t _L_=__LINE__, 
+			Item, Args...
+		)
+			(ref int idx, in Item[] items, in Args args)
 		{
-			HitInfo hit; 
-			bool changed; 
-			alias changed this; 
+			setIncomingId!(_M_, _L_)(); 
+			return _ListBox!(translator, Item, Args)(idx, items, args); 
 		} 
 		
-		auto ListBox(string _M_=__MODULE__, size_t _L_=__LINE__, A, Args...)
-			(ref int idx, in A[] items, in Args args)
+		auto ListBox(
+			alias translator = "a.text", string _M_=__MODULE__, size_t _L_=__LINE__, 
+			Item, Args...
+		)
+			(ref Item value, in Item[] items, in Args args)
 		{
-			mixin(prepareId); //Todo: enabled, tool theme
-			
-			//find translator function . This translates data to gui.
-			enum isTranslator(T) = __traits(compiles, T.init(A.init)); 
-			//is(T==void delegate(in A)) || is(T==void delegate(A)) || is(T==void function(in A)) || is(T==void function(A));
-			
-			enum translated = anySatisfy!(isTranslator, Args); 
-			
-			HitInfo hit; 
-			bool changed; 
-			Column(
-				{
-					actContainer.id = id_; //Todo: lame way of passing that fucking genericId
-					hit = hitTest(imEnabled); 
-					border = "1 normal gray"; 
-					
-					foreach(i, s; items)
-					{
-						auto selected = idx==i, oldSelected = selected; 
-						
-						static if(translated)
-						{
-							static foreach(f; args)
-							static if(isTranslator!(typeof(f)))
-							auto hit = ListBoxItem(selected, { f(s); }, genericId(i)); 
-							
-						}else
-						{ auto hit = ListBoxItem(selected, s, genericId(i)); }
-						if(!oldSelected && selected)
-						{
-							idx = cast(int) i; 
-							changed = true; 
-						}
-					}
-					
-					static foreach(a; args)
-					static if(__traits(compiles, a()))
-					a(); 
-				}/*, args*/
-			); 
-			//Todo: passing that fucking genericId
-			
-			return ListBoxResult(hit, changed); 
-		} 
-		
-		auto ListBox(string _M_=__MODULE__, size_t _L_=__LINE__, A, Args...)
-			(ref A value, A[] items, Args args)
-		{
-			auto idx = cast(int) items.countUntil(value); 
-			//Opt: slow search. iterates items twice: 1. in this, 2. in the main ListBox funct
-			
-			auto res = ListBox!(_M_, _L_)(idx, items, args); 
-			if(res)
-			value = items[idx]; 
-			return res; 
+			auto idx = (cast(int)(items.countUntil(value))); 
+			auto res = ListBox!(translator, _M_, _L_)(idx, items, args); 
+			if(res) value = items[idx]; return res; 
 		} 
 		
 		auto ListBox(string _M_=__MODULE__, size_t _L_=__LINE__, E, Args...)
-			(ref E e, Args args)
+			(ref E e, in Args args)
 			if(is(E==enum))
 		{
 			auto s = e.text; 
-			auto res = ListBox!(_M_, _L_)(s, getEnumMembers!E, args); 
-			if(res)
-			ignoreExceptions({ e = s.to!E; }); 
-			return res; 
+			auto res = ListBox!(translator, _M_, _L_)(s, getEnumMembers!E, args); 
+			if(res) ignoreExceptions({ e = s.to!E; }); return res; 
 		} 
 		
-		/+
-			Todo: the parameters of all the ListBox-es, ComboBoxes must be refactored. 
-			It's a lot of copy paste and yet it's far from full accessible functionality.
-		+/
-		static void ScrollListBox(T, U, string _M_=__MODULE__ , size_t _L_=__LINE__)
-			(ref T focusedItem, U items, void delegate(in T) cellFun, int pageSize, ref int topIndex)
-			if(isInputRange!U && is(ElementType!U == T))
+		auto _ListBox(alias translator, Item, Args...)
+			(ref int idx, in Item[] items, in Args args)
 		{
-			auto scrollMax = max(0, items.walkLength.to!int-pageSize); 
-			topIndex = topIndex.clamp(0, scrollMax); 
-			auto view = items.drop(topIndex).take(pageSize).array; 
-			Row!(_M_, _L_)(
+			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
+			{
+				mixin ContainerScript_Init!(.Column, q{hit}, (表([[],])), (表([[],]))); 
+				mixin(SCR.Create); 
+			}
+			
+			version(/+$DIDE_REGION Local variable declarations, initialize default properties+/all)
+			{
+				bool changed; 
+				border = "1 normal gray"; 
+			}
+			
+			version(/+$DIDE_REGION Load all properties+/all)
+			{ mixin(SCR.ProcessProperties); }
+			
+			version(/+$DIDE_REGION Do custom behavior+/all)
+			{
+				foreach(i, item; items)
 				{
-					ListBox(focusedItem, view, cellFun); 
-					if(1 || scrollMax)
-					{
-						Spacer; 
-						Slider(topIndex, range(scrollMax, 0), { width = 1*fh; }); 
-						flags.yAlign = YAlign.stretch; 
-					}
+					if(ListBoxItem(((i).名!q{id}), ((i==idx).名!q{selected}), unaryFun!translator(item), args))
+					{ idx = (cast(int)(i)); changed = true; }
 				}
-			); 
-		} 
-		
-		struct PopupState
+			}
+			
+			version(/+$DIDE_REGION Handle the recursive composition+/all)
+			{ mixin(SCR.ProcessComposition); }
+			
+			return ListBoxResult(hit, changed); 
+		} 
+		static struct PopupState
 		{
 			Cell cell; //the popup itself
 			Cell parent; //the initiator of the popup
@@ -10108,7 +10152,7 @@ struct im
 			raise("Popup must contain only one Cell"); 
 			
 			auto popup = actContainer.removeLast; 
-			append(popup); 
+			//260819: Do the append in _endFrame. /+code:append(popup);+/ 
 			
 			popupState.cell = popup; 
 			popupState.parent = parent; 
@@ -10137,66 +10181,10 @@ struct im
 			//callee must handle the if and optionally set "comboState" to false
 			//Todo: what if callee don't handle it????
 		} 
-		
-		void ScrollBox()
-		{
-			NOTIMPL; 
-			version(/+$DIDE_REGION+/none) {
-				Panel(
-					PanelPosition.bottomClient,
-					{
-						margin = "0"; padding = "0"; //border = "1 normal gray";
-						outerHeight = 200; 
-						auto siz = innerSize; 
-						Container
-						(
-							{
-								outerSize = siz; 
-								with(flags) {
-									clipSubCells = true; 
-									vScrollState = ScrollState.auto_; 
-									hScrollState = ScrollState.auto_; 
-								}
-								
-								if(auto mod = errorModule)
-								{
-									if(auto col = mod.content)
-									{
-										//total size placeholder
-										Container({ outerPos = col.outerSize; outerSize = vec2(0); }); 
-										
-										flags.saveVisibleBounds = true; 
-										if(auto visibleBounds = imstVisibleBounds(actId))
-										{
-											CodeRow[] visibleRows = col.rows.filter!(
-												r => r.outerBounds.overlaps(visibleBounds)
-												&& r.subCells.length
-											).array; 
-											//Opt: binary search
-											
-											actContainer.append(cast(Cell[])visibleRows); 
-											//Note: append is important because it already has the spaceHolder Container.
-										}
-									}
-									else
-									WARN("Invalid errorList"); 
-								}
-							}
-						); 
-					}
-				); 
-			}
-		} 
 		
-		auto ComboBox_idx(string _M_=__MODULE__, size_t _L_=__LINE__, A, Args...)(ref int idx, in A[] items, Args args)
+		auto ComboBox_idx(alias translator = "a.text", string _M_=__MODULE__, size_t _L_=__LINE__, A, Args...)
+			(ref int idx, in A[] items, in Args args)
 		{
-			 //ComboBox ////////////////////////////////
-			//Todo: enabled
-			
-			//find translator function . This translates data to gui.
-			enum isTranslator(T) = __traits(compiles, T.init(A.init)); 
-			enum translated = anySatisfy!(isTranslator, Args); 
-			
 			Cell btn; 
 			auto hit = WhiteBtn!(_M_, _L_)
 				(
@@ -10204,25 +10192,18 @@ struct im
 					btn = actContainer; 
 					flags.hAlign = HAlign.left; 
 					
-					if(idx.inRange(items))
-					{
-						static if(translated)
-						{
-							static foreach(f; args)
-							static if(isTranslator!(typeof(f)))
-							f(items[idx]); 
-							
-						}else
-						{ Text(items[idx].text); }
-					}else
-					{
-						Text(clGray, "none"); 
-						//null value
-					}
+					if(idx.inRange(items))	{ Text(unaryFun!translator(items[idx])); }
+					else	{ Text(clGray, "none"); }
 					
 					Flex; 
-					Row({ flags.clickable = false; Text(" ", symbolStr("ChevronDown"), " "); }); 
-				}, args
+					Row(
+						{
+							flags.clickable = false; 
+							Text(" ", symbolStr("ChevronDown"), " "); 
+						}
+					); 
+				}
+				, args
 			); 
 			
 			if(isFocused(hit.id))
@@ -10241,25 +10222,18 @@ struct im
 			{
 				Popup(
 					btn, {
-						
 						void inheritComboWidth()
 						{
 							if(btn.innerWidth>0)
 							innerWidth = btn.innerWidth+6; //Todo: tool theme*/
 						} 
 						
-						static if(translated)
-						{
-							static foreach(f; args)
-							static if(isTranslator!(typeof(f)))
-							res = ListBox!(_M_, _L_)(idx, items, genericId(1), &inheritComboWidth, f); 
-							 //Todo: this translator appending is a big mess
-						}else
-						{ res = ListBox!(_M_, _L_)(idx, items, genericId(1), &inheritComboWidth); }
+						res = ListBox!(translator, _M_, _L_)(idx, items, ((1).名!q{id}), &inheritComboWidth); 
 						
-						if(res.hit.hover && inputs.LMB.released)
+						if(res && inputs.LMB.released)
 						{
 							comboState = false; //close the box
+							/+Todo: This logic is broken. 260819+/
 						}
 					}
 				); 
@@ -10268,29 +10242,32 @@ struct im
 			return res; 
 		} 
 		
-		auto ComboBox_ref(string _M_=__MODULE__, size_t _L_=__LINE__, A, Args...)(ref A value, in A[] items, Args args)
+		auto ComboBox_ref(alias translator = "a.text", string _M_=__MODULE__, size_t _L_=__LINE__, Item, Args...)
+			(ref Item item, in Item[] items, in Args args)
 		{
-			auto idx = cast(int) items.countUntil(value); 
-			auto res = ComboBox_idx!(_M_, _L_)(idx, items, args); 
-			if(res)
-			value = items[idx]; 
-			return res; 
+			auto idx = (cast(int)(items.countUntil(item))); 
+			auto res = ComboBox_idx!(translator, _M_, _L_)(idx, items, args); 
+			if(res) item = items[idx]; return res; 
 		} 
 		
-		auto ComboBox(string _M_=__MODULE__, size_t _L_=__LINE__, A, Args...)(ref int idx, in A[] items, Args args)
-		{ return ComboBox_idx!(_M_, _L_, A, Args)(idx, items, args); } 
+		auto ComboBox(alias translator = "a.text", string _M_=__MODULE__, size_t _L_=__LINE__, Item, Args...)
+			(ref int idx, in Item[] items, in Args args)
+		{ return ComboBox_idx!(translator, _M_, _L_, Item, Args)(idx, items, args); } 
 		
-		auto ComboBox(string _M_=__MODULE__, size_t _L_=__LINE__, A, Args...)(ref A value, in A[] items, Args args)
-		{ return ComboBox_ref!(_M_, _L_, A, Args)(value, items, args); } 
+		auto ComboBox(alias translator = "a.text", string _M_=__MODULE__, size_t _L_=__LINE__, Item, Args...)
+			(ref Item value, in Item[] items, in Args args)
+		{ return ComboBox_ref!(translator, _M_, _L_, Item, Args)(value, items, args); } 
 		
-		auto ComboBox(string _M_=__MODULE__, size_t _L_=__LINE__, E, T...)(ref E e, T args) if(is(E==enum))
+		auto ComboBox(alias translator = "a.text", string _M_=__MODULE__, size_t _L_=__LINE__, E, Args...)
+			(ref E e, in Args args)
+			if(is(E==enum))
 		{
 			auto s = e.text; 
-			auto res = ComboBox!(_M_, _L_)(s, EnumMemberNames!E, args); 
-			if(res)
-			ignoreExceptions({ e = s.to!E; }); 
+			auto res = ComboBox!(translator, _M_, _L_)(s, EnumMemberNames!E, args); 
+			if(res) ignoreExceptions({ e = s.to!E; }); 
 			return res; 
-		} 
+		} 
+		
 		version(/+$DIDE_REGION+/all)
 		{
 			//AdvancedSlider //////////////////////////////
@@ -10563,151 +10540,13 @@ struct im
 			} 
 			
 		}
-		version(/+$DIDE_REGION Flash meggages+/all)
-		{
-			///Brings up an error message on the center of the screen for a short duration
-			struct FlashMessage {
-				DateTime when; 
-				enum Type { info, warning, error, exception} 
-				Type type; 
-				string msg; 
-				int count=1; 
-				
-				RGB color() const
-				{
-					with(Type)
-					final switch(type)
-					{
-						case info: 	return clWhite; 
-						case warning: 	return clYellow; 
-						case error, exception: 	return clRed; 
-					}
-				} 
-				
-				RGB fontColor() const
-				{
-					if(type==Type.exception) return clYellow; 
-					return blackOrWhiteFor(color); 
-				} 
-			} 
-			
-			FlashMessage[] flashMessages; 
-			
-			protected void appendMessage(FlashMessage.Type type, string msg, int count)
-			{
-				enum maxLen = 10; 
-				if(flashMessages.length>maxLen)
-				flashMessages = flashMessages[$-maxLen..$]; 
-				flashMessages ~= FlashMessage(now, type, msg, count); 
-				
-				with(FlashMessage.Type)
-				final switch(type)
-				{
-					case error, exception: 	winSnd("Windows Critical Stop"); 	break; 
-					case warning: 	if(count==1) winSnd("Windows Default"); 	break; 
-					case info: 	if(count==1) winSnd("Windows Information Bar"); 	
-				}
-			} 
-			
-			void flashMessage(FlashMessage.Type type, string msg)
-			{
-				if(msg=="") return; 
-				
-				//duplicated item
-				auto count = 1; 
-				
-				const duplicatedIdx = flashMessages.countUntil!((m)=>(m.type==type && m.msg==msg)); 
-				if(duplicatedIdx>=0)
-				{
-					auto duplicatedItem = flashMessages[duplicatedIdx]; 
-					count = duplicatedItem.count+1; 
-					flashMessages = flashMessages.remove(duplicatedIdx); 
-				}
-				
-				appendMessage(type, msg, count); 
-			} 
-			
-			void flashMessage(FlashMessage.Type type, string prefix, string msg)
-			{
-				if(prefix=="") return; 
-				
-				const duplicatedIdx = flashMessages.countUntil!((m)=>(m.msg.startsWith(prefix))); 
-				DateTime when = now; 
-				if(duplicatedIdx>=0)
-				{
-					when = flashMessages[duplicatedIdx].when; 
-					flashMessages = flashMessages.remove(duplicatedIdx); 
-				}
-				
-				appendMessage(type, prefix~msg, 0/+clear counter, the status itself will be the signal.+/); 
-				
-				if(flashMessages.length) flashMessages.back.when = when; 
-			} 
-			
-			void flashInfo(string msg)
-			{ flashMessage(FlashMessage.Type.info, msg); } 	void flashInfo(string prefix, string msg)
-			{ flashMessage(FlashMessage.Type.info, prefix, msg); } 
-			void flashWarning(string msg)
-			{ flashMessage(FlashMessage.Type.warning, msg); } 	void flashWarning(string prefix, string msg)
-			{ flashMessage(FlashMessage.Type.warning, prefix, msg); } 
-			void flashError(string msg)
-			{ flashMessage(FlashMessage.Type.error, msg); } 	void flashError(string prefix, string msg)
-			{ flashMessage(FlashMessage.Type.error, prefix, msg); } 
-			
-			void flashException(string msg)
-			{ flashMessage(FlashMessage.Type.exception, msg); } 
-			
-			enum flashMessageDuration = 4*second; 
-			
-			private bool flashMessagesInvoked; 
-			
-			private void updateFlashMessages_internal_onEndFrame()
-			{
-				const t = now-flashMessageDuration; 
-				flashMessages = flashMessages.remove!(a => a.when<t); 
-				
-				if(!flashMessagesInvoked)
-				UI_FlashMessages; 
-				flashMessagesInvoked = false; 
-			} 
-			
-			void UI_FlashMessages()
-			{
-				flashMessagesInvoked = true; 
-				//Note: User can call it wherever, but if not, it will drawn automatically.
-				with(im) {
-					if(flashMessages.empty) return; 
-					Panel(
-						PanelPosition.bottomCenter, 
-						{
-							background = clWhite; 
-							style.bold = true; 
-							foreach(m; flashMessages)
-							Row(
-								{
-									style.bkColor = m.color; 
-									style.fontColor = m.fontColor; 
-									
-									if(m.type == FlashMessage.Type.error)
-									style.fontColor = mix(style.fontColor, style.bkColor, blink^^2); 
-									
-									padding = "4 24"; 
-									flags.hAlign = HAlign.center; 
-									const 	tIn = (now-m.when).value(.5f*second),
-										tOut = (m.when+flashMessageDuration-now).value(.25f*second); 
-									
-									fh = DefaultFontHeight*1.68f 	* (tIn<1 ? easeOutElastic(tIn.clamp(0, 1), 0, 1, 1) : 1)
-										* (tOut<1 ? easeOutQuad(tOut.clamp(0, 1), 0, 1, 1) : 1); 
-									
-									const s = m.msg ~ (m.count>1 ? m.count.format!" (x%d)" : ""); 
-									Text(s); 
-								}
-							); 
-						}
-					); 
-				}
-			} 
-		}
+	}
+	version(/+$DIDE_REGION+/all) {
+		
+		
+		
+		
+		
 		
 		
 	}
@@ -11349,7 +11188,7 @@ version(/+$DIDE_REGION Dead code+/none)
 		} 
 	}
 }
-version(/+$DIDE_REGION Dead code 260813+/all)
+version(/+$DIDE_REGION Dead code 260813+/none)
 {
 	auto Static_old(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(in T0 value, T args)
 	{
@@ -11629,10 +11468,10 @@ version(/+$DIDE_REGION Dead code 260813+/all)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x5102BEB16D5C4).檢(hit.toJson)); 
+					((0x4FEE0EB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x51065EB16D5C4).檢(localMouse)); 
+					((0x4FF1AEB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
@@ -12188,5 +12027,203 @@ version(/+$DIDE_REGION Dead code 260813+/all)
 				return userModified; 
 			} 
 		+/
+		
+		void ScrollBox()
+		{
+			NOTIMPL; 
+			version(/+$DIDE_REGION+/none) {
+				Panel(
+					PanelPosition.bottomClient,
+					{
+						margin = "0"; padding = "0"; //border = "1 normal gray";
+						outerHeight = 200; 
+						auto siz = innerSize; 
+						Container
+						(
+							{
+								outerSize = siz; 
+								with(flags) {
+									clipSubCells = true; 
+									vScrollState = ScrollState.auto_; 
+									hScrollState = ScrollState.auto_; 
+								}
+								
+								if(auto mod = errorModule)
+								{
+									if(auto col = mod.content)
+									{
+										//total size placeholder
+										Container({ outerPos = col.outerSize; outerSize = vec2(0); }); 
+										
+										flags.saveVisibleBounds = true; 
+										if(auto visibleBounds = imstVisibleBounds(actId))
+										{
+											CodeRow[] visibleRows = col.rows.filter!(
+												r => r.outerBounds.overlaps(visibleBounds)
+												&& r.subCells.length
+											).array; 
+											//Opt: binary search
+											
+											actContainer.append(cast(Cell[])visibleRows); 
+											//Note: append is important because it already has the spaceHolder Container.
+										}
+									}
+									else
+									WARN("Invalid errorList"); 
+								}
+							}
+						); 
+					}
+				); 
+			}
+		} 
+	}
+	version(/+$DIDE_REGION+/none) {
+		auto OldListItem(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(T0 text, T args)
+			if(isSomeString!T0 || __traits(compiles, text()) )
+		{
+			mixin(prepareId, enable.M, selected_M); 
+			
+			//Todo: This is only the base of a listitem. Later it must communicate with a container
+			
+			HitInfo hit; 
+			Row(
+				{
+					/+actContainer.id = id_; +/
+					hit = hitTest(enabled); 
+					
+					style = tsNormal; //!!! na ez egy gridbol kell, hogy jojjon!
+					
+					margin = "0"; 
+					auto bcolor = mix(style.fontColor, style.bkColor, .5f); 
+					border	= Border(1, BorderStyle.normal, mix(bcolor, style.fontColor, hit.hover_smooth)); 
+					border.inset	= true; 
+					border.extendBottomRight = true; 
+					padding = Padding(0, 2, 0, 2); 
+					
+					style.bkColor = mix(style.bkColor, clGray, hit.hover_smooth*.16f); 
+					
+					if(!enabled)
+					{
+						style.fontColor = mix(style.fontColor, clGray, 0.5f); 
+						//Todo: rather use an 50% overlay for disabled?
+					}
+					
+					if(_selected)
+					{
+						style.bkColor	= mix(style.bkColor, clAccent, .5f); 
+						border.color	= mix(border.color , clAccent, .5f); 
+					}
+					
+					bkColor = style.bkColor; 
+					//Todo: update the backgroundColor of the container. Should be automatic, but how?...
+					
+					static if(isSomeString!T0)
+					Text(text); 
+					else text(); 
+					 //delegate
+				}
+			); 
+			
+			return hit; 
+		} 
 	}
+	version(/+$DIDE_REGION+/none) {
+		auto ListBoxItem(string _M_=__MODULE__, size_t _L_=__LINE__, C, Args...)
+			(ref bool isSelected, C s, in Args args)
+		{
+			HitInfo hit; 
+			Row!(_M_, _L_)
+			(
+				{
+					hit = hitTest(imEnabled); 
+					
+					if(
+						!isSelected && hit.hover && (
+							inputs.LMB.down || inputs.RMB.down
+							/+mosue down left or right+/
+						)
+					)
+					isSelected = true; 
+					
+					padding = "2 2"; 
+					background = mix(background, clAccent, max(isSelected ? 0.66f:0, hit.hover_smooth*0.33f)); 
+					style.bkColor = background; 
+					
+					static if(__traits(compiles, s()))
+					s(); 
+					else Text(s.text); 
+				}, args
+			); 
+			
+			return hit; 
+		} 
+	}
+	
+	version(/+$DIDE_REGION+/none) {
+		auto ListBox(string _M_=__MODULE__, size_t _L_=__LINE__, A, Args...)
+			(ref A value, A[] items, Args args)
+		{
+			auto idx = cast(int) items.countUntil(value); 
+			//Opt: slow search. iterates items twice: 1. in this, 2. in the main ListBox funct
+			
+			auto res = ListBox!(_M_, _L_)(idx, items, args); 
+			if(res)
+			value = items[idx]; 
+			return res; 
+		} 
+		
+		auto ListBox(string _M_=__MODULE__, size_t _L_=__LINE__, E, Args...)
+			(ref E e, Args args)
+			if(is(E==enum))
+		{
+			auto s = e.text; 
+			auto res = ListBox!(_M_, _L_)(s, getEnumMembers!E, args); 
+			if(res)
+			ignoreExceptions({ e = s.to!E; }); 
+			return res; 
+		} 
+		
+		/+
+			Todo: the parameters of all the ListBox-es, ComboBoxes must be refactored. 
+			It's a lot of copy paste and yet it's far from full accessible functionality.
+		+/
+		static void ScrollListBox(T, U, string _M_=__MODULE__ , size_t _L_=__LINE__)
+			(ref T focusedItem, U items, void delegate(in T) cellFun, int pageSize, ref int topIndex)
+			if(isInputRange!U && is(ElementType!U == T))
+		{
+			auto scrollMax = max(0, items.walkLength.to!int-pageSize); 
+			topIndex = topIndex.clamp(0, scrollMax); 
+			auto view = items.drop(topIndex).take(pageSize).array; 
+			Row!(_M_, _L_)(
+				{
+					ListBox(focusedItem, view, cellFun); 
+					if(1 || scrollMax)
+					{
+						Spacer; 
+						Slider(topIndex, range(scrollMax, 0), { width = 1*fh; }); 
+						flags.yAlign = YAlign.stretch; 
+					}
+				}
+			); 
+		} 
+	}
+	version(/+$DIDE_REGION+/none) {
+		//Parameter structs ///////////////////////////////////
+		//deprecated struct id      { uint val;  /*private*/ enum M = q{ auto id_ = file.xxh(line)^baseId;                          static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
+		deprecated immutable prepareId = q{auto id_ = combine(imId, srcId!(_M_, _L_)(args)); }; 
+		
+		/*
+			struct enable 
+				{ bool val; 	 enum M = q{auto oldEnabled = enabled; scope(exit) enabled = oldEnabled; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled = enabled && a.val; 	}; } 
+		*/
+		
+		deprecated immutable selected_M = q{static foreach(a; args) static if(isGenericArg!(typeof(cast()a), "selected")) imSelected	= a.val; 	}; 
+		
+		
+		/+private enum range_M = q{range _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == range)) _range = a; }; +/
+		/+deprecated private enum range_M = q{ValueRange _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == ValueRange)) _range = a; }; +/
+	}
+	
+	
 }
