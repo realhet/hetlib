@@ -3279,7 +3279,7 @@ version(/+$DIDE_REGION+/all)
 				[q{bool},q{1},q{"focused"},q{},q{/+maintained by system, not by user+/}],
 				[q{bool},q{1},q{"hovered_deprecated"},q{},q{/+maintained by system, not by user+/}],
 				[q{bool},q{1},q{"clipSubCells"},q{},q{/++/}],
-				[q{bool},q{1},q{"_saveComboBounds"},q{},q{/+marks the container to save the absolute bounds to align the popup window to.+/}],
+				[q{bool},q{1},q{"_unused01_"},q{},q{/++/}],
 				[q{bool},q{1},q{"_unused00_"},q{},q{/++/}],
 				[q{bool},q{1},q{"columnElasticTabs"},q{1},q{/+Column will do ElasticTabs its own Rows.+/}],
 				[],
@@ -3946,25 +3946,13 @@ version(/+$DIDE_REGION+/all)
 				{ dr.fillRect(border.adjustBounds(borderBounds_inner)); }
 			}
 			
-			if(flags._saveComboBounds)
-			{
-				_savedComboBounds = dr.inputTransform(outerBounds); 
-				//Todo: Use saveContainerBounds for this as well!
-			}
-			
 			const 	scrollOffset = getScrollOffset,
 				hasScrollOffset = !isnull(scrollOffset); 
 			
 			if(flags.saveVisibleBounds)
-			{
-				flags.saveVisibleBounds = true; 
-				imstVisibleBounds(id) = bounds2(scrollOffset, scrollOffset+innerSize); 
-			}
+			{ imstVisibleBounds(id) = bounds2(scrollOffset, scrollOffset+innerSize); }
 			if(flags.saveOuterBounds)
-			{
-				flags.saveOuterBounds = true; 
-				imstOuterBounds(id) = dr.inputTransform(outerBounds); 
-			}
+			{ imstOuterBounds(id) = dr.inputTransform(outerBounds); }
 			
 			dr.translate(innerPos); 
 			const useClipBounds = flags.clipSubCells; 
@@ -6515,25 +6503,25 @@ version(/+$DIDE_REGION+/all)
 			{
 				
 				immutable
-					clTexturePool 	= RGB(255, 180, 40),
-					clTextureUsed 	= RGB(180, 255, 40),
+					clTexturePool 	= (RGB(255, 180, 40)),
+					clTextureUsed 	= (RGB(180, 255, 40)),
 						
 					clBitmap	= clAqua,
 					clHotBitmap	= mix(clGray, clBitmap, .5),
 					clResidentBitmap	= mix(clGray, clBitmap, .25),
 						
-					clVirtualFile	= RGB(100, 150, 255),
+					clVirtualFile	= (RGB(100, 150, 255)),
 					clResidentVirtualFile	= mix(clGray, clVirtualFile, .25),
 						
-					clUPS	= RGB(180, 40, 255),
-					clFPS	= RGB(255, 40, 180),
+					clUPS	= (RGB(180, 40, 255)),
+					clFPS	= (RGB(255, 40, 180)),
 						
-					clTPS	= RGB(40,  80, 255),
-					clVPS	= RGB(40, 255,  80),
+					clTPS	= (RGB(40,  80, 255)),
+					clVPS	= (RGB(40, 255,  80)),
 						
-					clGcUsed	= RGB(120, 180, 40),
-					clGcAll	= RGB(40, 220, 120),
-					clGcRate	= RGB(80, 160,  90); 
+					clGcUsed	= (RGB(120, 180, 40)),
+					clGcAll	= (RGB(40, 220, 120)),
+					clGcRate	= (RGB(80, 160,  90)); 
 				
 				static int timeIdx = 0; 
 				int gridXStepSize = Item.N/(timeIdx==2 ? 10 : 5); 
@@ -6555,11 +6543,11 @@ version(/+$DIDE_REGION+/all)
 				{
 					Btn(
 						{
-							background = RGB(40, 40, 40); 
+							background = (RGB(40, 40, 40)); 
 							padding = "3"; 
 							margin = "2 0"; 
 							innerWidth = graphWidth; 
-							innerHeight = fh*3.5; 
+							innerHeight = fh*3; 
 							
 							/*
 								auto hit = hitTest(actContainer, true);
@@ -6580,7 +6568,7 @@ version(/+$DIDE_REGION+/all)
 										sx	=  (w+1) / dataWidth,
 										sy	= -(h) / dataHeight; 
 									
-									dr.color = RGB(70, 70, 70); 
+									dr.color = (RGB(70, 70, 70)); 
 									dr.lineWidth = 1; 
 									if(gridXStepSize)
 									iota(0, dataWidth+1, gridXStepSize).each!(i => vLine(round(sx*i)-.5f, 0, h)); 
@@ -6598,6 +6586,8 @@ version(/+$DIDE_REGION+/all)
 					); 
 				} 
 				
+				void Spacer() { im.Spacer(2); } 
+				
 				void VirtualFileGraph()
 				{
 					Row(
@@ -6713,12 +6703,22 @@ version(/+$DIDE_REGION+/all)
 					Graph("GCRate", [Data(gcRate.history[timeIdx][], clGcRate)], gridXStepSize); 
 				} 
 				
-				void SelectTimeIdx(ref int t)
+				void SelectTimeIdx()
 				{
 					Row(
-						HAlign.right, {
-							Text("Time step"); 	ComboBox(timeIdx, Item.timeStepNames , { width = fh*4; }); 
-							Text("   Visible interval"); 	ComboBox(timeIdx, Item.timeRangeNames, { width = fh*4; }); 
+						{
+							Column(
+								{
+									Text("Time step"); 
+									ComboBox(timeIdx, Item.timeStepNames , { width = fh*4; }); 
+								}
+							); 
+							Column(
+								{
+									Text("Visible interval"); 
+									ComboBox(timeIdx, Item.timeRangeNames, { width = fh*4; }); 
+								}
+							); 
 						}
 					); 
 				} 
@@ -6728,7 +6728,13 @@ version(/+$DIDE_REGION+/all)
 						padding = "4"; 
 						border = "1 normal silver"; 
 						theme.tool; 
-						Text(boldStr("Resource Monitor")); 	Spacer; 
+						Row(
+							YAlign.top,
+							{
+								Text(boldStr("Resource Monitor")); 
+								Flex; SelectTimeIdx; 
+							}
+						); 	Spacer; 
 						VirtualFileGraph; 	Spacer; 
 						BitmapCacheGraph; 	Spacer; 
 						TextureCacheGraph; 	Spacer; 
@@ -6736,7 +6742,6 @@ version(/+$DIDE_REGION+/all)
 						FPSGraph; 	Spacer; 
 						GCGraph; 	Spacer; 
 						GCRateGraph; 	Spacer; 
-						SelectTimeIdx(timeIdx); 
 					}
 				); 
 				
@@ -6865,10 +6870,6 @@ struct im
 		}
 		float deltaTime=0; 
 		
-		bool comboState; //automatically cleared on focus.change
-		bool comboOpening; //popup cant disappear when clicking away and this is set true by the combo
-		Id comboId;    //when the focus of this is lost, comboState goes false
-		
 		//GUI area that tracks PanelPosition changes
 		bounds2 clientArea; 
 		
@@ -6928,8 +6929,7 @@ struct im
 				focusedState.container = null; 
 				textEditorState.beginFrame; 
 				
-				popupState.reset; 
-				comboOpening = false; 
+				dropdownState.beginFrame; 
 				
 				//this is needed for PanelPosition
 				clientArea = view_gui.screenBounds_anim.bounds2; 
@@ -6967,7 +6967,8 @@ struct im
 				
 				selectTargetSurface(TargetSurface.gui); //GUI surface by default
 				
-				if(popupState.cell) append(popupState.cell); 
+				if(dropdownState.dropdownContainer)
+				append(dropdownState.dropdownContainer); 
 				
 				auto rc = rootContainers(true); 
 				
@@ -6981,18 +6982,16 @@ struct im
 				if(!a.flags._measured)
 				a.measure; //some panels are already have been measured
 				
-				//Todo: remove this: applyScrollers(screenBounds);
+				dropdownState.doAlign; 
 				
 				hScrollInfo.createBars(true); 
 				vScrollInfo.createBars(true); 
-				
-				popupState.doAlign; 
 				
 				//from here, all positions are valid
 				
 				//hittest in zOrder (currently in reverse creation order)
 				bool[2] mouseOverUI; 
-				bool mouseOverPopup; 
+				bool mouseOverDropdownContainer; 
 				foreach_reverse(a; rc)
 				{
 					const surf = a.flags.targetSurface; //1: gui, 0:view
@@ -7002,8 +7001,8 @@ struct im
 					{
 						mouseOverUI[surf] = true; 
 						
-						if(popupState.cell==a)
-						mouseOverPopup = true; 
+						if(dropdownState.dropdownContainer==a)
+						mouseOverDropdownContainer = true; 
 						
 						break; //got a hit, so escape now
 					}
@@ -7021,8 +7020,11 @@ struct im
 				hitTestManager.nextFrame; 
 				
 				//clicking away from popup closes the popup
-				if(comboState && !comboOpening && !mouseOverPopup && (inputs.LMB.pressed || inputs.RMB.pressed))
-				comboState = false; 
+				if(
+					dropdownState.active && !dropdownState.opening && !mouseOverDropdownContainer 
+					&& (inputs.LMB.pressed || inputs.RMB.pressed)
+				)
+				dropdownState.active = false; 
 				
 				//the IM GUI wants to use the mouse for scrolling or clicking. Example: It tells the 'view' not to zoom.
 				wantMouse = mouseOverUI[1]; 
@@ -7397,11 +7399,9 @@ struct im
 			
 			void onFocusLost(in Id oldId)
 			{
-				if(comboId && oldId==comboId)
-				{
-					comboState = false; 
-					comboId = Id.init; 
-				}
+				if(!oldId) return; 
+				if(dropdownState.active && oldId==dropdownState.comboId)
+				{ dropdownState.close; }
 			} 
 			
 			/// internal use only
@@ -8333,8 +8333,9 @@ struct im
 			
 			private void append(T)(T c)
 			{
+				/+Only appends non-nulls.+/
 				if(actContainer !is null)	actContainer.append(c); 
-				else	rootCells ~= c; 
+				else	{ if(c) rootCells ~= c; }
 			} 
 			
 			public void imAppend(T)(T c)
@@ -9986,10 +9987,17 @@ struct im
 			{ return userModified; }
 		} 
 		
-		bool ListBoxItem(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
+		enum ListBoxItemEvent : ubyte
+		{
+			none, 
+			selected, /+user actively selected an unselected item by pressing the mouse+/
+			clickedOnSelected /+user released the mouse on the currently selected item+/
+		} 
+		
+		ListBoxItemEvent ListBoxItem(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
 		{ setIncomingId!(_M_, _L_)(); return _ListBoxItem(args); } 
 		
-		private auto _ListBoxItem(Args...)(in Args args)
+		private ListBoxItemEvent _ListBoxItem(Args...)(in Args args)
 		{
 			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
 			{
@@ -10005,12 +10013,20 @@ struct im
 			
 			version(/+$DIDE_REGION Do custom behavior+/all)
 			{
-				bool haveSelected; 
-				if(
-					canProcessUserInput && imEnabled && !imSelected 
-					&& hit.hover && (inputs.LMB.down || inputs.RMB.down)
-				)
-				{ imSelected = haveSelected = true; }
+				ListBoxItemEvent event; 
+				if(hit.hover && canProcessUserInput && imEnabled)
+				{
+					if(!imSelected)
+					{
+						if(inputs.LMB.pressed || inputs.RMB.pressed)
+						{ event = ListBoxItemEvent.selected; imSelected = true; }
+					}
+					else
+					{
+						if(inputs.LMB.released || inputs.RMB.released)
+						event = ListBoxItemEvent.clickedOnSelected; 
+					}
+				}
 				
 				background = mix(background, clAccent, max(imSelected ? 0.66f:0, hit.hover_smooth*0.33f)); 
 				style.bkColor = background; 
@@ -10020,12 +10036,12 @@ struct im
 			{ mixin(SCR.ProcessComposition); }
 			
 			version(/+$DIDE_REGION Return custom results+/all)
-			{ return haveSelected; }
+			{ return event; }
 		} 
 		
 		
 		static struct ListBoxResult
-		{ HitInfo hit; bool changed; alias changed this; } 
+		{ HitInfo hit; bool userSelected, userClickedOnSelected; alias this = userSelected; } 
 		
 		auto ListBox(
 			alias translator = "a.text", string _M_=__MODULE__, size_t _L_=__LINE__, 
@@ -10067,42 +10083,69 @@ struct im
 			}
 			
 			version(/+$DIDE_REGION Local variable declarations, initialize default properties+/all)
-			{
-				bool changed; 
-				border = "1 normal gray"; 
-			}
+			{ border = "1 normal gray"; }
 			
 			version(/+$DIDE_REGION Load all properties+/all)
 			{ mixin(SCR.ProcessProperties); }
 			
 			version(/+$DIDE_REGION Do custom behavior+/all)
 			{
+				auto res = ListBoxResult(hit); 
 				foreach(i, item; items)
 				{
-					if(ListBoxItem(((i).名!q{id}), ((i==idx).名!q{selected}), unaryFun!translator(item), args))
-					{ idx = (cast(int)(i)); changed = true; }
+					const e = ListBoxItem(((i).名!q{id}), ((i==idx).名!q{selected}), unaryFun!translator(item), args); 
+					if(e==mixin(舉!((ListBoxItemEvent),q{selected})))	{ idx = (cast(int)(i)); res.userSelected = true; }
+					else if(e==mixin(舉!((ListBoxItemEvent),q{clickedOnSelected})))	{ res.userClickedOnSelected = true; }
 				}
 			}
 			
 			version(/+$DIDE_REGION Handle the recursive composition+/all)
 			{ mixin(SCR.ProcessComposition); }
 			
-			return ListBoxResult(hit, changed); 
+			return res; 
 		} 
-		static struct PopupState
+		DropdownState dropdownState; 
+		static struct DropdownState
 		{
-			Cell cell; //the popup itself
-			Cell parent; //the initiator of the popup
+			Id comboId;    //when the focus of this is lost, comboState goes false
 			
-			HAlign hAlign; 
-			VAlign vAlign; 
+			.Container 	parentContainer 	/+the initiator of the popup+/, 
+				dropdownContainer	/+the popup itself+/; 
 			
-			void reset()
+			bool active; //automatically cleared on focus.change
+			bool opening; //popup cant disappear when clicking away and this is set true by the combo
+			
+			/+
+				HAlign hAlign; 
+				VAlign vAlign; 
+			+/
+			void open(Id id)
 			{
-				hAlign = HAlign.left; 
-				vAlign = VAlign.bottom; 
-				cell = null; 
-				parent = null; 
+				active = true; comboId = id; 
+				opening = true; //ignore this mousepress when closing popup
+			} 
+			
+			
+			void close()
+			{
+				active = false; comboId = Id.init; 
+				opening = false; 
+			} 
+			
+			void toggle(Id id)
+			{ if(active) close; else open(id); } 
+			
+			private void beginFrame()
+			{
+				/+`active` and `comboId` is retained.+/
+				
+				opening = false; 
+				parentContainer = null; 
+				dropdownContainer = null; 
+				/+
+					hAlign = HAlign.left; 
+					vAlign = VAlign.bottom; 
+				+/
 			} 
 			
 			void doAlign()
@@ -10121,71 +10164,91 @@ struct im
 					}
 				*/
 				
-				if(cell)
+				/+
+					Todo: When the ComboBox is stretched, 
+					this dropdown and all it's lines should be stretched too!
+				+/
+				
+				if(dropdownContainer && parentContainer)
 				{
-					if(parent)
+					//first try to align to the bottom.
+					auto bnd = imstOuterBounds(parentContainer.id); 
+					dropdownContainer.outerPos = vec2(bnd.left+2, bnd.bottom-2); 
+					
+					//then if it clips the sceen, put it on top.
+					if(dropdownContainer.flags.targetSurface == TargetSurface.gui)
 					{
-						auto bnd = .Container._savedComboBounds; 
-						cell.outerPos = vec2(bnd.left+2, bnd.bottom-2); 
+						const maxy = view_gui.screenBounds_anim.bounds2.bottom; 
+						if(dropdownContainer.outerBottom > maxy)
+						dropdownContainer.outerPos.y = 
+							bnd.top - 2 - dropdownContainer.outerHeight; 
 					}
 				}
 			} 
 		} 
-		PopupState popupState; 
 		
-		private void Popup(Cell parent, void delegate() contents)
+		private void Dropdown(.Container parent, void delegate() contents)
 		{
-			//Popup for combobox only ////////////////////////////////////
-			/+
-				Todo: this check is not working because of the IM gui. 
-				When ComboBox1 is pulled down and the user clicks on ComboBox2
-			+/
-			//commented out intentionally: enforce(popupState.cell is null, "im.Popup() already called.");
+			enforce(parent, "Dropdown parent can't be null."); 
 			
 			auto oldLen = actContainer.subCells.length; 
 			contents(); 
 			auto extraLen = actContainer.subCells.length-oldLen; 
 			
-			if(extraLen==0)
-			return; 
-			if(extraLen>1)
-			raise("Popup must contain only one Cell"); 
+			if(extraLen==0) return; 
+			if(extraLen>1) raise("Popup must contain only one Cell"); 
 			
-			auto popup = actContainer.removeLast; 
-			//260819: Do the append in _endFrame. /+code:append(popup);+/ 
+			auto container = actContainer.removeLastContainer; 
+			enforce(container, "Dropdown content must be a single Container."); 
 			
-			popupState.cell = popup; 
-			popupState.parent = parent; 
+			dropdownState.dropdownContainer = container; 
+			dropdownState.parentContainer = parent; 
 		} 
 		
-		auto PopupBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T0, Args...)(T0 text, Args args)
-			if((isSomeString!T0 || __traits(compiles, text())) && Args.length>=1 && __traits(compiles, args[$-1]()) )
-		{
-			Cell btn; 
-			auto hit = Btn(text, args[0..$-1], { btn = actContainer; }); 
-			
-			if(isFocused(hit.id))
-			(cast(.Container)btn).flags._saveComboBounds = true; //notifies glDraw to place the popup
-			
-			if(hit.pressed)
+		version(/+$DIDE_REGION+/none) {
+			deprecated("Copy the working stuff from ComboBox_idx!")
+			auto PopupBtn(string _M_=__MODULE__, size_t _L_=__LINE__, T0, Args...)
+				(T0 text, Args args)
+				if(
+				(isSomeString!T0 || __traits(compiles, text())) 
+				&& Args.length>=1 && __traits(compiles, args[$-1]()) 
+			)
 			{
-				comboId = hit.id; 
-				comboState.toggle; 
-				comboOpening = true; //ignore this mousepress when closing popup
-			}
-			
-			const popupVisible = isFocused(hit.id) && comboState; 
-			if(popupVisible)
-			{ Popup(btn, { Column({ args[$-1](); }); }); }
-			return popupVisible; 
-			//callee must handle the if and optionally set "comboState" to false
-			//Todo: what if callee don't handle it????
-		} 
+				/+
+					Todo: Too many copy+paste, this is the same as ComboBox.
+					The newer one is in ComboBox_idx. 260819
+				+/
+				
+				Cell btn; 
+				auto hit = Btn(text, args[0..$-1], { btn = actContainer; }); 
+				
+				if(isFocused(hit.id))
+				{
+					(cast(.Container)(btn)).flags._saveComboBounds = true; 
+					//notifies glDraw to place the popup
+				}
+				
+				
+				if(hit.pressed)
+				{
+					comboId = hit.id; 
+					comboState.toggle; 
+					comboOpening = true; //ignore this mousepress when closing popup
+				}
+				
+				const popupVisible = isFocused(hit.id) && comboState; 
+				if(popupVisible)
+				{ Popup(btn, { Column({ args[$-1](); }); }); }
+				return popupVisible; 
+				//callee must handle the if and optionally set "comboState" to false
+				//Todo: what if callee don't handle it????
+			} 
+		}
 		
 		auto ComboBox_idx(alias translator = "a.text", string _M_=__MODULE__, size_t _L_=__LINE__, A, Args...)
 			(ref int idx, in A[] items, in Args args)
 		{
-			Cell btn; 
+			.Container btn; 
 			auto hit = WhiteBtn!(_M_, _L_)
 				(
 				{
@@ -10206,39 +10269,36 @@ struct im
 				, args
 			); 
 			
-			if(isFocused(hit.id))
-			(cast(.Container)btn).flags._saveComboBounds = true; //notifies glDraw to place the popup
-			
-			if(hit.pressed)
-			{
-				comboId = hit.id; 
-				comboState.toggle; 
-				comboOpening = true; //ignore this mousepress when closing popup
-			}
-			
 			ListBoxResult res; 
-			
-			if(isFocused(hit.id) && comboState)
+			if(isFocused(hit.id))
 			{
-				Popup(
-					btn, {
-						void inheritComboWidth()
-						{
-							if(btn.innerWidth>0)
-							innerWidth = btn.innerWidth+6; //Todo: tool theme*/
-						} 
-						
-						res = ListBox!(translator, _M_, _L_)(idx, items, ((1).名!q{id}), &inheritComboWidth); 
-						
-						if(res && inputs.LMB.released)
-						{
-							comboState = false; //close the box
-							/+Todo: This logic is broken. 260819+/
+				btn.flags.saveOuterBounds = true /+world outer bounds will be saved on next Draw()+/; 
+				/+It is saved ALL the time, so it survives the 1 frame delay.+/
+				
+				if(hit.pressed) dropdownState.toggle(hit.id); 
+				
+				if(dropdownState.active)
+				{
+					Dropdown
+					(
+						btn, {
+							void inheritComboWidth()
+							{
+								if(btn.innerWidth>0)
+								innerWidth = btn.innerWidth+6; //Todo: tool theme*/
+								/+Todo: Why +6? This is lame....+/
+							} 
+							
+							res = ListBox!(translator, _M_, _L_)(idx, items, ((1).名!q{id}), &inheritComboWidth); 
+							
+							if(dropdownState.active && res.userClickedOnSelected)
+							{
+								dropdownState.close; //close the dropdown
+							}
 						}
-					}
-				); 
+					); 
+				}
 			}
-			
 			return res; 
 		} 
 		
@@ -11468,10 +11528,10 @@ version(/+$DIDE_REGION Dead code 260813+/none)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x4FEE0EB16D5C4).檢(hit.toJson)); 
+					((0x505DCEB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x4FF1AEB16D5C4).檢(localMouse)); 
+					((0x50616EB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
