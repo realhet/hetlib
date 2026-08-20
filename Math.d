@@ -128,6 +128,130 @@ version(/+$DIDE_REGION+/all)
 			} 
 		} 
 		
+		/+
+			AI: /+
+				User: /+
+					Code: struct vec2
+					{
+						float 	x,
+							y; 
+					} 
+					
+					struct vec3
+					{
+						union 
+						{
+							struct 
+							{
+								float x; 
+								union 
+								{
+									struct 
+									{
+										float 	y,
+											z; 
+									} 
+									vec2 yz; 
+								} 
+							} 
+							struct 
+							{ vec2 xy; } 
+						} 
+					} 
+				+/
+				
+				Can you make a vec4 with xyzw?
+			+/
+			/+
+				Assistant: /+
+					Para: Yes — here is a /+Highlighted: vec4+/ with /+Highlighted: x+/, /+Highlighted: y+/, /+Highlighted: z+/, /+Highlighted: w+/ and overlapping swizzles /+Highlighted: xy+/, /+Highlighted: yz+/, /+Highlighted: zw+/, /+Highlighted: xyz+/,
+					and /+Highlighted: yzw+/:
+				+/
+				
+				/+
+					Structured: struct vec2
+					{
+						float x,
+							y; 
+					} 
+					
+					struct vec3
+					{
+						union 
+						{
+							struct 
+							{
+								float x; 
+								union 
+								{
+									struct 
+									{
+										float y,
+											z; 
+									} 
+									vec2 yz; 
+								} 
+							} 
+							struct 
+							{ vec2 xy; } 
+						} 
+					} 
+					
+					struct vec4
+					{
+						union 
+						{
+							struct 
+							{
+								float x; 
+								union 
+								{
+									struct 
+									{
+										float y; 
+										union 
+										{
+											struct 
+											{
+												float z,
+													w; 
+											} 
+											vec2 zw; 
+										} 
+									} 
+									struct 
+									{
+										union 
+										{
+											vec2 yz; 
+											vec3 yzw; 
+										} 
+									} 
+								} 
+							} 
+							struct 
+							{
+								union 
+								{
+									vec2 xy; 
+									vec3 xyz; 
+								} 
+							} 
+						} 
+					} 
+					
+					static assert(vec4.sizeof == 16); 
+				+/
+				
+				/+
+					Para: The struct itself is the whole /+Highlighted: xyzw+/ vector. A data member named /+Highlighted: xyzw+/ of type /+Highlighted: vec4+/ would
+					be recursive, so if you want /+Highlighted: v.xyzw+/ to be an explicit lvalue, use a /+Highlighted: ref+/ property instead.
+				+/
+				
+				/+Note: Usage(prompt_hit: 128, prompt_miss: 383, completion: 31093, HUF: 13.01, price: 200%)+/
+			+/
+		+/
+		
 		
 		
 		struct vec4

@@ -8478,13 +8478,13 @@ struct im
 					+/
 				+/
 				
-				void setIncomingId(string srcModule, size_t srcLine)()
+				public void setIncomingId(string srcModule, size_t srcLine)()
 				{
 					static if(Debug_incomingId) enforce(!_incomingId, "_incomingId already set."); 
 					_incomingId = Id(srcModule, srcLine); 
 				} 
 				
-				auto fetchIncomingId()
+				public auto fetchIncomingId()
 				{
 					static if(Debug_incomingId) enforce(_incomingId, "_incomingId not set."); 
 					auto res = _incomingId; 
@@ -8569,7 +8569,7 @@ struct im
 				const parentEnabled = imEnabled; //Inherit `enabled` from parent.
 				
 				auto _container = new CType; 
-				append(_container); push(_container, _id); scope(exit) pop; 
+				imAppend(_container); imPush(_container, _id); scope(exit) imPop; 
 				imEnabled = parentEnabled; //Inherit `enabled` from parent.
 				_container.bkColor = style.bkColor; //Inherit `bkcolor` from the current fontStyle.
 				
@@ -11528,10 +11528,10 @@ version(/+$DIDE_REGION Dead code 260813+/none)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x505DCEB16D5C4).檢(hit.toJson)); 
+					((0x505F0EB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x50616EB16D5C4).檢(localMouse)); 
+					((0x5062AEB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 

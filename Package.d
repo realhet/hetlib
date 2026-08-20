@@ -3563,10 +3563,6 @@ version(/+$DIDE_REGION Numeric+/all)
 					      If float*double(pi) doesnt calculates using double cpu instructions then it is obsolete. 
 		+/
 		
-		//it replaces the exception with a default value.
-		T safeConv(T, U)(const U src, lazy const T def)
-		{ try { return src.to!T; }catch(Throwable) { return def; }} 
-		
 		T safeDiv(T)(T a, T b, T def=0)
 		=> b==0 ? def : a/b; 
 		
@@ -3952,6 +3948,34 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		float superEllipticRampTarget(uint pattern)
 		=> ((pattern&2)?(0):(((pattern&4)?(-1):(1)))); 
+		
+		struct Uint24
+		{
+			/+
+				This is a compact 3byte uint value.
+				Bitfields can't do this because that requires 2^N bytes storage.
+			+/
+			align(1): ushort lo; ubyte hi; 
+			
+			@property get() const => (cast(uint)(lo)) | ((cast(uint)(hi))<<16); 
+			void set(T)(T x)
+			{ lo = (cast(ushort)(x & 0xFFFF)); hi = (cast(ubyte)((x>>16)&0xFF)); } 
+			@property set_safe(T)(T x)
+			{
+				import std.conv : ConvOverflowException; 
+				if(x>=(1<<24)) throw new ConvOverflowException("UInt24 Positive overflow"); 
+				if(x<0) throw new ConvOverflowException("UInt24 Negative overflow"); 
+				set(x); 
+			} 
+			
+			@property _prop() const => get; 
+			@property _prop(T)(T x) { set(x); return this; } 
+			alias this = _prop; 
+			
+			this(T)(T x) { set(x); } 
+		} 
+		Uint24 Uint24_safe(T)(in T x)
+		{ Uint24 res; res.set_safe(x); return res; } 
 		
 		
 	}version(/+$DIDE_REGION Bitwise+/all)
