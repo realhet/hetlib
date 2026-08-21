@@ -7095,6 +7095,9 @@ struct im
 				foreach(i, d; dr)
 				{ d.popClipBounds; }
 				
+				//set mouse cursor icon once per frame
+				mainWindow.mouseCursor = mouseCursor; 
+				
 				version(/+$DIDE_REGION+/none) {
 					if(VisualizeHitStack && drVisualizeHitStack)
 					{
@@ -8191,6 +8194,8 @@ struct im
 			
 			//Todo: ezt egy alias this-el egyszerusiteni. Jelenleg az im-ben is meg az im.StackEntry-ben is ugyanaz van redundansan deklaralva
 			.Container actContainer, lastContainer; //top of the containerStack for faster access
+			//Todo: thisContainer could be a better name for actContainer.
+			
 			TextStyle textStyle;   alias style = textStyle; //Todo: style.opDispatch("fontHeight=0.5x")
 			
 			enum Theme: ubyte
@@ -8228,6 +8233,8 @@ struct im
 			} 
 			
 			ThemeState theme; 
+			
+			MouseCursor mouseCursor; 
 			
 			@property
 			{
@@ -8268,6 +8275,7 @@ struct im
 				//statck reset
 				textStyle = tsNormal; 
 				theme.clear; 
+				mouseCursor = MouseCursor.DEFAULT; 
 				
 				rootCells = []; 
 				stack = [StackEntry(null, textStyle, theme)]; 
@@ -8301,7 +8309,7 @@ struct im
 				
 				stack.popBack; 
 				
-				//save actContainer here.
+				//save lastContainer here.
 				lastContainer = actContainer; 
 				
 				//actContainer is the top of the stack or null
@@ -8389,6 +8397,27 @@ struct im
 			{ return buildContainer!(.Row   , srcModule, srcLine)(args); } 
 			auto buildColumn(string _M_=__MODULE__, size_t _L_=__LINE__, A...)(in A args)
 			{ return buildContainer!(.Column, srcModule, srcLine)(args); } 
+			
+			
+			.Container parentContainer()
+			{
+				if(stack.length<2) enforce(0, "im.Stack underflow."); 
+				if(stack.length==2) return null; 
+				return stack[$-2].container; 
+			} 
+			
+			Cell[] siblingCells()
+			{
+				auto p = parentContainer; 
+				return ((p)?(p.subCells):(rootCells)); 
+			} 
+			
+			Cell prevSiblingCell()
+			{
+				auto siblings = siblingCells; 
+				enforce(siblings.length>=2 && siblings.back is actContainer, "siblingCells() broken."); 
+				return siblings[$-2]; 
+			} 
 			
 			//easy access
 			
@@ -8426,11 +8455,14 @@ struct im
 			
 			mixin(
 				[
-					"innerWidth", "outerWidth", "innerHeight", "outerHeight", 
-					"innerSize", "outerSize", "innerPos", "outerPos", "pos", 
-					"width", "height"
+					"innerPos", "innerX", "innerY",
+					"innerSize", "size", 
+					"innerWidth", "width", 
+					"innerHeight", "height"
 				].map!ContainerProp.join ~
 				[
+					"outerPos", "outerX", "outerY", "pos", 
+					"outerSize", "outerWidth", "outerHeight", 
 					"flags", "flex", "margin", "border", "padding", 
 					/+"bkColor" removed: 260815+/
 				].map!ContainerRef.join
@@ -8786,7 +8818,7 @@ struct im
 		} 
 		
 		void HLine()
-		{ Row({ innerHeight = 1; background = mix(clWinBackground, clWinText, .25f); }); } 
+		{ Row({ innerHeight = 1; background = mix(clWinBackground, clWinText, .25f); }); } 
 		
 		void Panel(CType = .Column, string _M_=__MODULE__, size_t _L_=__LINE__, T...)(in T args)
 		{
@@ -8837,6 +8869,79 @@ struct im
 					with(actContainer) swap(subCells[0], subCells[1]); /+Correct Z-Order+/
 				}
 			); 
+		} 
+		
+		HitInfo Splitter(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
+		{
+			setIncomingId!(_M_, _L_)(); 
+			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
+			{
+				mixin ContainerScript_Init!(.Container, q{panelPosition hit}, (表([[],])), (表([[],]))); 
+				mixin(SCR.Create); 
+			}
+			
+			version(/+$DIDE_REGION Local variable declarations+/all)
+			{}
+			
+			version(/+$DIDE_REGION Load all properties+/all)
+			{ mixin(SCR.ProcessProperties); }
+			
+			version(/+$DIDE_REGION Do custom behavior+/all)
+			{
+				const 	isHorz 	= !!panelPosition.among(mixin(舉!((PanelPosition),q{leftClient})), mixin(舉!((PanelPosition),q{rightClient}))),
+					isVert 	= !!panelPosition.among(mixin(舉!((PanelPosition),q{topClient})), mixin(舉!((PanelPosition),q{bottomClient}))); 
+				enforce(
+					isHorz || isVert, 
+					"Splitter: invalid panelPosition: `"~panelPosition.text~"`"
+				); 
+				
+				const siz = fh/6; 
+				if(isHorz) outerWidth = siz; if(isVert) outerHeight = siz; 
+				
+				static vec2 startMousePos, startTargetSize; 
+				auto actMousePos() => targetView.mousePos.vec2; 
+				
+				auto targetCell = prevSiblingCell; 
+				enforce(targetCell, "Splitter can't access previous Cell."); 
+				
+				static bool dragging; 
+				
+				if(canProcessUserInput && hit.pressed)
+				{
+					startMousePos = actMousePos; 
+					startTargetSize = targetCell.outerSize; 
+					dragging = true; 
+				}
+				
+				if(dragging)
+				{
+					if(!(canProcessUserInput && inputs.LMB.down))
+					{ dragging = false; }
+					else
+					{
+						const shift = ((0x3E6C8EB16D5C4).檢(actMousePos - startMousePos)); 
+						const targetSize = (startTargetSize + shift).clamp(1, 20_000); 
+						if(isHorz) targetCell.outerSize.x = targetSize.x; 
+						if(isVert) targetCell.outerSize.y = targetSize.y; 
+					}
+				}
+				
+				if(dragging || canProcessUserInput && hit.hover)
+				mouseCursor = MouseCursor.SIZEWE; 
+				
+				background = ((dragging)?(clAccent) :(
+					mix(
+						clWinBackground, clWinBtnPressed, 
+						hit.hover_smooth
+					)
+				)); 
+			}
+			
+			version(/+$DIDE_REGION Handle the recursive composition+/all)
+			{ mixin(SCR.ProcessComposition); }
+			
+			version(/+$DIDE_REGION Return custom results+/all)
+			{ return hit; }
 		} 
 		
 		
@@ -10109,7 +10214,7 @@ struct im
 		{
 			Id comboId;    //when the focus of this is lost, comboState goes false
 			
-			.Container 	parentContainer 	/+the initiator of the popup+/, 
+			.Container 	ownerContainer 	/+the initiator of the popup+/, 
 				dropdownContainer	/+the popup itself+/; 
 			
 			bool active; //automatically cleared on focus.change
@@ -10140,7 +10245,7 @@ struct im
 				/+`active` and `comboId` is retained.+/
 				
 				opening = false; 
-				parentContainer = null; 
+				ownerContainer = null; 
 				dropdownContainer = null; 
 				/+
 					hAlign = HAlign.left; 
@@ -10169,10 +10274,10 @@ struct im
 					this dropdown and all it's lines should be stretched too!
 				+/
 				
-				if(dropdownContainer && parentContainer)
+				if(dropdownContainer && ownerContainer)
 				{
 					//first try to align to the bottom.
-					auto bnd = imstOuterBounds(parentContainer.id); 
+					auto bnd = imstOuterBounds(ownerContainer.id); 
 					dropdownContainer.outerPos = vec2(bnd.left+2, bnd.bottom-2); 
 					
 					//then if it clips the sceen, put it on top.
@@ -10202,7 +10307,7 @@ struct im
 			enforce(container, "Dropdown content must be a single Container."); 
 			
 			dropdownState.dropdownContainer = container; 
-			dropdownState.parentContainer = parent; 
+			dropdownState.ownerContainer = parent; 
 		} 
 		
 		version(/+$DIDE_REGION+/none) {
@@ -11528,10 +11633,10 @@ version(/+$DIDE_REGION Dead code 260813+/none)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x505F0EB16D5C4).檢(hit.toJson)); 
+					((0x51237EB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x5062AEB16D5C4).檢(localMouse)); 
+					((0x51271EB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 

@@ -167,13 +167,16 @@ version(/+$DIDE_REGION+/all) {
 	//MouseCursor /////////////////////////////////////////////////////////////////////
 	
 	enum MouseCursor {
-		ARROW, IBEAM, WAIT, CROSS, UPARROW, /+SIZE, ICON,+/ 
+		DEFAULT, //non standard cursor, mapped to ARROW. It is there for a default no-action.
+		ARROW, IBEAM, WAIT, CROSS, UPARROW, SIZE, ICON, 
 		SIZENWSE, SIZENESW, SIZEWE, SIZENS, SIZEALL, NO, HAND, APPSTARTING, HELP
 	} 
 	
 	void SetCursor(MouseCursor c)
 	{
-		immutable _cursorIds = mixin("[", [EnumMembers!MouseCursor].map!`"IDC_"~a.text`.join(','), "]"); 
+		enum IDC_DEFAULT = IDC_ARROW; 
+		
+		static immutable _cursorIds = mixin("[", [EnumMembers!MouseCursor].map!`"IDC_"~a.text`.join(','), "]"); 
 		__gshared HCURSOR[MouseCursor.max] _loadedCursors; 
 		
 		auto ref h() { return _loadedCursors[c]; } 
