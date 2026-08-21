@@ -938,6 +938,8 @@ version(/+$DIDE_REGION+/all)
 	
 	struct UpperFloat
 	{
+		/+This is a way too simple version of Float16+/
+		
 		ushort _raw;  //Only store the 16 upper bits.  Enough for font sizes and such.
 		@property value() const 
 		=> uintBitsToFloat((cast(uint)(_raw))<<16);  @property value(float a)
@@ -1096,7 +1098,7 @@ version(/+$DIDE_REGION+/all)
 			}
 		} 
 	} 
-	
+	
 	LineStyle toLineStyle(BorderStyle style)
 	=> style.predSwitch(
 		BorderStyle.dot	, LineStyle.dot,
@@ -1105,7 +1107,7 @@ version(/+$DIDE_REGION+/all)
 		BorderStyle.dash2	, LineStyle.dash2,
 		BorderStyle.dashDot2	, LineStyle.dashDot2,
 			LineStyle.normal
-	); 
+	); 
 	
 	struct FlexAmount
 	{ UpperFloat value=0; alias this = value; } 
@@ -1324,18 +1326,18 @@ version(/+$DIDE_REGION+/all)
 			auto innerBottom() const
 			{ return innerY + innerHeight; } 
 			
-			auto outerLeft	() const
-			{ return outerX; } 
+			alias outerLeft = outerX; 
+			alias outerTop = outerY; 
 			auto outerRight	() const
 			{ return outerX+outerWidth; } 
-			auto outerTop	() const
-			{ return outerY; } 
 			auto outerBottom() const
 			{ return outerY+outerHeight; } 
+			
 			auto innerCenter() const
 			{ return innerPos + innerSize*.5f; } 
 			
-			auto outerTopLeft	  () const
+			auto ref outerTopLeft	  () const
+			{ return outerPos; } auto ref outerTopLeft	  ()
 			{ return outerPos; } 
 			auto outerTopRight	  () const
 			{ return outerPos + vec2(outerWidth, 0); } 
@@ -1399,7 +1401,7 @@ version(/+$DIDE_REGION+/all)
 			{
 				if(auto container = cast(Container)this)
 				{
-					if(container.flags.noHitTest)
+					if(container.flags.dontHitTest)
 					return false; //Note: false means -> keep continue the search
 					im.hitTestManager.addHitRect(
 						container.id, hitBnd, mouse-(innerPos+ofs), 
@@ -1566,27 +1568,57 @@ version(/+$DIDE_REGION+/all)
 	} 
 	
 	
+	struct GlyphFlags
+	{
+		mixin((
+			(表([
+				[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+				[q{ubyte},q{6},q{"fontFlags"},q{},q{/++/}],
+				[q{SyntaxKind},q{6},q{"syntax"},q{},q{/++/}],
+				[q{bool},q{1},q{"isWhite"},q{},q{/++/}],
+				[q{bool},q{1},q{"isTab"},q{},q{/++/}],
+				[q{bool},q{1},q{"isNewLine"},q{},q{/++/}],
+				[q{bool},q{1},q{"isReturn"},q{},q{/++/}],
+			]))
+		) .GEN!q{GEN_bitfields}); 
+	} 
+	static assert(GlyphFlags.sizeof==2); 
+	
 	class Glyph : Cell
 	{
 		TexHandle stIdx; 
-		dchar ch; 
+		dchar ch; //21 bits should be enough in 2026.
 		
 		RGB fontColor, bkColor; 
-		ubyte fontFlags; 
-		SyntaxKind syntax; //needed for DIDE
+		//ubyte fontFlags; 
+		//SyntaxKind syntax; //needed for DIDE
 		
-		bool isWhite, isTab, isNewLine, isReturn; //needed for wordwrap and elastic tabs
+		//bool isWhite, isTab, isNewLine, isReturn; //needed for wordwrap and elastic tabs
+		GlyphFlags flags; alias this = flags; /+Todo: bitfields can't alias_this the bool foelds.+/
+		
 		int lineIdx; //1based. needed for DIDE.
+		
+		this(Glyph src)
+		{
+			outerPos 	= src.outerPos,
+			outerSize 	= src.outerSize,
+			stIdx	= src.stIdx,
+			ch	= src.ch,
+			fontColor	= src.fontColor,
+			bkColor	= src.bkColor,
+			flags	= src.flags,
+			lineIdx	= src.lineIdx; 
+		} 
 		
 		this(dchar ch, in TextStyle ts)
 		{
 			this.ch = ch; 
 			
 			//tab is the isSame as a space
-			isTab = ch=='\t'/+9+/; 
-			isWhite = isTab || ch==' '/+32+/; 
-			isNewLine = ch=='\n'/+10+/; 
-			isReturn = ch=='\r'/+13+/; 
+			flags.isTab = ch=='\t'/+9+/; 
+			flags.isWhite = flags.isTab || ch==' '/+32+/; 
+			flags.isNewLine = ch=='\n'/+10+/; 
+			flags.isReturn = ch=='\r'/+13+/; 
 			/+
 				Todo: ezt a boolean mess-t kivaltani. a chart meg el kene tarolni. 
 				ossz 16byte all rendelkezeser ugyis.
@@ -1595,12 +1627,12 @@ version(/+$DIDE_REGION+/all)
 			dchar visibleCh = ch; 
 			if(VisualizeGlyphs)
 			{
-				if(isReturn)	visibleCh = 0x240D; 
-				else if(isNewLine)	visibleCh = 0x240A; 
+				if(flags.isReturn)	visibleCh = 0x240D; 
+				else if(flags.isNewLine)	visibleCh = 0x240A; 
 			}
 			else
 			{
-				if(isReturn || isNewLine)	{ visibleCh = ' '; }
+				if(flags.isReturn || flags.isNewLine)	{ visibleCh = ' '; }
 				else if(ch=='\v'/+11+/)	{
 					visibleCh = 0x240B; 
 					//vertical tab. It is used for multiColumns
@@ -1611,93 +1643,23 @@ version(/+$DIDE_REGION+/all)
 			
 			fontColor = ts.fontColor; 
 			bkColor = ts.bkColor; 
-			fontFlags = ts.fontFlags; 
+			flags.fontFlags = ts.fontFlags; 
 			
 			innerSize = calcGlyphSize_clearType(ts, stIdx); 
 			
 			if(!VisualizeGlyphs)
-			if(isReturn || isNewLine)
+			if(flags.isReturn || flags.isNewLine)
 			innerWidth = 0; 
 		} 
 		
 		this(dchar ch, in TextStyle ts, SyntaxKind sk)
-		{ this(ch, ts); syntax = sk; } 
+		{ this(ch, ts); flags.syntax = sk; } 
 		
-		override void draw(Drawing dr)
+		override string toString()
+		{ return format!"Glyph(%s, %s, %s)"(ch.text.quoted, stIdx, outerBounds); } 
+		
+		final void drawVisualizers(Drawing dr)
 		{
-			drawBorder(dr); //Todo: csak a containernek kell border elvileg, ez hatha gyorsit.
-			dr.color = fontColor; 
-			
-			if(isStretched)
-			{
-				const isr = 1/stretchRatio; //inverse stretch ratio
-				enum center 	= .53f, /+The center of the { symbol measured from the top. 0..1 range.+/
-				side 	= .12f /+The straight part in the { symbol measured from the center.+/; 
-				
-				/+
-					Code: {}()[]
-					⎧⎫⎛⎞⎡⎤⌈⌉⎾⏋⌜⌝
-					⎨⎬⎜⎟⎢⎥⌊⌋⎿⏌⌞⌟
-					⎪⎪⎝⎠⎣⎦
-					⎩⎭
-				+/ void part(float targety0, float targety1, float srcy0, float srcy1)
-				{
-					dr.drawFontGlyph
-					(
-						(cast(int)(stIdx)), bounds2(
-							0	, targety0*outerSize.y,
-							outerSize.x	, targety1*outerSize.y
-						)+innerPos, 
-						bkColor, fontFlags, vec2(srcy0, srcy1)
-					); 
-				} 
-				
-				switch(ch)
-				{
-					case 	'[', ']', 
-						'(', ')', 
-						'|', '‖',
-						'⎡', '⎤',
-						'⎣', '⎦': {
-						auto 	y0 = 0f,
-							y1 = center*isr, 
-							y2 = 1-(1-center)*isr,
-							y3 = 1f; 
-						
-						if(ch.among('⎡', '⎤')) { y3 -= .05; }
-						if(ch.among('⎣', '⎦')) { y0 += .1; }
-						
-						part(y0, y1, 0, center); 
-						part(y1, y2, center, center); 
-						part(y2, y3, center, 1); 
-					}break; 
-					case 	'{', '}',
-						'⁅', '⁆': {
-						//First draw the { without the center peak.
-						const 	y1 = (center-side)*isr, 
-							y2 = .5f-side*isr,
-							y3 = .5f+side*isr,
-							y4 = 1-(1-(center+side))*isr; 
-						part( 0, y1, 0, center-side); 
-						part(y1, y2, center-side, center-side); 
-						part(y2, y3, center-side, center+side); 
-						part(y3, y4, center+side, center+side); 
-						part(y4,  1, center+side, 1); 
-					}break; 
-					
-					
-					default: {
-						/+simple default stretching+/
-						dr.drawFontGlyph((cast(int)(stIdx)), innerBounds, bkColor, fontFlags); 
-					}
-				}
-			}
-			else
-			{
-				//normal height
-				dr.drawFontGlyph((cast(int)(stIdx)), innerBounds, bkColor, fontFlags); 
-			}
-			
 			if(VisualizeCodeLineIndices)
 			{
 				dr.color = clWhite; 
@@ -1712,34 +1674,121 @@ version(/+$DIDE_REGION+/all)
 				dr.lineWidth = 0.16f*2; 
 				dr.drawRect(innerBounds); 
 				
-				if(isTab)
+				if(flags.isTab)
 				{
 					dr.lineWidth = innerHeight*0.04f; dr.arrowStyle = ArrowStyle.vector; 
 					dr.line(innerBounds.leftCenter, innerBounds.rightCenter); 
 					dr.arrowStyle = ArrowStyle.none; 
 				}
-				else if(isWhite)
+				else if(flags.isWhite)
 				{ dr.drawX(innerBounds); }
 			}
 		} 
 		
-		override string toString()
-		{ return format!"Glyph(%s, %s, %s)"(ch.text.quoted, stIdx, outerBounds); } 
-		
-		version(/+$DIDE_REGION Vertical Glyph-Stretching+/all)
+		override void draw(Drawing dr)
 		{
-			float stretchRatio=1;  /+stretch the glyph vertically.  This operation depends on the character.  Used for  [] () {} etc...+/
-			bool isStretched; 
-			void stretch(float y0, float y1)
+			dr.color = fontColor; 
+			dr.drawFontGlyph((cast(int)(stIdx)), innerBounds, bkColor, fontFlags); 
+			drawVisualizers(dr); 
+		} 
+	} 
+	
+	class StretchedGlyph : Glyph
+	{
+		/+
+			stretch the glyph vertically.  
+			This operation depends on the character.  Used for  [] () {} etc...
+		+/
+		
+		UpperFloat invStretchRatio;  //Note: At this point, there is no textStyle, so have to store the stretch ratio.
+		
+		this(Glyph src, in float y0, in float y1)
+		{
+			assert(!(cast(StretchedGlyph)(src)), "Already stretched."); 
+			
+			super(src); 
+			
+			const originalHeight = outerHeight; 
+			outerTop = y0; 
+			outerHeight = y1-y0; 
+			
+			invStretchRatio = originalHeight/outerHeight; 
+		} 
+		
+		override void draw(Drawing dr)
+		{
+			dr.color = fontColor; 
+			
+			
+			const float isr = invStretchRatio; //inverse stretch ratio
+			enum center 	= .53f, /+The center of the { symbol measured from the top. 0..1 range.+/
+			side 	= .12f /+The straight part in the { symbol measured from the center.+/; 
+			
+			/+
+				Code: {}()[]
+				⎧⎫⎛⎞⎡⎤⌈⌉⎾⏋⌜⌝
+				⎨⎬⎜⎟⎢⎥⌊⌋⎿⏌⌞⌟
+				⎪⎪⎝⎠⎣⎦
+				⎩⎭
+			+/ void part(float targety0, float targety1, float srcy0, float srcy1)
 			{
-				const h0 = outerHeight; 
-				outerPos.y = y0; 
-				outerSize.y = y1-y0; 
-				stretchRatio *= outerHeight/h0; 
-				isStretched = true; 
+				dr.drawFontGlyph
+				(
+					(cast(int)(stIdx)), bounds2(
+						0	, targety0*outerSize.y,
+						outerSize.x	, targety1*outerSize.y
+					)+innerPos, 
+					bkColor, fontFlags, vec2(srcy0, srcy1)
+				); 
 			} 
-		}
+			
+			switch(ch)
+			{
+				case 	'[', ']', 
+					'(', ')', 
+					'|', '‖',
+					'⎡', '⎤',
+					'⎣', '⎦': {
+					auto 	y0 = 0f,
+						y1 = center*isr, 
+						y2 = 1-(1-center)*isr,
+						y3 = 1f; 
+					
+					if(ch.among('⎡', '⎤')) { y3 -= .05; }
+					if(ch.among('⎣', '⎦')) { y0 += .1; }
+					
+					part(y0, y1, 0, center); 
+					part(y1, y2, center, center); 
+					part(y2, y3, center, 1); 
+				}break; 
+				case 	'{', '}',
+					'⁅', '⁆': {
+					//First draw the { without the center peak.
+					const 	y1 = (center-side)*isr, 
+						y2 = .5f-side*isr,
+						y3 = .5f+side*isr,
+						y4 = 1-(1-(center+side))*isr; 
+					part( 0, y1, 0, center-side); 
+					part(y1, y2, center-side, center-side); 
+					part(y2, y3, center-side, center+side); 
+					part(y3, y4, center+side, center+side); 
+					part(y4,  1, center+side, 1); 
+				}break; 
+				
+				
+				default: {
+					/+simple default stretching+/
+					dr.drawFontGlyph((cast(int)(stIdx)), innerBounds, bkColor, fontFlags); 
+				}
+			}
+			
+			drawVisualizers(dr); 
+		} 
 	} 
+	
+	void stretchGlyph(ref Cell g, in float y0, in float y1)
+	{ g = new StretchedGlyph((cast(Glyph)(g)), y0, y1); } 
+	
 	
 	enum ShapeType
 	{led} 
@@ -3259,12 +3308,65 @@ version(/+$DIDE_REGION+/all)
 	
 	
 	enum ScrollState
-	{ off, on, autoOff, autoOn, auto_ = autoOff} 
-	
-	bool getEffectiveScroll(ScrollState s) pure
+	{ off, on, autoOff, autoOn, auto_ = autoOff}  bool getEffectiveScroll(ScrollState s) pure
 	=> s.among(ScrollState.on, ScrollState.autoOn)>0; 
 	
 	struct ContainerFlags
+	{
+		mixin((
+			(表([
+				[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+				[q{bool},q{1},q{"enabled"},q{1},q{/++/}],
+				[q{bool},q{1},q{"clickable"},q{1},q{/+If false, hittest will not check this as clicked. It checks the parent instead.+/}],
+				[q{bool},q{1},q{"focused"},q{},q{/+readonly.+/}],
+				[q{bool},q{1},q{"hover"},q{},q{/+readonly. Anything with a HitRec sets this.+/}],
+				[q{bool},q{1},q{"captured"},q{},q{/+readonly. Anything with a HitRec sets this.+/}],
+				[q{bool},q{1},q{"selected"},q{},q{/++/}],
+				[],
+				[q{//Size / scrolling
+				}],
+				[q{bool},q{1},q{"autoWidth"},q{},q{/+kinda readonly: It's set by Container in measure to outerSize!=0+/}],
+				[q{bool},q{1},q{"autoHeight"},q{},q{/+later everything else can read it.+/}],
+				[q{ScrollState},q{2},q{"hScrollState"},q{},q{/++/}],
+				[q{ScrollState},q{2},q{"vScrollState"},q{},q{/++/}],
+				[],
+				[q{//Visuals
+				}],
+				[q{TargetSurface},q{1},q{"targetSurface"},q{1},q{/+0: zoomable view, 1: GUI screen+/}],
+				[q{bool},q{1},q{"hidden"},q{},q{/+disable all draw calls recursively+/}],
+				[q{bool},q{1},q{"noBackground"},q{},q{/++/}],
+				[q{bool},q{1},q{"clipSubCells"},q{},q{/+drawings will be clipped outside the container's visible area.+/}],
+				[q{bool},q{1},q{"cullSubCells"},q{},q{/+only those cells will be drawn which are in the container's visible area.+/}],
+				[],
+				[q{//Behavior
+				}],
+				[q{bool},q{1},q{"dontSearch"},q{},q{/+no search() inside this container+/}],
+				[q{bool},q{1},q{"dontHitTest"},q{},q{/+don't even bother to add this container and it's subcontainers to the hit list.+/}],
+				[q{bool},q{1},q{"dontLocate"},q{},q{/+disables the locate() method for this container and its subcontainers+/}],
+				[],
+				[q{//Change detection
+				}],
+				[q{bool},q{1},q{"oldSelected"},q{},q{/+SelectionManager2 needs this.+/}],
+				[q{bool},q{1},q{"changedCreated"},q{},q{/+Dide2.CodeRow: changed by creationg a new cell+/}],
+				[q{bool},q{1},q{"changedRemoved"},q{},q{/+Dide2.CodeRow: changed by removing existing cells+/}],
+				[q{bool},q{1},q{"removed"},q{},q{/+At the moment it is only used by DIDE: SearchResults, BuildMessages can detect validity+/}],
+				[],
+				[q{//System managed
+				}],
+				[q{bool},q{1},q{"_measureOnlyOnce"},q{},q{/++/}],
+				[q{bool},q{1},q{"_measured"},q{},q{/+used to tell if a top level container was measured already+/}],
+				[q{bool},q{1},q{"_saveVisibleBounds"},q{},q{/+draw() will save the visible innerBounds into imstVisibleBounds+/}],
+				[q{bool},q{1},q{"_saveOuterBounds"},q{},q{/+draw() will save the outer world outerBounds into imstOuterBounds +/}],
+				[q{bool},q{1},q{"_hasDrawCallback"},q{},q{/++/}],
+				[q{bool},q{1},q{"_hasHScrollBar"},q{},q{/+readonly.+/}],
+				[q{bool},q{1},q{"_hasVScrollBar"},q{},q{/+readonly.+/}],
+				[q{bool},q{1},q{"_debug"},q{},q{/+the container can be marked, for debugging+/}],
+			]))
+		) .GEN!q{GEN_bitfields}); 
+	} 
+	static assert(ContainerFlags.sizeof==4); 
+	
+	struct RowFlags
 	{
 		mixin((
 			(表([
@@ -3273,66 +3375,30 @@ version(/+$DIDE_REGION+/all)
 				[q{HAlign},q{2},q{"hAlign"},q{},q{/+alignment for all subCells+/}],
 				[q{VAlign},q{2},q{"vAlign"},q{},q{/++/}],
 				[q{YAlign},q{3},q{"yAlign"},q{1},q{/++/}],
-				[],
 				[q{bool},q{1},q{"dontHideSpaces"},q{},q{/+useful for active edit mode+/}],
-				[q{bool},q{1},q{"canSelect"},q{},q{/++/}],
-				[q{bool},q{1},q{"focused"},q{},q{/+maintained by system, not by user+/}],
-				[q{bool},q{1},q{"hovered_deprecated"},q{},q{/+maintained by system, not by user+/}],
-				[q{bool},q{1},q{"clipSubCells"},q{},q{/++/}],
-				[q{bool},q{1},q{"_unused01_"},q{},q{/++/}],
-				[q{bool},q{1},q{"_unused00_"},q{},q{/++/}],
-				[q{bool},q{1},q{"columnElasticTabs"},q{1},q{/+Column will do ElasticTabs its own Rows.+/}],
-				[],
 				[q{bool},q{1},q{"rowElasticTabs"},q{},q{/+Row will do elastic tabs inside its own WrappedLines.+/}],
-				[q{TargetSurface},q{1},q{"targetSurface"},q{1},q{/+0: zoomable view, 1: GUI screen+/}],
-				[q{bool},q{1},q{"_debug"},q{},q{/+the container can be marked, for debugging+/}],
-				[q{bool},q{1},q{"btnRowLines"},q{},q{/+draw thin, dark lines between the buttons of a btnRow+/}],
-				[q{bool},q{1},q{"autoWidth"},q{},q{/+kinda readonly: It's set by Container in measure to outerSize!=0+/}],
-				[q{bool},q{1},q{"autoHeight"},q{},q{/+later everything else can read it.+/}],
-				[q{bool},q{1},q{"hasHScrollBar"},q{},q{/+system manages this, not the user.+/}],
-				[q{bool},q{1},q{"hasVScrollBar"},q{},q{/++/}],
-				[],
-				[q{bool},q{1},q{"_measured"},q{},q{/+used to tell if a top level container was measured already+/}],
-				[q{bool},q{1},q{"saveVisibleBounds"},q{},q{/+draw() will save the visible innerBounds into imstVisibleBounds+/}],
-				[q{bool},q{1},q{"saveOuterBounds"},q{},q{/+draw() will save the outer world outerBounds into imstOuterBounds +/}],
-				[q{bool},q{1},q{"_measureOnlyOnce"},q{},q{/++/}],
 				[q{bool},q{1},q{"acceptEditorKeys"},q{},q{/+accepts Enter and Tab if it is a textEditor. Conflicts with transaction mode.+/}],
-				[q{ScrollState},q{2},q{"hScrollState"},q{},q{/++/}],
-				[q{ScrollState},q{2},q{"vScrollState"},q{},q{/++/}],
-				[],
-				[q{bool},q{1},q{"clickable"},q{1},q{/+
-					If false, hittest will not check this as clicked. 
-					It checks the parent instead.
-				+/}],
-				[q{bool},q{1},q{"noBackground"},q{},q{/++/}],
-				[q{bool},q{1},q{"cullSubCells"},q{},q{/+clipSubCells must be enabled too+/}],
-				[q{bool},q{1},q{"_hasDrawCallback"},q{},q{/++/}],
-				[q{bool},q{1},q{"selected"},q{},q{/+maintained by system+/}],
-				[q{bool},q{1},q{"hidden"},q{},q{/+only affects draw() calls.+/}],
-				[q{bool},q{1},q{"dontSearch"},q{},q{/+no search() inside this container+/}],
-				[q{bool},q{1},q{"noHitTest"},q{},q{/+don't even bother to add this container and it's subcontainers to the hit list.+/}],
-				[],
-				[q{bool},q{1},q{"dontLocate"},q{},q{/+disables the locate() method for this container and its subcontainers+/}],
-				[q{bool},q{1},q{"oldSelected"},q{},q{/+SelectionManager2 needs this.+/}],
-				[q{bool},q{1},q{"changedCreated"},q{},q{/+Dide2.CodeRow: changed by creationg a new cell+/}],
-				[q{bool},q{1},q{"changedRemoved"},q{},q{/+Dide2.CodeRow: changed by removing existing cells+/}],
-				[q{bool},q{1},q{"dontStretchSubCells"},q{},q{/+Column: don't stretch the items to the innerWidth of the column.+/}],
-				[q{bool},q{1},q{"columnIsTable"},q{},q{/+At the moment it is only used by DIDE+/}],
-				[q{bool},q{1},q{"removed"},q{},q{/+At the moment it is only used by DIDE: SearchResults, BuildMessages can detect validity+/}],
-				[q{uint},q{3},q{"languageId"},q{},q{/+
-					At the moment it is only used by DIDE: 
-					0: DLang/GLSL (Default)
-					1: SQL
-					//2: Console - no syntax, \33 coloring
-					//3: Arduino 
-				+/}],
-				[q{bool},q{1},q{"enabled"},q{1},q{/++/}],
-				[q{bool},q{1},q{"down"},q{1},q{/+Anything with a HitRec sets this. (It is actually h.captured)+/}],
+				[q{bool},q{1},q{"btnRowLines"},q{},q{/+draw thin, dark lines between the buttons of a btnRow+/}],
+				[q{bool},q{1},q{"strictCellOrder"},q{},q{/++/}],
 			]))
 		) .GEN!q{GEN_bitfields}); 
 	} 
-	static assert(ContainerFlags.sizeof==8); 
+	static assert(RowFlags.sizeof==2); 
 	
+	struct ColumnFlags
+	{
+		mixin((
+			(表([
+				[q{/+Note: Type+/},q{/+Note: Bits+/},q{/+Note: Name+/},q{/+Note: Def+/},q{/+Note: Comment+/}],
+				[q{bool},q{1},q{"columnElasticTabs"},q{1},q{/+Column will do ElasticTabs its own Rows.+/}],
+				[q{bool},q{1},q{"dontStretchSubCells"},q{},q{/+Column: don't stretch the items to the innerWidth of the column.+/}],
+				[q{bool},q{1},q{"columnIsTable"},q{},q{/+At the moment it is only used by DIDE+/}],
+				[q{uint},q{3},q{"languageId"},q{},q{/+0: DLang/GLSL (Default), 1: SQL+/}],
+			]))
+		) .GEN!q{GEN_bitfields}); 
+	} 
+	static assert(ColumnFlags.sizeof==1); 
+	
 	
 	//Effective horizontal and vertical flow configuration of subCells
 	enum FlowConfig
@@ -3365,6 +3431,8 @@ version(/+$DIDE_REGION+/all)
 		Cell[] subCells; 
 		SrcId id; //Scrolling needs it. Also useful for debugging. Also DIDE heavily relies on it.
 		ContainerFlags flags; 
+		ColumnFlags colFlags; 
+		RGB bkColor=clWhite; //Todo: background struct
 		protected
 		{
 			Margin margin_; 
@@ -3372,17 +3440,15 @@ version(/+$DIDE_REGION+/all)
 			Border border_; 
 			FlexAmount flex_; 
 		} 
-		RGB bkColor=clWhite; //Todo: background struct
-		
 		
 		auto getHScrollBar()
-		{ return flags.hasHScrollBar ? im.hScrollInfo.getScrollBar(id) : null; } 
+		{ return flags._hasHScrollBar ? im.hScrollInfo.getScrollBar(id) : null; } 
 		auto getVScrollBar()
-		{ return flags.hasVScrollBar ? im.vScrollInfo.getScrollBar(id) : null; } 
+		{ return flags._hasVScrollBar ? im.vScrollInfo.getScrollBar(id) : null; } 
 		auto getHScrollOffset()
-		{ return flags.hasHScrollBar ? im.hScrollInfo.getScrollOffset(id) : 0; } 
+		{ return flags._hasHScrollBar ? im.hScrollInfo.getScrollOffset(id) : 0; } 
 		auto getVScrollOffset()
-		{ return flags.hasVScrollBar ? im.vScrollInfo.getScrollOffset(id) : 0; } 
+		{ return flags._hasVScrollBar ? im.vScrollInfo.getScrollOffset(id) : 0; } 
 		auto getScrollOffset()
 		{ return vec2(getHScrollOffset, getVScrollOffset); } 
 		
@@ -3513,22 +3579,28 @@ version(/+$DIDE_REGION+/all)
 		
 		protected
 		{
-			auto getHFlowConfig()	const
-			{ return .getHFlowConfig     (flags.autoWidth , flags.wordWrap,	flags.hScrollState); } 
-			auto getEffectiveHScroll()	const
-			{ return .getEffectiveHScroll(flags.autoWidth , flags.wordWrap,	flags.hScrollState); } 
-			auto getVFlowConfig()	const
-			{ return .getVFlowConfig     (flags.autoHeight,	flags.vScrollState); } 
-			auto getEffectiveVScroll()	const
-			{ return .getEffectiveVScroll(flags.autoHeight,	flags.vScrollState); } 
+			bool getWordWrap() const
+			{
+				if(auto row = (cast(Row)(this))) return row.rowFlags.wordWrap; 
+				return false; 
+			} 
+			
+			auto getHFlowConfig() const
+			=> .getHFlowConfig(flags.autoWidth, getWordWrap, flags.hScrollState); 
+			auto getEffectiveHScroll() const
+			=> .getEffectiveHScroll(flags.autoWidth, getWordWrap, flags.hScrollState); 
+			auto getVFlowConfig() const
+			=> .getVFlowConfig(flags.autoHeight, flags.vScrollState); 
+			auto getEffectiveVScroll() const
+			=> .getEffectiveVScroll(flags.autoHeight, flags.vScrollState); 
 		} 
 		
-		float calcContentWidth ()
-		{ return subCells.map!(c => c.outerRight ).maxElement(0); } 
+		float calcContentWidth()
+		=> subCells.map!((c)=>(c.outerRight)).maxElement(0); 
 		float calcContentHeight()
-		{ return subCells.map!(c => c.outerBottom).maxElement(0); } 
-		vec2 calcContentSize  ()
-		{ return vec2(calcContentWidth, calcContentHeight); } 
+		=> subCells.map!((c)=>(c.outerBottom)).maxElement(0); 
+		vec2 calcContentSize()
+		=> vec2(calcContentWidth, calcContentHeight); 
 		
 		final void setSubContainerWidths(bool setAll=true)(float targetWidth)
 		{
@@ -3550,7 +3622,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			measureSubCells; 
 			if(flags.autoWidth)
-			innerWidth	= calcContentWidth; 
+			innerWidth = calcContentWidth; 
 			if(flags.autoHeight)
 			innerHeight = calcContentHeight; 
 		} 
@@ -3610,10 +3682,10 @@ version(/+$DIDE_REGION+/all)
 					size.x>=e && (
 						size.y>=scrollThickness+e || 
 						vFlow==FlowConfig.autoSize
-					) && !flags.hasHScrollBar
+					) && !flags._hasHScrollBar
 				)
 				{
-					flags.hasHScrollBar = true; if(vFlow!=FlowConfig.autoSize)
+					flags._hasHScrollBar = true; if(vFlow!=FlowConfig.autoSize)
 					outerSize.y -= scrollThickness; 
 					return true; 
 				}
@@ -3622,10 +3694,10 @@ version(/+$DIDE_REGION+/all)
 					size.y>=e && (
 						size.x>=scrollThickness+e || 
 						hFlow==FlowConfig.autoSize
-					) && !flags.hasVScrollBar
+					) && !flags._hasVScrollBar
 				)
 				{
-					flags.hasVScrollBar = true; if(hFlow!=FlowConfig.autoSize)
+					flags._hasVScrollBar = true; if(hFlow!=FlowConfig.autoSize)
 					outerSize.x -= scrollThickness; 
 					return true; 
 				}
@@ -3730,8 +3802,8 @@ version(/+$DIDE_REGION+/all)
 			} 
 			
 			//detect scrollbars
-			flags.hasHScrollBar = false; 
-			flags.hasVScrollBar = false; 
+			flags._hasHScrollBar = false; 
+			flags._hasVScrollBar = false; 
 			
 			if(maxFlow<=FlowConfig.noScroll)
 			{ handleNoScroll; }
@@ -3752,18 +3824,18 @@ version(/+$DIDE_REGION+/all)
 				}
 				
 				//setup the scrollbars
-				if(flags.hasHScrollBar)
+				if(flags._hasHScrollBar)
 				im.hScrollInfo.update(this, calcContentWidth, innerWidth); 
-				if(flags.hasVScrollBar)
+				if(flags._hasVScrollBar)
 				im.vScrollInfo.update(this, calcContentHeight, innerHeight); 
 				
 				/+
 					restore size after rearrange. 
 					(Autosize wont subtract the scrollbarthickness, so it will be added here as an extra.)
 				+/
-				if(flags.hasHScrollBar)
+				if(flags._hasHScrollBar)
 				outerSize.y += scrollThickness; 
-				if(flags.hasVScrollBar)
+				if(flags._hasVScrollBar)
 				outerSize.x += scrollThickness; 
 			}
 			
@@ -3949,9 +4021,9 @@ version(/+$DIDE_REGION+/all)
 			const 	scrollOffset = getScrollOffset,
 				hasScrollOffset = !isnull(scrollOffset); 
 			
-			if(flags.saveVisibleBounds)
+			if(flags._saveVisibleBounds)
 			{ imstVisibleBounds(id) = bounds2(scrollOffset, scrollOffset+innerSize); }
-			if(flags.saveOuterBounds)
+			if(flags._saveOuterBounds)
 			{ imstOuterBounds(id) = dr.inputTransform(outerBounds); }
 			
 			dr.translate(innerPos); 
@@ -3979,14 +4051,6 @@ version(/+$DIDE_REGION+/all)
 			g_getDrawCallback(this)(dr, this); 
 			
 			onDraw(dr); 
-			
-			if(flags.btnRowLines && subCells.length>1)
-			{
-				dr.color = clWinText; dr.lineWidth = 1; dr.alpha = 0.25f; 
-				foreach(sc; subCells[1..$])
-				dr.vLine(sc.outerX, sc.outerY+sc.margin.top+.25f, sc.outerY+sc.outerHeight-sc.margin.bottom-.25f); 
-				dr.alpha = 1; 
-			}
 			
 			if(hasScrollOffset)
 			dr.pop; 
@@ -4383,10 +4447,8 @@ version(/+$DIDE_REGION+/all)
 	
 	class Row : Container
 	{
-		//for Elastic tabs
-		/+private+/ int[] tabIdxInternal; 
-		bool strictCellOrder; 
-		/+bool hasFlex; +/
+		/+private+/ int[] tabIdxInternal; //for Elastic tabs
+		RowFlags rowFlags; 
 		
 		void refreshTabIdx()
 		{ tabIdxInternal = subCells.enumerate.filter!((a)=>(isTab(a.value))).map!(a => (cast(int)(a.index))).array; } 
@@ -4583,24 +4645,24 @@ version(/+$DIDE_REGION+/all)
 		override void rearrange()
 		{
 			//adjust length of leading and internal tabs
-			if(flags.rowElasticTabs)
+			if(rowFlags.rowElasticTabs)
 			adjustTabSizes_multiLine; 
 			else adjustTabSizes_singleLine; 
 			
 			solveFlexAndMeasureAll();  //Opt: a containerFlag to disable the slow flexSum calculation
 			
-			const doWrap = flags.wordWrap && !flags.autoWidth; 
+			const doWrap = rowFlags.wordWrap && !flags.autoWidth; 
 			
 			auto wrappedLines = makeWrappedLines(doWrap); 
 			//LOG("wl", wrappedLines, autoWidth, wrappedLines.calcWidth);
 			
-			if(flags.rowElasticTabs)
+			if(rowFlags.rowElasticTabs)
 			processElasticTabs(wrappedLines, ((flags.autoWidth)?(float.nan):(innerWidth))); 
 			
 			//hide spaces on the sides by wetting width to 0. This needs for size calculation.
 			//Todo: don't do this for the line being edited!!!
-			if(doWrap && !flags.dontHideSpaces)
-			wrappedLines.hideSpaces(flags.hAlign); 
+			if(doWrap && !rowFlags.dontHideSpaces)
+			wrappedLines.hideSpaces(rowFlags.hAlign); 
 			
 			//horizontal alignment, sizing
 			if(flags.autoWidth)
@@ -4608,7 +4670,7 @@ version(/+$DIDE_REGION+/all)
 			
 			//horizontal text align on every line
 			if(!flags.autoWidth || wrappedLines.length>1)
-			wrappedLines.applyHAlign(flags.hAlign, innerWidth); 
+			wrappedLines.applyHAlign(rowFlags.hAlign, innerWidth); 
 			//Note: >1 because autoWidth and 1 line is already aligned
 			
 			//vertical alignment, sizing
@@ -4622,15 +4684,15 @@ version(/+$DIDE_REGION+/all)
 				//height is fixed
 				auto remaining = innerHeight - wrappedLines.calcHeight; 
 				if(remaining > AlignEpsilon)
-				wrappedLines.applyVAlign(flags.vAlign, innerHeight); 
+				wrappedLines.applyVAlign(rowFlags.vAlign, innerHeight); 
 			}
 			
-			wrappedLines.applyYAlign(flags.yAlign); 
+			wrappedLines.applyYAlign(rowFlags.yAlign); 
 			
 			//remember the contents of the edited row
 			rememberEditedWrappedLines(this, wrappedLines); 
 			
-			strictCellOrder = wrappedLines.length<=1; 
+			rowFlags.strictCellOrder = wrappedLines.length<=1; 
 		} 
 		
 		override void draw(Drawing dr)
@@ -4641,10 +4703,24 @@ version(/+$DIDE_REGION+/all)
 			drawTextEditorOverlay(dr, this); 
 		} 
 		
+		override void onDraw(Drawing dr)
+		{
+			if(rowFlags.btnRowLines && subCells.length>1)
+			{
+				dr.color = clWinText; dr.lineWidth = 1; dr.alpha = 0.25f; 
+				foreach(sc; subCells[1..$])
+				dr.vLine(
+					sc.outerX, 	sc.outerY + sc.margin.top	+.25f, 
+						sc.outerY + sc.outerHeight - sc.margin.bottom 	-.25f
+				); 
+				dr.alpha = 1; 
+			}
+		} 
+		
 		
 		override Cell[] internal_hitTest_filteredSubCells(vec2 p)
 		{
-			if(strictCellOrder)
+			if(rowFlags.strictCellOrder)
 			{
 				return sortedSubCellsAroundX(subCells, p); 
 				/+Todo: make this work for multiline too+/
@@ -4664,7 +4740,7 @@ version(/+$DIDE_REGION+/all)
 		
 		Cell subCellAtX(float x, Flag!"snapToNearest" snapToNearest = No.snapToNearest)
 		{
-			assert(!flags.wordWrap); //Todo: no multiline either
+			assert(!rowFlags.wordWrap); //Todo: no multiline either
 			
 			if(subCells.empty)
 			return null; 
@@ -4679,14 +4755,15 @@ version(/+$DIDE_REGION+/all)
 			return snapToNearest ? subCells.back : null; 
 		} 
 		
-		void stretchGlyph(long idx/+index of glyph+/)
+		void stretchSubGlyph(sizediff_t idx/+index of glyph, -1 means [$-1]+/)
 		{
-			if(auto g = (cast(Glyph)(subCells.get(idx>=0 ? idx : subCells.length+idx))))
-			{ g.stretch(0, innerHeight); }
+			if(idx<0) idx += subCells.length; 
+			if(auto g = (cast(Glyph)(subCells.get(idx))))
+			{ .stretchGlyph(subCells[idx], 0, innerHeight); }
 		} 
 		
-		void stretchGlyphs(long[] idx... /+indices of glyphs+/)
-		{ idx.each!(i=>stretchGlyph(i)); } 
+		void stretchSubGlyphs(sizediff_t[] idx... /+indices of glyphs+/)
+		{ idx.each!((i)=>(stretchSubGlyph(i))); } 
 	} 
 	
 	class Column : Container
@@ -4694,7 +4771,7 @@ version(/+$DIDE_REGION+/all)
 		override void rearrange()
 		{
 			//measure the subCells and stretch them to a maximum width
-			if(flags.dontStretchSubCells)
+			if(colFlags.dontStretchSubCells)
 			{
 				measureSubCells; 
 				innerWidth = calcContentWidth; 
@@ -4718,7 +4795,7 @@ version(/+$DIDE_REGION+/all)
 				setSubContainerWidths(innerWidth); 
 			}
 			
-			if(flags.columnElasticTabs)
+			if(colFlags.columnElasticTabs)
 			processElasticTabs(subCells, ((flags.autoWidth)?(float.nan):(innerWidth))); //Todo: ez a flex=1 -el egyutt bugzik.
 			
 			//process vertically flexible items
@@ -4779,7 +4856,7 @@ version(/+$DIDE_REGION+/all)
 			
 			void drawPages(Cell[][] pages)
 			{
-				if(flags.dontStretchSubCells)
+				if(colFlags.dontStretchSubCells)
 				WARN("flags.dontStretchSubCells should be disabled for multiPage Column."); 
 				
 				const ub = pages.map!(c => c.front.outerRight).assumeSorted.upperBound(b.left).length; 
@@ -4837,7 +4914,7 @@ version(/+$DIDE_REGION+/all)
 			
 			Row[][] rearrangePages_byLastRows(alias isLastRow)(float pageGapWidth)
 			{
-				if(flags.dontStretchSubCells)
+				if(colFlags.dontStretchSubCells)
 				WARN("flags.dontStretchSubCells should be disabled for multiPage Column."); 
 				
 				auto rows = cast(Row[]) subCells; 
@@ -5317,7 +5394,7 @@ version(/+$DIDE_REGION+/all)
 							invRowHeight 	= 1/rowHeight; 
 						Container({ outerPos = vec2(maxRowWidth, rows.length*rowHeight); outerSize = vec2(0); }); 
 						
-						flags.saveVisibleBounds = true; 
+						flags._saveVisibleBounds = true; 
 						if(const visibleBounds = imstVisibleBounds(imId))
 						{
 							void doit(int i, TreeRow r)
@@ -5327,7 +5404,7 @@ version(/+$DIDE_REGION+/all)
 									Row(
 										((identityStr(r.item)).genericArg!q{id}),
 										{
-											flags.wordWrap = false; outerPos = vec2(0, i*rowHeight); outerHeight = fh; 
+											rowFlags.wordWrap = false; outerPos = vec2(0, i*rowHeight); outerHeight = fh; 
 											
 											version(/+$DIDE_REGION Tree graphics+/all)
 											{
@@ -5434,6 +5511,9 @@ version(/+$DIDE_REGION+/all)
 		
 		260810: realigning fields in Container
 		Border: 6, Padding:8, Cell:32, Glyph:61, Container:91, Row:113, Column:91, Style: 9
+		
+		260821: split flags to -> flags, rowFlags, colFlags
+		Border: 6, Padding:8, Cell:32, Glyph:61, Container:88, Row:106, Column:88, Style: 9
 	+/
 	
 	pragma(msg,i"Border: $(Border.sizeof), Padding:$(Padding.sizeof), Cell:$(__traits(classInstanceSize, Cell)), Glyph:$(__traits(classInstanceSize, Glyph)), Container:$(__traits(classInstanceSize, Container)), Row:$(__traits(classInstanceSize, Row)), Column:$(__traits(classInstanceSize, Column)), Style: $(TextStyle.sizeof)".text.注); 
@@ -6877,7 +6957,7 @@ struct im
 		{
 			if(actContainer)
 			{
-				actContainer.flags.saveOuterBounds = true; 
+				actContainer.flags._saveOuterBounds = true; 
 				return imstOuterBounds(actContainer.id); 
 			}
 			return typeof(return).init; 
@@ -7144,8 +7224,7 @@ struct im
 				{
 					if(pp)
 					{
-						
-						enforce(cntr.flags.targetSurface == 1, "Unable to set PanelPosition on world_surface."); 
+						enforce(cntr.flags.targetSurface == TargetSurface.gui, "Unable to set PanelPosition on world_surface."); 
 						
 						cntr.measure; //must know all the sizes from now on
 						
@@ -7373,18 +7452,21 @@ struct im
 				
 			} 
 			
-			static auto hitTest(.Container container, bool enabled=true)
+			static auto hitTest(.Container container)
 			{
 				assert(container !is null); 
 				auto res = hitTestManager.check(container.id); 
-				res.enabled = enabled; 
+				res.enabled = container.flags.enabled; 
 				
-				container.flags.down = res.captured; 
+				container.flags.hover = res.hover; 
+				container.flags.captured = res.captured; 
+				
+				
 				return res; 
 			} 
 			
-			auto hitTest(bool enabled=true)
-			{ return hitTest(actContainer, enabled); } 
+			auto hitTest()
+			{ return hitTest(actContainer); } 
 		}
 		version(/+$DIDE_REGION Focus+/all)
 		{
@@ -7421,6 +7503,7 @@ struct im
 				).調!(GEN_bitfields)); 
 				alias this = focused; 
 			} 
+			//Todo: this needs only 2 bits! none, exited, entered, focused
 			
 			FocusState focusUpdate(.Container container, in Id id, bool canFocus, lazy bool enterFocusNow, lazy bool exitFocusNow)
 			{
@@ -7592,7 +7675,7 @@ struct im
 										padding.set(4); 
 										style.fontColor = clText; 
 										background = style.bkColor = clBack; 
-										flags.rowElasticTabs = true; 
+										rowFlags.rowElasticTabs = true; 
 										Text(str); 
 									}
 								); 
@@ -7961,8 +8044,8 @@ struct im
 						if(doPurge) toRemove ~= id; 
 						continue; 
 					}
-					const exists 	= (orientation=='H' && info.container.flags.hasHScrollBar)
-						|| (orientation=='V' && info.container.flags.hasVScrollBar); 
+					const exists 	= (orientation=='H' && info.container.flags._hasHScrollBar)
+						|| (orientation=='V' && info.container.flags._hasVScrollBar); 
 					if(!exists) continue; 
 					
 					bool enabled; 
@@ -8005,12 +8088,12 @@ struct im
 								if(orientation=='H')
 								{
 									im.outerPos = vec2(0, innerHeight-scrollThickness); 
-									im.outerSize = vec2(innerWidth-((flags.hasVScrollBar) ?(scrollThickness):(0)), scrollThickness); 
+									im.outerSize = vec2(innerWidth-((flags._hasVScrollBar) ?(scrollThickness):(0)), scrollThickness); 
 								}
 								else
 								{
 									im.outerPos = vec2(innerWidth-scrollThickness, 0); 
-									im.outerSize = vec2(scrollThickness, innerHeight-((flags.hasHScrollBar) ?(scrollThickness):(0))); 
+									im.outerSize = vec2(scrollThickness, innerHeight-((flags._hasHScrollBar) ?(scrollThickness):(0))); 
 								}
 							}
 						).名!q{init})
@@ -8159,7 +8242,7 @@ struct im
 									style.fontColor = mix(style.fontColor, style.bkColor, blink^^2); 
 									
 									padding = "4 24"; 
-									flags.hAlign = HAlign.center; 
+									rowFlags.hAlign = HAlign.center; 
 									const 	tIn = (now-m.when).value(.5f*second),
 										tOut = (m.when+flashMessageDuration-now).value(.25f*second); 
 									
@@ -8194,6 +8277,8 @@ struct im
 			
 			//Todo: ezt egy alias this-el egyszerusiteni. Jelenleg az im-ben is meg az im.StackEntry-ben is ugyanaz van redundansan deklaralva
 			.Container actContainer, lastContainer; //top of the containerStack for faster access
+			auto actRow() => (cast(.Row)(actContainer)); 
+			auto actColumn() => (cast(.Column)(actContainer)); 
 			//Todo: thisContainer could be a better name for actContainer.
 			
 			TextStyle textStyle;   alias style = textStyle; //Todo: style.opDispatch("fontHeight=0.5x")
@@ -8468,6 +8553,11 @@ struct im
 				].map!ContainerRef.join
 			); 
 			
+			ref auto rowFlags()
+			=> actRow.rowFlags; ref auto colFlags()
+			=> actColumn.colFlags; 
+			
+			
 			@property background()
 			=> actContainer.bkColor; 
 			
@@ -8533,14 +8623,18 @@ struct im
 			}],
 			[q{isG!"id"},q{/+already handled+/}],
 			[q{isG!"init"},q{a(); }],
-			[q{isT!YAlign},q{flags.yAlign = a; }],
-			[q{isT!HAlign},q{flags.hAlign = a; }],
-			[q{isT!VAlign},q{flags.vAlign = a; }],
+			[q{isT!YAlign},q{rowFlags.yAlign = a; }],
+			[q{isT!HAlign},q{rowFlags.hAlign = a; }],
+			[q{isT!VAlign},q{rowFlags.vAlign = a; }],
 			[q{isT!Theme},q{theme.set(a); }],
 			[q{isG!"padding" || isT!Padding},q{padding = a; }],
 			[q{isG!"border" || isT!Border},q{border = a; }],
 			[q{isG!"margin" || isT!Margin},q{margin = a; }],
 			[q{isG!"background"},q{background = a; }],
+			[q{isG!"outerWidth"},q{outerWidth = a; }],
+			[q{isG!"outerHeight"},q{outerHeight = a; }],
+			[q{isG!"innerWidth"},q{innerWidth = a; }],
+			[q{isG!"innerHeight"},q{innerHeight = a; }],
 			[q{isT!RGB},q{style.fg = a; }],
 			[q{isG!"flex"},q{flex = a; }],
 			[q{isG!"enabled"},q{imEnabled = a; }],
@@ -8653,7 +8747,7 @@ struct im
 						}
 					)
 				)
-				$(OPT!"hit"(q{auto hit = hitTest(_container, imEnabled); }))
+				$(OPT!"hit"(q{auto hit = hitTest(_container); }))
 				$(
 					OPT!"key" /+Must be after `hit` and before `focus`.+/
 					(
@@ -8785,7 +8879,7 @@ struct im
 			const vert = (cast(.Row)(actContainer)) !is null; 
 			Row(
 				args, {
-					if(vert) { innerWidth = size; flags.yAlign = YAlign.stretch; }
+					if(vert) { innerWidth = size; rowFlags.yAlign = YAlign.stretch; }
 					else {
 						innerHeight = size; 
 						/+width is auto by default. A Column will stretch it properly.+/
@@ -8871,7 +8965,8 @@ struct im
 			); 
 		} 
 		
-		HitInfo Splitter(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
+		HitInfo Splitter(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)
+			(ref float targetSize, float targetMinSize, float targetMaxSize, in Args args)
 		{
 			setIncomingId!(_M_, _L_)(); 
 			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
@@ -8898,18 +8993,17 @@ struct im
 				const siz = fh/6; 
 				if(isHorz) outerWidth = siz; if(isVert) outerHeight = siz; 
 				
-				static vec2 startMousePos, startTargetSize; 
+				static vec2 startMousePos; 
 				auto actMousePos() => targetView.mousePos.vec2; 
 				
-				auto targetCell = prevSiblingCell; 
-				enforce(targetCell, "Splitter can't access previous Cell."); 
+				static float startTargetSize = 0; 
 				
 				static bool dragging; 
 				
 				if(canProcessUserInput && hit.pressed)
 				{
 					startMousePos = actMousePos; 
-					startTargetSize = targetCell.outerSize; 
+					startTargetSize = targetSize; 
 					dragging = true; 
 				}
 				
@@ -8919,10 +9013,16 @@ struct im
 					{ dragging = false; }
 					else
 					{
-						const shift = ((0x3E6C8EB16D5C4).檢(actMousePos - startMousePos)); 
-						const targetSize = (startTargetSize + shift).clamp(1, 20_000); 
-						if(isHorz) targetCell.outerSize.x = targetSize.x; 
-						if(isVert) targetCell.outerSize.y = targetSize.y; 
+						const ofs = actMousePos - startMousePos; 
+						float a = startTargetSize; 
+						with(PanelPosition)
+						switch(panelPosition)
+						{
+							case leftClient: 	a += ofs.x; 	break; 
+							case rightClient: 	a -= ofs.x; 	break; 
+							default: 
+						}
+						targetSize = a.clamp(targetMinSize, targetMaxSize.max(targetMinSize)); 
 					}
 				}
 				
@@ -9265,7 +9365,7 @@ struct im
 				version(/+$DIDE_REGION Local variable declarations+/all)
 				{
 					applyEditStyle(true, false, 0); 
-					flags.hAlign = ((isNumeric!V)?(HAlign.right) :(HAlign.left)); 
+					rowFlags.hAlign = ((isNumeric!V)?(HAlign.right) :(HAlign.left)); 
 				}
 				
 				version(/+$DIDE_REGION Load all properties+/all)
@@ -9315,7 +9415,7 @@ struct im
 			{
 				auto _row = cast(.Row)_container; 
 				
-				flags.hAlign = ((isNumeric!V)?(HAlign.right) :(HAlign.left)); 
+				rowFlags.hAlign = ((isNumeric!V)?(HAlign.right) :(HAlign.left)); 
 				flags.clipSubCells = true; 
 			}
 			
@@ -9380,9 +9480,9 @@ struct im
 						const localMouse = res.hit.hover ? res.hit.localPos : vec2(0); 
 						
 						textEditorState.handleKeyboardInput
-							(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
+							(mainWindow.inputChars, rowFlags.acceptEditorKeys, localMouse); 
 						
-						flags.dontHideSpaces = true; 
+						rowFlags.dontHideSpaces = true; 
 					}
 				}
 			}
@@ -9539,7 +9639,7 @@ struct im
 			version(/+$DIDE_REGION Local variable declarations+/all)
 			{
 				//flags.wordWrap = false;
-				flags.hAlign = HAlign.center; 
+				rowFlags.hAlign = HAlign.center; 
 			}
 			
 			version(/+$DIDE_REGION Load all properties+/all)
@@ -9566,7 +9666,7 @@ struct im
 			Container!(Cntr, _M_, _L_)
 			(
 				{
-					flags.btnRowLines = true; 
+					static if(is(Cntr : .Row)) rowFlags.btnRowLines = true; 
 					
 					fun(); 
 					
@@ -9731,7 +9831,7 @@ struct im
 			}
 			
 			version(/+$DIDE_REGION Local variable declarations+/all)
-			{ flags.hAlign = HAlign.center; }
+			{ rowFlags.hAlign = HAlign.center; }
 			
 			version(/+$DIDE_REGION Load all properties+/all)
 			{ mixin(SCR.ProcessProperties); }
@@ -9778,7 +9878,7 @@ struct im
 			bool res; 
 			Row(
 				{
-					flags.btnRowLines = true; 
+					rowFlags.btnRowLines = true; 
 					auto r1 = DecBtn!(_M_, _L_)(value, args); 
 					lastCell.margin.right = 0; 
 					auto r2 = IncBtn!(_M_, _L_)(value, args); 
@@ -10358,7 +10458,7 @@ struct im
 				(
 				{
 					btn = actContainer; 
-					flags.hAlign = HAlign.left; 
+					rowFlags.hAlign = HAlign.left; 
 					
 					if(idx.inRange(items))	{ Text(unaryFun!translator(items[idx])); }
 					else	{ Text(clGray, "none"); }
@@ -10377,7 +10477,7 @@ struct im
 			ListBoxResult res; 
 			if(isFocused(hit.id))
 			{
-				btn.flags.saveOuterBounds = true /+world outer bounds will be saved on next Draw()+/; 
+				btn.flags._saveOuterBounds = true /+world outer bounds will be saved on next Draw()+/; 
 				/+It is saved ALL the time, so it survives the 1 frame delay.+/
 				
 				if(hit.pressed) dropdownState.toggle(hit.id); 
@@ -10463,7 +10563,7 @@ struct im
 									Row(
 										{
 											flex = 1; 
-											actContainer.flags.hAlign = HAlign.right; 
+											rowFlags.hAlign = HAlign.right; 
 											Text(" "); 
 										}
 									); 
@@ -10490,7 +10590,7 @@ struct im
 									Row(
 										{
 											flex = 1; 
-											flags.hAlign = HAlign.center; //Todo: not precise center!!!
+											rowFlags.hAlign = HAlign.center; //Todo: not precise center!!!
 											if(Link("default: " ~ prop.def.text ~ postFix))
 											prop.act = prop.def; 
 										}
@@ -11633,10 +11733,10 @@ version(/+$DIDE_REGION Dead code 260813+/none)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x51237EB16D5C4).檢(hit.toJson)); 
+					((0x51D1FEB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x51271EB16D5C4).檢(localMouse)); 
+					((0x51D59EB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 

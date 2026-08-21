@@ -50,7 +50,7 @@ void ColorRow(string colorName, float hScale = 1)
 					}
 					outerWidth = 52; 
 					background = style.bkColor = colorName.toWireColor; 
-					style.fontColor = blackOrWhiteFor(style.bkColor); flags.hAlign = HAlign.center; 
+					style.fontColor = blackOrWhiteFor(style.bkColor); rowFlags.hAlign = HAlign.center; 
 					fh = fh*hScale; 
 					Text(colorName); 
 				}
@@ -633,7 +633,7 @@ class ArduinoNanoProject
 			{
 				CableFrame(
 					{
-						flags.yAlign = YAlign.baseline; 
+						rowFlags.yAlign = YAlign.baseline; 
 						ColorRow(color); 
 						fh = 22; 	  Text("  ", boldStr(name)); 
 						fh = 3; 	  Text("\n "); 
@@ -733,7 +733,7 @@ class ArduinoNanoProject
 				border = "2 normal gray"; 
 				padding = "4"; 
 				background = style.bkColor = RGB(230, 230, 230); 
-				flags.yAlign = YAlign.baseline; 
+				rowFlags.yAlign = YAlign.baseline; 
 			}, args
 		); 
 		
