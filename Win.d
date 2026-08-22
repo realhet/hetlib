@@ -14,6 +14,8 @@ version(/+$DIDE_REGION+/all) {
 	
 	public import het.inputs: inputs, KeyCombo, MouseState, ClickDetector; 
 	
+	__gshared _FORCED_APPLICATION_EXIT_IN_MAIN = false; 
+	
 	//moved into utils.application.tick __gshared uint global_tick; //counts in every update cycle
 	__gshared size_t global_TPSCnt, global_TPS; //texture upload bytes /sec
 	__gshared size_t global_VPSCnt, global_VPS; //VBO upload bytes /sec
@@ -254,10 +256,12 @@ version(/+$DIDE_REGION+/all) {
 	
 	int main(string[] args)
 	{
-		MSG  msg; 
+		/+Runtime.initialize; scope(exit) Runtime.terminate; +///260822: Removed because this will never be a DLL. 
 		Runtime.initialize; 
 		application._initialize; 
 		
+		MSG  msg; 
+		int exitCode = 0; 
 		try {
 			SetPriorityClass(GetCurrentProcess, HIGH_PRIORITY_CLASS); 
 			
@@ -298,15 +302,19 @@ version(/+$DIDE_REGION+/all) {
 			done: 
 			Window.destroyAllWindows; 
 		}
-		catch(Throwable o) { showException(o); }
-		
+		catch(Throwable o) { exitCode = 1; showException(o); }
 		application._finalize; 
 		Runtime.terminate; 
 		
-		//Todo: Mark the unused threads as daemon threads (in karc2.d, utils.d, bitmap.d) and remove this application.exit!!!!
-		application.exit; //let it exit even if there are threads stuck in
+		if(_FORCED_APPLICATION_EXIT_IN_MAIN)
+		{
+			//Todo: Mark the unused threads as daemon threads (in karc2.d, utils.d, bitmap.d) and remove this application.exit!!!!
+			application.exit(exitCode); /+application.exit; //let it exit even if there are threads stuck in+/
+			/+260822: This workaround required because DIDE stuck inside at exit.+/
+		}
 		
-		return 0; //never reached
+		
+		return exitCode; 
 	} 
 	
 	

@@ -5115,10 +5115,6 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				void reload()
 				{
 					clearShaderModules; 
-					enforce(
-						binary.startsWith((cast(ubyte[])("PK\3\4"))), 
-						"Invalid Shader Module binary format."
-					); 
 					auto z = binary.unzipAA; 
 					{
 						string[] a; foreach(k; z.keys) if(!stageName.canFind(k)) a ~= k; 
@@ -5915,9 +5911,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							uploadBuffers; /+
 								Opt: upload imgSrc only -> 1 command buffer 
 								with a barrier bewteen copy and execute
-							+/	((0x337D54F76D066).檢(0x326B29B0E4249)); 
-							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x3383B4F76D066).檢(0x3271A9B0E4249)); 
-							downloadBuffers; /+Opt: Download imgMask only+/	((0x3389E4F76D066).檢(0x3277F9B0E4249)); 
+							+/	((0x337584F76D066).檢(0x326B29B0E4249)); 
+							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x337BE4F76D066).檢(0x3271A9B0E4249)); 
+							downloadBuffers; /+Opt: Download imgMask only+/	((0x338214F76D066).檢(0x3277F9B0E4249)); 
 						} 
 					}
 				} 

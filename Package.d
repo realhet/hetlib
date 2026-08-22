@@ -1518,65 +1518,6 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		pragma(lib, "Psapi.lib"); 
 		
-		class ExeMapFile
-		{
-			ulong baseAddr; 
-			
-			struct Rec {
-				string mangledName; 
-				ulong addr; 
-				string objName; 
-				
-				string name() {
-					import std.demangle; 
-					return demangle(mangledName); 
-				} 
-			} 
-			
-			Rec[] list; 
-			
-			this(File f = File.init)
-			{
-				if(!f) f = appFile.otherExt("map"); 
-				
-				bool active=false; 
-				foreach(line; f.readLines(false))
-				{
-					LOG(line); 
-					
-					if(!active) active = line.isWild("*Address*Publics by Value*Rva+Base*Lib:Object"); 
-					auto p = line.split.array; 
-					switch(p.length) {
-						case 5: { if(p[0]=="Preferred") { baseAddr = p[4].to!ulong(16); }}break; 
-						case 4: {
-							if(active && p[0].isWild("0001:*"))
-							{
-								//LDC1.28+
-								list ~= Rec(p[1], p[2].to!ulong(16) - baseAddr, p[3]); 
-							}
-						}break; 
-						default: 
-					}
-				}
-				
-				list = list.sort!"a.addr < b.addr".array; //not sure if already sorted
-				
-				if(list.empty) ERR("EXEMAPFILE is fucked up."); 
-			} 
-			
-			string locate(ulong relAddr)
-			{
-				//Todo: Try core.runtime.defaultTraceHandler
-				
-				foreach(idx; 1..list.length)
-				if(list[idx-1].addr <= relAddr && list[idx].addr > relAddr)
-				return list[idx-1].name; 
-				return ""; 
-			} 
-		} 
-		
-		alias exeMapFile = Singleton!ExeMapFile; 
-		
 		auto exceptionCodeToStr(uint code)
 		{
 			import core.sys.windows.windows; 
@@ -1648,7 +1589,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 							Now I disable it.  In the IDE it seems ok...
 						+/
 						
-						if(locateInMapFile && enableExeMapFile)
+						static if(enableExeMapFile)
+						if(locateInMapFile)
 						{
 							if(fileName==appFile)
 							{ res.location = exeMapFile.locate(addr-base); }
@@ -3427,15 +3369,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1AEDB59F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A9A159F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1AFA359F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1AA6959F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B04D59F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B0C259F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1AB1359F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1AB8859F156A1})); 
 						+/
 					+/
 				+/
@@ -14656,6 +14598,7 @@ version(/+$DIDE_REGION Date Time handling+/all)
 		
 		void unzipCB(const(ubyte)[] zipData, void delegate(string, lazy ubyte[]) fun)
 		{
+			enforce(zipData.startsWith((cast(ubyte[])("PK\3\4"))), "Invalid ZIP signature."); 
 			import std.zip; 
 			auto zip = scoped!ZipArchive(cast(ubyte[])zipData); 
 			foreach(member; zip.directory)
@@ -15988,7 +15931,66 @@ version(/+$DIDE_REGION debug+/all)
 			
 		} 
 	}
-	class DebugInfo
+	version(/+$DIDE_REGION+/all) {
+		class ExeMapFile
+		{
+			ulong baseAddr; 
+			
+			struct Rec {
+				string mangledName; 
+				ulong addr; 
+				string objName; 
+				
+				string name() {
+					import std.demangle; 
+					return demangle(mangledName); 
+				} 
+			} 
+			
+			Rec[] list; 
+			
+			this(File f = File.init)
+			{
+				if(!f) f = appFile.otherExt("map"); 
+				
+				bool active=false; 
+				foreach(line; f.readLines(false))
+				{
+					LOG(line); 
+					
+					if(!active) active = line.isWild("*Address*Publics by Value*Rva+Base*Lib:Object"); 
+					auto p = line.split.array; 
+					switch(p.length) {
+						case 5: { if(p[0]=="Preferred") { baseAddr = p[4].to!ulong(16); }}break; 
+						case 4: {
+							if(active && p[0].isWild("0001:*"))
+							{
+								//LDC1.28+
+								list ~= Rec(p[1], p[2].to!ulong(16) - baseAddr, p[3]); 
+							}
+						}break; 
+						default: 
+					}
+				}
+				
+				list = list.sort!"a.addr < b.addr".array; //not sure if already sorted
+				
+				if(list.empty) ERR("EXEMAPFILE is fucked up."); 
+			} 
+			
+			string locate(ulong relAddr)
+			{
+				//Todo: Try core.runtime.defaultTraceHandler
+				
+				foreach(idx; 1..list.length)
+				if(list[idx-1].addr <= relAddr && list[idx].addr > relAddr)
+				return list[idx-1].name; 
+				return ""; 
+			} 
+		} 
+		
+		alias exeMapFile = Singleton!ExeMapFile; 
+	}class DebugInfo
 	{
 		static private
 		{

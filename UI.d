@@ -3460,7 +3460,10 @@ version(/+$DIDE_REGION+/all)
 		=> subCells.map!((c)=>((cast(Container)(c)))).filter!"a"; 
 		
 		void appendCell (Cell c)
-		{ if(c)	subCells ~= c; } 
+		{
+			//This is the central append function. It can be overridden.
+			if(c)	subCells ~= c; 
+		} 
 		
 		int cellCount() const
 		=> (cast(int)(subCells.length)); 
@@ -3480,10 +3483,10 @@ version(/+$DIDE_REGION+/all)
 		final void append(Cell c)
 		{ appendCell(c); } 
 		final void append(Cell[] r)
-		{ r.each!(c => appendCell(c)); } 
+		{ r.each!((c)=>(appendCell(c))); } 
 		
 		final void append(void delegate() fun)
-		{ append(im.build(fun)); } 
+		{ append(im.buildCells(fun)); } 
 		
 		void	appendImg (File fn, in TextStyle ts)
 		{ appendCell(new Img(fn, ts.bkColor)); } 
@@ -8281,6 +8284,42 @@ struct im
 			auto actColumn() => (cast(.Column)(actContainer)); 
 			//Todo: thisContainer could be a better name for actContainer.
 			
+			auto prevCell(T:Cell=Cell)()
+			{
+				Cell cell; 
+				if(actContainer && actContainer.subCells.length)
+				cell = actContainer.subCells[$-1]; 
+				return cast(T)cell; 
+			} 
+			
+			auto subCells()
+			=> actContainer.subCells; 
+			auto subCells(T : .Cell)()
+			=> actContainer.subCells.map!(c => cast(T)c).filter!(c => c !is null); 
+			auto subContainers()
+			=> actContainer.subContainers; 
+			
+			.Container parentContainer()
+			{
+				if(stack.length<2) enforce(0, "im.Stack underflow."); 
+				if(stack.length==2) return null; 
+				return stack[$-2].container; 
+			} 
+			
+			Cell[] siblingCells()
+			{
+				auto p = parentContainer; 
+				return ((p)?(p.subCells):(rootCells)); 
+			} 
+			
+			Cell prevSiblingCell()
+			{
+				auto siblings = siblingCells; 
+				enforce(siblings.length>=2 && siblings.back is actContainer, "siblingCells() broken."); 
+				return siblings[$-2]; 
+			} 
+			
+			
 			TextStyle textStyle;   alias style = textStyle; //Todo: style.opDispatch("fontHeight=0.5x")
 			
 			enum Theme: ubyte
@@ -8320,36 +8359,8 @@ struct im
 			ThemeState theme; 
 			
 			MouseCursor mouseCursor; 
-			
-			@property
-			{
-				//must use `im` prefixes because these are dangerously common identifier names.
-				
-				Id imId()
-				=> ((actContainer)?(actContainer.id):(Id.init)); 
-				
-				bool imFocused()
-				=> ((actContainer)?(actContainer.flags.focused):(false)); 
-				
-				bool imEnabled()
-				=> ((actContainer)?(actContainer.flags.enabled):(true/+empty root is always enabled+/)); 
-				bool imEnabled(bool a)
-				{ if(actContainer) actContainer.flags.enabled = a; return a; } 
-				
-				bool imSelected()
-				=> ((actContainer)?(actContainer.flags.selected):(false)); 
-				bool imSelected(bool a)
-				{ if(actContainer) actContainer.flags.selected = a; return a; } 
-			} 
 			
-			auto lastCell(T:Cell=Cell)()
-			{
-				Cell cell; 
-				if(actContainer && actContainer.subCells.length)
-				cell = actContainer.subCells[$-1]; 
-				return cast(T)cell; 
-			} 
-			
+			
 			private static struct StackEntry
 			{ .Container container; TextStyle textStyle; ThemeState theme; } 
 			private StackEntry[] stack; 
@@ -8441,135 +8452,117 @@ struct im
 					: (cast(.Container)(rootCells.fetchBack)); 
 			} 
 			
-			//DrawCallback ////////////////////////
-			alias DrawCallback = void delegate(Drawing, .Container); 
-			
-			private DrawCallback[.Container] drawCallbacks; 
-			
-			void addDrawCallback(DrawCallback fun)
+			version(/+$DIDE_REGION DrawCallback+/all)
 			{
-				enforce(actContainer !is null); 
-				enforce(!actContainer.flags._hasDrawCallback, "Container already has a DrawCallback."); 
+				alias DrawCallback = void delegate(Drawing, .Container); 
 				
-				actContainer.flags._hasDrawCallback = true; 
-				drawCallbacks[actContainer] = fun; 
-			} 
-			
-			private auto getDrawCallback(.Container cntr)
-			{
-				if(auto cb = cntr in drawCallbacks)
-				return *cb; 
-				else return null; 
-			} 
-			
-			
-			//Note: build* functions are only callable from update()
-			
-			//Build an array of cells using a temporary container
-			Cell[] build(string _M_=__MODULE__, size_t _L_=__LINE__,A...)(in A args)
-			{
-				Container!(.Container, _M_, _L_)(args); 
-				return removeLastContainer.subCells; 
-			} 
-			
-			auto buildContainer(T : .Container, string _M_=__MODULE__, size_t _L_=__LINE__, A...)(in A args)
-			{
-				Container!(T, srcModule, srcLine)(args); 
-				return cast(T)removeLastContainer; 
-			} 
-			
-			auto buildRow   (string _M_=__MODULE__, size_t _L_=__LINE__, A...)(in A args)
-			{ return buildContainer!(.Row   , srcModule, srcLine)(args); } 
-			auto buildColumn(string _M_=__MODULE__, size_t _L_=__LINE__, A...)(in A args)
-			{ return buildContainer!(.Column, srcModule, srcLine)(args); } 
+				private DrawCallback[.Container] drawCallbacks; 
+				
+				void addDrawCallback(DrawCallback fun)
+				{
+					enforce(actContainer !is null); 
+					enforce(
+						!actContainer.flags._hasDrawCallback, 
+							"Container already has a DrawCallback."
+					); 
+					
+					actContainer.flags._hasDrawCallback = true; 
+					drawCallbacks[actContainer] = fun; 
+				} 
+				
+				private auto getDrawCallback(.Container cntr)
+				{
+					if(auto cb = cntr in drawCallbacks)
+					return *cb; 
+					else return null; 
+				} 
+			}
 			
 			
-			.Container parentContainer()
-			{
-				if(stack.length<2) enforce(0, "im.Stack underflow."); 
-				if(stack.length==2) return null; 
-				return stack[$-2].container; 
-			} 
 			
-			Cell[] siblingCells()
-			{
-				auto p = parentContainer; 
-				return ((p)?(p.subCells):(rootCells)); 
-			} 
 			
-			Cell prevSiblingCell()
-			{
-				auto siblings = siblingCells; 
-				enforce(siblings.length>=2 && siblings.back is actContainer, "siblingCells() broken."); 
-				return siblings[$-2]; 
-			} 
 			
-			//easy access
+			
+			@property
+			{
+				//must use `im` prefixes because these are dangerously common identifier names.
+				
+				Id imId()
+				=> ((actContainer)?(actContainer.id):(Id.init)); 
+				
+				bool imFocused()
+				=> ((actContainer)?(actContainer.flags.focused):(false)); 
+				
+				bool imEnabled()
+				=> ((actContainer)?(actContainer.flags.enabled):(true/+empty root is always enabled+/)); 
+				bool imEnabled(bool a)
+				{ if(actContainer) actContainer.flags.enabled = a; return a; } 
+				
+				bool imSelected()
+				=> ((actContainer)?(actContainer.flags.selected):(false)); 
+				bool imSelected(bool a)
+				{ if(actContainer) actContainer.flags.selected = a; return a; } 
+			} 
 			
 			@property
 			{
 				float fh()
-				{ return textStyle.fontHeight; } 
-				void fh(float v)
-				{ textStyle.fontHeight = cast(ubyte)(v.iround); } 
+				=> textStyle.fontHeight; 
+				float fh(float v)
+				{ textStyle.fontHeight = cast(ubyte)(v.iround); return v; } 
 			} 
 			
-			auto subCells()
-			{ return actContainer.subCells; } 
-			auto subCells(T : .Cell)()
-			{ return actContainer.subCells.map!(c => cast(T)c).filter!(c => c !is null); } 
-			auto subContainers()
-			{ return actContainer.subContainers; } 
 			
 			//container delegates
 			
-			private auto ContainerProp(string name)
+			private auto _ContainerProp(string name)
 			=> q{
-				@property auto #()
-				{ return actContainer.#; } 
-				@property auto #(typeof(actContainer.#) val)
+				auto #()
+				=> actContainer.#; auto #(typeof(actContainer.#) val)
 				{ actContainer.# = val; return val; } 
-			}
-			.replace("#", name); 
-			
-			private auto ContainerRef(string name)
+			}.replace("#", name); 
+			private auto _ContainerRef(string name)
 			=> q{
 				ref auto #()
-				{ return actContainer.#; }; 
+				=> actContainer.#; 
 			}.replace("#", name); 
+			@property
+			{
+				mixin(
+					[
+						"innerPos", "innerX", "innerY",
+						"innerSize", "size", 
+						"innerWidth", "width", 
+						"innerHeight", "height"
+					].map!_ContainerProp.join ~
+					[
+						"outerPos", "outerX", "outerY", "pos", 
+						"outerSize", "outerWidth", "outerHeight", 
+						"flags", "flex", "margin", "border", "padding", 
+						/+"bkColor" removed: 260815+/
+					].map!_ContainerRef.join
+				); 
+			} 
 			
-			mixin(
-				[
-					"innerPos", "innerX", "innerY",
-					"innerSize", "size", 
-					"innerWidth", "width", 
-					"innerHeight", "height"
-				].map!ContainerProp.join ~
-				[
-					"outerPos", "outerX", "outerY", "pos", 
-					"outerSize", "outerWidth", "outerHeight", 
-					"flags", "flex", "margin", "border", "padding", 
-					/+"bkColor" removed: 260815+/
-				].map!ContainerRef.join
-			); 
-			
-			ref auto rowFlags()
-			=> actRow.rowFlags; ref auto colFlags()
-			=> actColumn.colFlags; 
-			
-			
-			@property background()
-			=> actContainer.bkColor; 
-			
-			@property background(RGB a)
-			{ actContainer.bkColor = a; style.bkColor = a; return a; } 
-			
-			@property ref bg()
-			=> style.bg; 
-			
-			@property ref fg()
-			=> style.fg; 
-			
+			@property
+			{
+				ref auto rowFlags()
+				=> actRow.rowFlags; ref auto colFlags()
+				=> actColumn.colFlags; 
+				
+				
+				@property background()
+				=> actContainer.bkColor; 
+				
+				@property background(RGB a)
+				{ actContainer.bkColor = a; style.bkColor = a; return a; } 
+				
+				@property ref bg()
+				=> style.bg; 
+				
+				@property ref fg()
+				=> style.fg; 
+			} 
 			
 			
 			/+
@@ -8615,6 +8608,42 @@ struct im
 					return res; 
 				} 
 			} 
+			
+			version(/+$DIDE_REGION Build functions+/all)
+			{
+				//Note: build* functions are only callable from update()
+				
+				//Build an array of cells using a temporary container
+				Cell[] buildCells(
+					string _M_=__MODULE__, 
+					size_t _L_=__LINE__, Args...
+				)(in Args args)
+				{
+					Container!(.Container, _M_, _L_)(args); 
+					return removeLastContainer.subCells; 
+				} 
+				
+				auto buildContainer(
+					CType : .Container, 
+					string _M_=__MODULE__, 
+					size_t _L_=__LINE__, Args...
+				)(in Args args)
+				{
+					Container!(CType, _M_, _L_)(args); 
+					return (cast(T)(removeLastContainer)); 
+				} 
+				
+				auto buildRow(
+					string _M_=__MODULE__, 
+					size_t _L_=__LINE__, Args...
+				)(in Args args)
+				{ return buildContainer!(.Row   , _M_, _L_)(args); } 
+				auto buildColumn(
+					string _M_=__MODULE__, 
+					size_t _L_=__LINE__, Args...
+				)(in Args args)
+				{ return buildContainer!(.Column, _M_, _L_)(args); } 
+			}
 		}
 		
 		enum StdPropertyDefs = 
@@ -9880,9 +9909,9 @@ struct im
 				{
 					rowFlags.btnRowLines = true; 
 					auto r1 = DecBtn!(_M_, _L_)(value, args); 
-					lastCell.margin.right = 0; 
+					prevCell.margin.right = 0; 
 					auto r2 = IncBtn!(_M_, _L_)(value, args); 
-					lastCell.margin.left = 0; 
+					prevCell.margin.left = 0; 
 					res = r1 || r2; 
 				}
 			); 
@@ -11733,10 +11762,10 @@ version(/+$DIDE_REGION Dead code 260813+/none)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x51D1FEB16D5C4).檢(hit.toJson)); 
+					((0x51E65EB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x51D59EB16D5C4).檢(localMouse)); 
+					((0x51E9FEB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
