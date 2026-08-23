@@ -1148,9 +1148,13 @@ version(/+$DIDE_REGION+/all)
 	{
 		vec2 outerPos, outerSize; 
 		
+		this()
+		{} this(vec2 pos, vec2 size)
+		{ outerPos = pos; outerSize = size; } 
+		
 		///Optionally the container can have a parent.
 		inout(Container) getParent() inout
-		{ return null; } 
+		=> null; 
 		void setParent(Container p)
 		{} 
 		
@@ -5300,6 +5304,11 @@ version(/+$DIDE_REGION+/all)
 	} 
 	static class VirtualTreeView(Item) if(is(Item==struct))
 	{
+		/+
+			Todo: implement keyboard handling: 
+			/+Link: https://wiki.openjdk.org/spaces/OpenJFX/pages/15368267/TreeView+User+Experience+Documentation+/
+		+/
+		
 		Item _root; 
 		@property root(Item a) { if(_root.chkSet(a)) refresh; } 
 		@property ref root() => _root; 
@@ -5372,30 +5381,28 @@ version(/+$DIDE_REGION+/all)
 		{} 
 		
 		void UI(
-			void delegate() setup/+must set outerSize in setup! Optionally can set fontHeight+/,
+			void delegate() onSetup/+must set outerSize in onSetup! Optionally can set fontHeight+/,
 			void delegate(Item*) onItem=null
 		)
 		{
 			with(im)
 			{
 				Container(
-					((identityStr(this)).genericArg!q{id}),
+					((this).名!q{id}), Theme.tool,
 					{
-						theme.isTool = true; 
 						with(flags)
 						vScrollState 	= ScrollState.auto_,
 						hScrollState 	= ScrollState.auto_,
 						clipSubCells 	= true; 
-						
 						if(rowsUpdated<changed) makeRows; 
-						
-						if(setup) setup(); 
+						if(onSetup) onSetup(); 
 						
 						//total size placeholder
 						const float 	fh 	= style.fontHeight/+For faster access. Many things depend on 'fh'.+/, 
 							rowHeight 	= fh, 
 							invRowHeight 	= 1/rowHeight; 
-						Container({ outerPos = vec2(maxRowWidth, rows.length*rowHeight); outerSize = vec2(0); }); 
+						imAppend(new Cell(vec2(maxRowWidth, rows.length*rowHeight), vec2(0))); 
+						/+Container({ outerPos = vec2(maxRowWidth, rows.length*rowHeight); outerSize = vec2(0); }); +/
 						
 						flags._saveVisibleBounds = true; 
 						if(const visibleBounds = imstVisibleBounds(imId))
@@ -5440,12 +5447,12 @@ version(/+$DIDE_REGION+/all)
 												{
 													if(
 														Btn(
+															Margin.init, VAlign.center,
 															{
-																margin = Margin.init; outerSize = vec2(fh); 
-																//Text(((r.item.opened)?("▼"):("▷"))); 
-																Text(((r.item.opened)?("▷"):("▼"))); 
+																outerSize = vec2(fh); fh = 14; 
+																Text(symbolStr((r.item.opened)?("ChevronDown") :("ChevronRight"))); 
 															}
-														)
+														).pressed
 													) {
 														r.item.toggle; 
 														this.changed = now; 
@@ -5487,6 +5494,8 @@ version(/+$DIDE_REGION+/all)
 			}
 		} 
 	} 
+	
+	/+AI:+/
 	
 	
 	
@@ -8705,7 +8714,24 @@ struct im
 			enum CustomPropertyDefs = props; 
 			enum CustomCompositionDefs = comps; 
 			/+Statement mixin can't go here, because mixin()  can only emit declarations.+/
-		} 
+		} 
+		
+		void imApply(Args...)(in Args args)
+		{
+			enum AllRows = chain(StdPropertyDefs.rows, StdPropertyDefs.rows).array; 
+			static foreach(a; args)
+			{
+				{
+					alias T = typeof(cast()a); enum isT(Type) 	= is(T == Type),
+					isG(string Name) 	= isGenericArg!(T, Name); 
+					mixin(
+						AllRows.map!((r)=>(iq{static if($(r[0])) {$(r[1])}}.text)).join(q{ else })
+						~q{else static assert(0, "Unsupported type: "~T.stringof); }
+					); 
+				}
+			}
+		} 
+		
 		template ContainerScript(string optionsStr)
 		{
 			enum ThisStr = "ContainerScript!(`"~optionsStr~"`)"; 
@@ -8760,10 +8786,7 @@ struct im
 					{
 						alias T = typeof(cast()a); enum isT(Type) 	= is(T == Type),
 						isG(string Name) 	= isGenericArg!(T, Name); 
-						mixin(
-							AllPropertyDefRows.map!((r)=>(iq{static if($(r[0])) {$(r[1])}}.text))
-							.join(q{ else })
-						); 
+						mixin(AllPropertyDefRows.map!((r)=>(iq{static if($(r[0])) {$(r[1])}}.text)).join(q{ else })); 
 					}
 				}
 				
@@ -8817,12 +8840,17 @@ struct im
 				$(OPT!"hint"(q{handleHint(_container, hintRec, hit); }))
 				$(
 					OPT!"spaceKey" /+Must be after `hit` and `focus`.+/
-					(
-						q{
-							if(canProcessUserInput && focused)
+					(q{})
+					/+
+						Todo: Can't Space to press buttons because it conflicts with DIDE, where the main screen is NOT focuised.
+						Must find out a way to override space key usage in DIDE. Also it is true for all classic Dialog keys.
+						An editor, like DIDE needs to send ALL keys to the editor. 
+						Normal business programs could use keys to focus and operate controls.
+						/+
+							Highlighted: if(canProcessUserInput && focused)
 							hit.simulateKey(KeyCombo("Space")); 
-						}
-					)
+						+/
+					+/
 				)
 			}.text; 
 			
@@ -8850,6 +8878,7 @@ struct im
 			
 			/+/+Note: Step 6.+/ Finalize/deallocate temporary things, measure nested content, etc.+/
 		} 
+		
 	}
 	version(/+$DIDE_REGION+/all)
 	{
@@ -11762,10 +11791,10 @@ version(/+$DIDE_REGION Dead code 260813+/none)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x51E65EB16D5C4).檢(hit.toJson)); 
+					((0x522E6EB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x51E9FEB16D5C4).檢(localMouse)); 
+					((0x52320EB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
