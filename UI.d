@@ -850,7 +850,8 @@ version(/+$DIDE_REGION+/all)
 		{ return s.toWidthHeight(g_actFontHeight); } 
 		
 		void opAssign(in string s)
-		{ setProps(s); } 
+		{ setProps(s); }  void opAssign(in float f)
+		{ set(f); } 
 		
 		void setProps(in string s)
 		{
@@ -8656,8 +8657,10 @@ struct im
 			[q{isG!"background"},q{background = a; }],
 			[q{isG!"outerWidth"},q{outerWidth = a; }],
 			[q{isG!"outerHeight"},q{outerHeight = a; }],
+			[q{isG!"outerSize"},q{outerSize = a; }],
 			[q{isG!"innerWidth"},q{innerWidth = a; }],
 			[q{isG!"innerHeight"},q{innerHeight = a; }],
+			[q{isG!"innerSize"},q{innerSize = a; }],
 			[q{isT!RGB},q{style.fg = a; }],
 			[q{isG!"flex"},q{flex = a; }],
 			[q{isG!"enabled"},q{imEnabled = a; }],
@@ -9360,7 +9363,9 @@ struct im
 			
 			void applyEditStyle(bool enabled, bool focused, float hover)
 			{
+				const oldFh = style.fontHeight; 
 				style   = tsNormal; 
+				style.fontHeight = oldFh; 
 				
 				auto bColor = focused	? clAccent : !enabled
 					? mix(clWinBtn, style.bkColor, 0.5f)
@@ -11764,10 +11769,10 @@ version(/+$DIDE_REGION Dead code 260813+/none)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x52249EB16D5C4).檢(hit.toJson)); 
+					((0x52313EB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x52283EB16D5C4).檢(localMouse)); 
+					((0x5234DEB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
