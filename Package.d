@@ -16295,7 +16295,14 @@ version(/+$DIDE_REGION debug+/all)
 			auto dh2 = DbgHelp2.get; 
 			actInstance = this; 
 			const process = GetCurrentProcess; 
-			
+			/+
+				Todo: Bad hProcess value.  Also no initialization.
+				/+Link: https://learn.microsoft.com/en-us/windows/win32/debug/initializing-the-symbol-handler+/
+			+/
+			/+
+				Todo: loading a symbol module.
+				/+Link: https://learn.microsoft.com/en-us/windows/win32/debug/loading-a-symbol-module+/
+			+/
 			//find modules
 			extern(Windows) 
 			BOOL enumModulesProc(const PCSTR ModuleName, const ULONG64 BaseOfDll, const PVOID UserContext)
