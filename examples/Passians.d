@@ -549,7 +549,7 @@ class FrmMain: UIWindow
 		with(im)
 		{
 			Panel(
-				PanelPosition.topLeft, 
+				DockAlignment.topLeft, 
 				{
 					Row(
 						{

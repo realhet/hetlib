@@ -17,7 +17,7 @@ class FrmHelloGUI: UIWindow
 		if(canProcessUserInput) navigateView(!im.wantKeys, !im.wantMouse); 
 		invalidate; 
 		
-		with(im) { Panel(PanelPosition.topLeft, { Text("Hello"); }); }
+		with(im) { Panel(DockAlignment.topLeft, { Text("Hello"); }); }
 	} 
 	
 	override void beforeImDraw(IDrawing drWorld, IDrawing drGui)
@@ -28,5 +28,5 @@ class FrmHelloGUI: UIWindow
 			fontHeight = 100; 
 			textOut(vec2(0), "Hello"); 
 		}
-	}
+	} 
 } 

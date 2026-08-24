@@ -24,7 +24,7 @@ class FrmTestVulkanUI : UIWindow
 		with(im)
 		{
 			Panel(
-				PanelPosition.topClient, 
+				DockAlignment.topClient, 
 				{
 					static bool flag; static str = "Edit me!"; static val = .5; 
 					foreach(i; 0..2)

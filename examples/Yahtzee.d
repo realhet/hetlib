@@ -200,7 +200,7 @@ void UI_Die(int num, vec2 ofs = vec2(0))
 		with(im)
 		{
 			Panel(
-				PanelPosition.topLeft, 
+				DockAlignment.topLeft, 
 				{
 					bkColor = clGreen1; 
 					border.width = 0; 

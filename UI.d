@@ -5072,6 +5072,80 @@ version(/+$DIDE_REGION+/all)
 				}
 			}
 		} 
+	} 
+	
+	enum DockAlignment
+	{
+		none, 
+		topLeft, 	topCenter, 	topRight, 	
+		leftCenter, 	center, 	rightCenter, 	
+		bottomLeft, 	bottomCenter, 	bottomRight, 	
+			topClient, 		
+		leftClient, 	client, 	rightClient, 	
+			bottomClient		
+	} 
+	
+	class DockSite : Container
+	{
+		/+This is not full automatic. The imGui builder must call the before and after dock administrative methods manually.+/
+		
+		bounds2 clientArea; //must be initialized before receiving contained cells.
+		
+		void beforeDock(.Container cntr, in DockAlignment da)
+		{
+			with(DockAlignment)
+			{
+				//flags.targetSurface is unknown at this point, will check it later in 'finalize'
+				if(da)
+				{
+					if(da.among(client, topClient, bottomClient))	cntr.outerWidth = clientArea.width; 
+					else if(da.among(client, leftClient, rightClient))	cntr.outerHeight = clientArea.height; 
+				}
+			}
+		} 
+		
+		private void afterDock(.Container cntr, in DockAlignment da)
+		{
+			with(DockAlignment)
+			{
+				if(da)
+				{
+					enforce(cntr.flags.targetSurface == TargetSurface.gui, "Unable to set DockAlignment on world_surface."); 
+					
+					cntr.measure; //must know all the sizes from now on
+					
+					const 	isAlignPosition 	= da.inRange(topLeft, bottomRight)	/+it will only position the container+/,
+						isClientPosition 	= da.inRange(topClient, bottomClient)/+it will change the client rect too+/; 
+					
+					if(isAlignPosition)
+					{
+						ivec2 p; divMod((cast(int)(da-1)), 3, p.y, p.x); 
+						if(p.x.inRange(0, 2) && p.y.inRange(0, 2))
+						{
+							auto 	t = p*.5f,
+								u = vec2(1)-t; 
+							
+							cntr.outerPos = clientArea.topLeft*u 	+ clientArea.bottomRight*t //Todo: bug: fucking vec2.lerp is broken again
+								- cntr.outerSize*t; 
+						}
+					}
+					else if(isClientPosition)
+					{
+						//Todo: put checking for running out of area and scrolling here.
+						switch(da)
+						{
+							case topClient: 	cntr.outerPos     = clientArea.topLeft; 	clientArea.top += cntr.outerHeight; 	break; 
+							case bottomClient: 	clientArea.bottom -= cntr.outerHeight; 	cntr.outerPos = clientArea.bottomLeft; 	break; 
+							case leftClient: 	cntr.outerPos     = clientArea.topLeft; 	clientArea.left += cntr.outerWidth; 	break; 
+							case rightClient: 	clientArea.right   -= cntr.outerWidth; 	cntr.outerPos = clientArea.topRight; 	break; 
+							case client: 	cntr.outerPos     = clientArea.topLeft; 	cntr.outerSize = clientArea.size,
+							clientArea = bounds2.init; 	break; 
+							default: 	ERR("invalid DockAlignment"); 
+						}
+					}
+				}
+			}
+		} 
 	} 
 	
 	class SelectionManager(T : Cell)
@@ -6960,9 +7034,6 @@ struct im
 		}
 		float deltaTime=0; 
 		
-		//GUI area that tracks PanelPosition changes
-		bounds2 clientArea; 
-		
 		
 		version(/+$DIDE_REGION Frame handling+/all)
 		{
@@ -7006,8 +7077,8 @@ struct im
 				
 				dropdownState.beginFrame; 
 				
-				//this is needed for PanelPosition
-				clientArea = view_gui.screenBounds_anim.bounds2; 
+				//this is needed for DockAlignment
+				rootContainer.clientArea = view_gui.screenBounds_anim.bounds2; 
 				//Maybe it is the same as the bounds for clipping rects: flags.clipChildren
 				
 				static DeltaTimer dt; 
@@ -7192,76 +7263,6 @@ struct im
 				//Todo: if window resizing, draw is called without update!!!  canDraw = false; can detect it.
 			} 
 		}
-		version(/+$DIDE_REGION PanelPosition+/all)
-		{
-			//aligns the container on the screen
-			
-			enum PanelPosition
-			{
-				none, 
-				topLeft, 	topCenter, 	topRight, 	
-				leftCenter, 	center, 	rightCenter, 	
-				bottomLeft, 	bottomCenter, 	bottomRight, 	
-					topClient, 		
-				leftClient, 	client, 	rightClient, 	
-					bottomClient		
-			} 
-			
-			private void initializePanelPosition(.Container cntr, PanelPosition pp, in bounds2 area)
-			{
-				with(PanelPosition)
-				{
-					//flags.targetSurface is unknown at this point, will check it later in 'finalize'
-					if(pp.among(client, topClient, bottomClient))	cntr.outerWidth = area.width; 
-					else if(pp.among(client, leftClient, rightClient))	cntr.outerHeight = area.height; 
-				}
-			} 
-			
-			private void finalizePanelPosition(.Container cntr, PanelPosition pp, ref bounds2 area)
-			{
-				with(PanelPosition)
-				{
-					if(pp)
-					{
-						enforce(cntr.flags.targetSurface == TargetSurface.gui, "Unable to set PanelPosition on world_surface."); 
-						
-						cntr.measure; //must know all the sizes from now on
-						
-						static isAlignPosition (PanelPosition pp)
-						=> pp.inRange(topLeft, bottomRight ); //it will only position the container
-						static isClientPosition(PanelPosition pp)
-						=> pp.inRange(topClient, bottomClient); //it will change the client rect too
-						
-						if(isAlignPosition(pp))
-						{
-							ivec2 p; divMod((cast(int)(pp-1)), 3, p.y, p.x); 
-							if(p.x.inRange(0, 2) && p.y.inRange(0, 2))
-							{
-								auto 	t = p*.5f,
-									u = vec2(1)-t; 
-								
-								cntr.outerPos = area.topLeft*u 	+ area.bottomRight*t //Todo: bug: fucking vec2.lerp is broken again
-									- cntr.outerSize*t; 
-							}
-						}
-						else if(isClientPosition(pp))
-						{
-							//Todo: put checking for running out of area and scrolling here.
-							switch(pp)
-							{
-								case topClient: 	cntr.outerPos = area.topLeft; 	area.top    += cntr.outerHeight; 	break; 
-								case bottomClient: 	area.bottom -= cntr.outerHeight; 	cntr.outerPos = area.bottomLeft; 	break; 
-								case leftClient: 	cntr.outerPos = area.topLeft; 	area.left    += cntr.outerWidth; 	break; 
-								case rightClient: 	area.right   -= cntr.outerWidth; 	cntr.outerPos = area.topRight; 	break; 
-								case client: 	cntr.outerPos = area.topLeft; 	cntr.outerSize = area.size; area = bounds2.init; 	break; 
-								default: 	ERR("invalid PanelPosition"); 
-							}
-						}
-					}
-				}
-			} 
-		}
-		
 		version(/+$DIDE_REGION HitTest+/all)
 		{
 			HitTestManager hitTestManager; 
@@ -8208,7 +8209,7 @@ struct im
 				with(im) {
 					if(flashMessages.empty) return; 
 					Panel(
-						PanelPosition.bottomCenter, 
+						DockAlignment.bottomCenter, 
 						{
 							background = clWhite; 
 							style.bold = true; 
@@ -8242,7 +8243,7 @@ struct im
 	version(/+$DIDE_REGION+/all) {
 		version(/+$DIDE_REGION internal state+/all)
 		{
-			.Container rootContainer; 
+			.DockSite rootContainer; 
 			
 			ref rootCells() => rootContainer.subCells; 
 			
@@ -8278,16 +8279,18 @@ struct im
 			auto subCells()
 			=> thisContainer.subCells; 
 			auto subCells(T : .Cell)()
-			=> thisContainer.subCells.map!(c => cast(T)c).filter!(c => c !is null); 
+			=> thisContainer.subCells.map!((c)=>((cast(T)(c)))).filter!((c)=>(c !is null)); 
 			auto subContainers()
 			=> thisContainer.subContainers; 
 			
 			.Container parentContainer()
 			{
 				if(stack.length<2) enforce(0, "im.Stack underflow."); 
-				if(stack.length==2) return null; 
 				return stack[$-2].container; 
 			} 
+			
+			DockSite parentDockSite()
+			=> (cast(DockSite)(parentContainer)); 
 			
 			Cell[] siblingCells()
 			{
@@ -8300,6 +8303,25 @@ struct im
 				auto siblings = siblingCells; 
 				enforce(siblings.length>=2 && siblings.back is thisContainer, "siblingCells() broken."); 
 				return siblings[$-2]; 
+			} 
+			
+			private
+			{
+				/+Foc convinience inside the template.+/
+				void imBeforeDock(in DockAlignment dockAlignment)
+				{
+					if(dockAlignment) {
+						if(auto ds = parentDockSite) ds.beforeDock(thisContainer, dockAlignment); 
+						else WARN("ParentDockSite is null, unable to dock."); 
+					}
+				} 
+				void imAfterDock(in DockAlignment dockAlignment)
+				{
+					if(dockAlignment) {
+						if(auto ds = parentDockSite) ds.afterDock(thisContainer, dockAlignment); 
+						else WARN("ParentDockSite is null, unable to dock."); 
+					}
+				} 
 			} 
 			
 			
@@ -8359,7 +8381,7 @@ struct im
 				drawCallbacks.clear; 
 				stack = []; 
 				
-				rootContainer = new .Container; 
+				rootContainer = new .DockSite; 
 				imPush(rootContainer, Id.init); 
 			} 
 			
@@ -8698,7 +8720,7 @@ struct im
 		template ContainerScript(string optionsStr)
 		{
 			enum ThisStr = "ContainerScript!(`"~optionsStr~"`)"; 
-			enum Option {panelPosition, hit, key, focus, hint, range, spaceKey} 
+			enum Option {dockAlignment, hit, key, focus, hint, range, spaceKey} 
 			
 			enum options = optionsStr.split(' ').map!(to!Option).array; 
 			
@@ -8717,7 +8739,7 @@ struct im
 				imEnabled = parentEnabled; //Inherit `enabled` from parent.
 				_container.bkColor = style.bkColor; //Inherit `bkcolor` from the current fontStyle.
 				
-				$(OPT!"panelPosition"(q{PanelPosition panelPosition; }))
+				$(OPT!"dockAlignment"(q{DockAlignment dockAlignment; }))
 				$(OPT!"focus"       (q{bool mustEnterFocus, mustExitFocus, focusMMB, focusRMB, focusMW; }))
 				$(OPT!"hint"        (q{HintRec hintRec; }))
 				$(OPT!"range"      (q{ValueRange range; }))
@@ -8728,7 +8750,7 @@ struct im
 			string ProcessProperties() /+Note: Step 3.+/
 			=> iq{
 				enum AllPropertyDefRows = CustomPropertyDefs.rows.array 
-				$(OPT!"panelPosition"(q{~(表([[q{isT!PanelPosition},q{panelPosition = a; }],])).rows.array}))
+				$(OPT!"dockAlignment"(q{~(表([[q{isT!DockAlignment},q{dockAlignment = a; }],])).rows.array}))
 				$(
 					OPT!"focus"       (
 						q{
@@ -8753,15 +8775,7 @@ struct im
 					}
 				}
 				
-				$(
-					OPT!"panelPosition"
-					(
-						q{
-							if(panelPosition) initializePanelPosition(_container, panelPosition, clientArea); 
-							scope(exit) if(panelPosition) finalizePanelPosition(_container, panelPosition, clientArea); 
-						}
-					)
-				)
+				$(OPT!"dockAlignment"(q{imBeforeDock(dockAlignment); scope(exit) imAfterDock(dockAlignment); }))
 				$(OPT!"hit"(q{auto hit = hitTest(_container); }))
 				$(
 					OPT!"key" /+Must be after `hit` and before `focus`.+/
@@ -8849,7 +8863,7 @@ struct im
 		{
 			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
 			{
-				mixin ContainerScript_Init!(CType_, q{panelPosition}, (表([[],])), (表([[],]))); 
+				mixin ContainerScript_Init!(CType_, q{dockAlignment}, (表([[],])), (表([[],]))); 
 				mixin(SCR.Create); 
 			}
 			
@@ -8932,7 +8946,6 @@ struct im
 		
 		void Panel(CType = .Column, string _M_=__MODULE__, size_t _L_=__LINE__, T...)(in T args)
 		{
-			enforce(thisContainer is rootContainer, "Panel() must be on root level"); 
 			setIncomingId!(_M_, _L_)(); 
 			_Container!(CType)
 			(
@@ -8999,8 +9012,8 @@ struct im
 			
 			version(/+$DIDE_REGION Do custom behavior+/all)
 			{
-				const 	isHorz 	= !!panelPosition.among(mixin(舉!((PanelPosition),q{leftClient})), mixin(舉!((PanelPosition),q{rightClient}))),
-					isVert 	= !!panelPosition.among(mixin(舉!((PanelPosition),q{topClient})), mixin(舉!((PanelPosition),q{bottomClient}))); 
+				const 	isHorz 	= !!panelPosition.among(mixin(舉!((DockAlignment),q{leftClient})), mixin(舉!((DockAlignment),q{rightClient}))),
+					isVert 	= !!panelPosition.among(mixin(舉!((DockAlignment),q{topClient})), mixin(舉!((DockAlignment),q{bottomClient}))); 
 				enforce(
 					isHorz || isVert, 
 					"Splitter: invalid panelPosition: `"~panelPosition.text~"`"
@@ -9031,7 +9044,7 @@ struct im
 					{
 						const ofs = actMousePos - startMousePos; 
 						float a = startTargetSize; 
-						with(PanelPosition)
+						with(DockAlignment)
 						switch(panelPosition)
 						{
 							case leftClient: 	a += ofs.x; 	break; 
@@ -11751,10 +11764,10 @@ version(/+$DIDE_REGION Dead code 260813+/none)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x520C6EB16D5C4).檢(hit.toJson)); 
+					((0x52249EB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x52100EB16D5C4).檢(localMouse)); 
+					((0x52283EB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
@@ -12316,7 +12329,7 @@ version(/+$DIDE_REGION Dead code 260813+/none)
 			NOTIMPL; 
 			version(/+$DIDE_REGION+/none) {
 				Panel(
-					PanelPosition.bottomClient,
+					DockAlignment.bottomClient,
 					{
 						margin = "0"; padding = "0"; //border = "1 normal gray";
 						outerHeight = 200; 

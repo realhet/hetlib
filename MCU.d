@@ -408,7 +408,7 @@ void ConnectorBtn(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(string co
 		
 		auto ci = connectorInfo(conn); 
 		const 	hasDetail 	= ci.valid && ci.type!=ConnectorInfo.Type.Wire,
-			bk 	= actContainer.bkColor; 
+			bk 	= thisContainer.bkColor; 
 		
 		struct IMData
 		{
@@ -433,7 +433,7 @@ void ConnectorBtn(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(string co
 					{
 							//valid connector
 						
-						imData = &ImStorage!IMData.access(actContainer.id); 
+						imData = &ImStorage!IMData.access(thisId); 
 						if(!hasDetail)
 						imData.opened = false; 
 						
