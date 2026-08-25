@@ -4,89 +4,11 @@
 ///@release
 
 /+
-	This is a DLang translation of this VLang project:
-	/+Link: https://github.com/vlang/gui/blob/main/examples/calc.v+/
-	Goal: Getting familiar with VLang and testing my DLang GUI.
+	This is a DLang translation of this VLang project: /+Link: https://github.com/vlang/gui/blob/main/examples/calc.v+/
+	Goal: Getting familiar with VLang and test my DLang GUI.
 +/
 
 import het.ui; 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 @WindowStyle(WS_OVERLAPPEDWINDOW - WS_SIZEBOX - WS_MAXIMIZEBOX) class Calc: UIWindow
 {
@@ -110,41 +32,45 @@ import het.ui;
 		[`1`, `2`, `3`, `+`],
 		[`0`, `.`, `±`, `=`],
 	]; 
+	/+Todo: `%` is not implemented.+/
 	
 	
 	override void onCreate()
-	{ clientSize = ivec2(200, 290); } 
+	{ clientSize = ivec2(200, 294); } 
 	
 	override void onUpdate()
 	{
 		invalidate; 
-		
-		with(im) {
-			Panel(
-				DockAlignment.client, 
+		processInputChars ((ch){ btn_click(ch.uc.text); }); 
+		with(im)
+		{
+			Panel
+			(
+				DockAlignment.client,
 				{
+					background = (RGB(clUiIndigo)); border.width = 8; padding = 4; fh = 30; 
+					
 					Spacer(4); 
-					border.width = 8; padding = 4; fh = 24; 
+					
 					Static(output, HAlign.right); 
+					
 					Spacer(4); 
+					
+					auto CalcBtn(string op)
+					=> Btn(((op).名!q{id}), VAlign.center, ((clientSize.x/4-3).名!q{outerSize}), op); 
 					foreach(row; row_ops)
 					Row(
 						HAlign.center,
 						{
 							foreach(op; row)
-							if(
-								Btn(
-									((op).名!q{id}), VAlign.center, 
-									((clientSize.x/4-3).名!q{outerSize}), op
-								)
-							)
+							if(CalcBtn(op))
 							btn_click(op); 
 						}
 					); 
 				}
 			); 
 		}
-	} 
+	} 
 	
 	void btn_click(string op)
 	{
@@ -200,14 +126,66 @@ import het.ui;
 		if((magnitude(round(result)-result))>epsilon)	{ output = result.format!"%g"; }
 		else	{ output = result.lround.text; }
 		if(output.length > max_digits) { output = output[0..max_digits]; }
-	} 
+	} 
 	
 	void calculate()
-	{} 
+	{
+		double a=0, b=0; 
+		string op; 
+		result = operands.backOr(0.0); 
+		for(int i=0;;)
+		{
+			i++; 
+			if(operations.empty) break; 
+			op = operations.fetchBack; 
+			if(op == `=`)	continue; 
+			if(operands.empty)
+			{
+				operations ~= op; 
+				break; 
+			}
+			b = operands.fetchBack; 
+			if(op == `±`)
+			{
+				result = -b; 
+				operands ~= result; 
+				continue; 
+			}
+			if(operands.empty)
+			{
+				operations ~= op; 
+				operands ~= b; 
+				break; 
+			}
+			a = operands.fetchBack; 
+			switch(op)
+			{
+				case `+`: 	result = a + b; 	break; 
+				case `-`: 	result = a - b; 	break; 
+				case `*`: 	result = a * b; 	break; 
+				case `÷`: 	{
+					if(b == 0) {
+						ERR(`Division by zero!`); 
+						b = 0.0000000001; 
+					}
+					result = a / b; 
+				}	break; 
+				default: 	{
+					operands ~= a; 
+					operands ~= b; 
+					result = b; 
+					ERR(i`Unknown op: ${op}`); 
+				}
+			}
+			
+			operands ~= result; 
+		}
+	} 
 	
 } 
 /+
-	Para: import gui
+	Highlighted: /+Link: https://github.com/vlang/gui/blob/main/examples/calc.v+/
+	import gui
 	import arrays
 	import math
 	
@@ -281,7 +259,7 @@ import het.ui;
 				content: get_row(ops)
 			)
 		}
-	
+	
 		width, height := w.window_size()
 		return gui.row(
 			width:   width
@@ -334,16 +312,16 @@ import het.ui;
 			app.do_op(c)
 		}
 	}
-	
+	
 	fn (mut app CalcApp) do_op(op string) {
 		if op !in arrays.flatten(app.row_ops) {
 			return
 		}
 		number := app.text
-		if op == 'C' {
-			app.result = 0
-			app.operands = []
-			app.operations = []
+		if(op ==`'`) {
+			app.result = 0;
+			app.operands ~= [];
+			app.operations = ;[]
 			app.new_number = true
 			app.is_float = false
 			app.update_result()
@@ -403,7 +381,7 @@ import het.ui;
 		res := a.last()
 		return res, a[0..a.len - 1]
 	}
-	
+	
 	fn (mut app CalcApp) calculate() {
 		mut a := f64(0)
 		mut b := f64(0)

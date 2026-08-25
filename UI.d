@@ -2453,16 +2453,14 @@ version(/+$DIDE_REGION+/all)
 		
 		void handleKeyboardInput(ref string inputChars, in bool acceptEditorKeys, in vec2 localMouse)
 		{
-			string unprocessed; 
 			with(EditCmd)
 			{
-				foreach(ch; inputChars.byDchar)
-				{
+				inputChars.processInputChars
+				((ch){
 					if(((ch>=32) || (acceptEditorKeys && ch.among(9, 10))))
-					{ cmdQueue ~= EditCmd(cInsert, [ch].to!string); }
-					else
-					{ unprocessed ~= ch; }
-				}
+					{ cmdQueue ~= EditCmd(cInsert, ch.text); return true; }
+					else { return false; }
+				}); 
 				
 				mixin((
 					(表([
@@ -2484,8 +2482,6 @@ version(/+$DIDE_REGION+/all)
 					Problem: Editor has a priority here, but the view is checked first.
 				+/
 			}
-			
-			inputChars = unprocessed; 
 		} 
 	} 
 	
@@ -11769,10 +11765,10 @@ version(/+$DIDE_REGION Dead code 260813+/none)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x52313EB16D5C4).檢(hit.toJson)); 
+					((0x522D6EB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x5234DEB16D5C4).檢(localMouse)); 
+					((0x52310EB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 

@@ -191,6 +191,24 @@ version(/+$DIDE_REGION+/all) {
 	//Todo: Ha a console ablak bezarodik, az ablakozorendszer destruktora akkor is hivodjon meg!
 	
 	//Todo: a sysmenu hasznalatakor ne klikkeljen az alkalmazasba bele
+	
+	
+	void processInputChars(ref string inputChars, bool delegate(dchar) onDchar)
+	{
+		string unhandled; 
+		while(!inputChars.empty)
+		{
+			const dchar ch = inputChars.front; 
+			inputChars.popFront; 
+			const bool handled = onDchar(ch); 
+			if(!handled)	unhandled ~= ch; 
+		}
+		inputChars = unhandled; 
+	} 
+	
+	void processInputChars(ref string inputChars, void delegate(dchar) onDchar)
+	{ processInputChars(inputChars, ((ch){ onDchar(ch); return true; })); } 
+	
 	
 	////////////////////////////////////////////////////////////////////////////////
 	///  Global Application entry point                                          ///
@@ -449,7 +467,7 @@ version(/+$DIDE_REGION+/all) {
 		
 		public: 
 		
-		string inputChars; //aaccumulated WM_CHAR input flushed in update()
+		string inputChars; //Accumulated WM_CHAR input. Reseted at the end of every update().
 		string lastFrameStats; 
 		
 		//Fields accessed from het.ui
@@ -654,6 +672,15 @@ version(/+$DIDE_REGION+/all) {
 			//DestroyWindow(hwnd);
 			//UnregisterClassW(className.toPWChar, GetModuleHandle(NULL));
 		} 
+		
+		void processInputChars(bool delegate(dchar) onDchar)
+		{ .processInputChars(inputChars, onDchar); } 
+		
+		void processInputChars(void delegate(dchar) onDchar)
+		{ .processInputChars(inputChars, onDchar); } 
+		
+		
+		
 		
 		
 		//static bool wasUpdateAfterPaint;
