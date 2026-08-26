@@ -8257,8 +8257,10 @@ struct im
 			
 			//Todo: ezt egy alias this-el egyszerusiteni. Jelenleg az im-ben is meg az im.StackEntry-ben is ugyanaz van redundansan deklaralva
 			.Container thisContainer, lastContainer; //top of the containerStack for faster access
-			auto thisRow() => (cast(.Row)(thisContainer)); 
-			auto thisColumn() => (cast(.Column)(thisContainer)); 
+			auto thisRow()
+			=> (cast(.Row)(thisContainer)); auto thisColumn()
+			=> (cast(.Column)(thisContainer)); DockSite thisDockSite()
+			=> (cast(DockSite)(thisContainer)); 
 			
 			auto thisId()
 			=> thisContainer.id; 
@@ -8273,21 +8275,19 @@ struct im
 				return typeof(return).init; 
 			} 
 			
+			.Container parentContainer()
+			{
+				if(stack.length<2) enforce(0, "im.Stack underflow."); 
+				return stack[$-2].container; 
+			}  DockSite parentDockSite()
+			=> (cast(DockSite)(parentContainer)); 
+			
 			auto subCells()
 			=> thisContainer.subCells; 
 			auto subCells(T : .Cell)()
 			=> thisContainer.subCells.map!((c)=>((cast(T)(c)))).filter!((c)=>(c !is null)); 
 			auto subContainers()
 			=> thisContainer.subContainers; 
-			
-			.Container parentContainer()
-			{
-				if(stack.length<2) enforce(0, "im.Stack underflow."); 
-				return stack[$-2].container; 
-			} 
-			
-			DockSite parentDockSite()
-			=> (cast(DockSite)(parentContainer)); 
 			
 			Cell[] siblingCells()
 			{
@@ -8942,8 +8942,11 @@ struct im
 		
 		void HLine()
 		{ Row({ innerHeight = 1; background = mix(clWinBackground, clWinText, .25f); }); } 
-		
-		void Panel(CType = .Column, string _M_=__MODULE__, size_t _L_=__LINE__, T...)(in T args)
+		void Panel(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
+		{ Panel!(.Column, _M_, _L_, Args)(args); } 
+		void PanelRow(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
+		{ Panel!(.Row, _M_, _L_, Args)(args); } 
+		void Panel(CType, string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
 		{
 			setIncomingId!(_M_, _L_)(); 
 			_Container!(CType)
@@ -8957,10 +8960,17 @@ struct im
 			); 
 		} 
 		
-		void Grp(alias Cntr=Column, string _M_=__MODULE__, size_t _L_=__LINE__, A...)
-			(void delegate() fun, in A args)
+		void Grp(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)
+			(void delegate() fun, in Args args)
+		{ Grp!(Column, _M_, _L_, Args)(fun, args); } 
+		void GrpRow(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)
+			(void delegate() fun, in Args args)
+		{ Grp!(Row, _M_, _L_, Args)(fun, args); } 
+		void Grp(alias Cntr, string _M_=__MODULE__, size_t _L_=__LINE__, Args...)
+			(void delegate() fun, in Args args)
 		{
 			Cntr(
+				((Id(_M_, _L_)).名!q{id}),
 				{
 					border = "2 normal silver"; padding = "2 4"; margin = "2 4"; 
 					fun(); 
@@ -8968,7 +8978,13 @@ struct im
 			); 
 		} 
 		
-		void Grp(alias Cntr=Column, string _M_=__MODULE__, size_t _L_=__LINE__, T, A...)
+		void Grp(string _M_=__MODULE__, size_t _L_=__LINE__, T, Args...)
+			(T title, void delegate() fun, in Args args)
+		{ Grp!(Column, _M_, _L_, T, Args)(title, fun, args); } 
+		void GrpRow(string _M_=__MODULE__, size_t _L_=__LINE__, T, Args...)
+			(T title, void delegate() fun, in Args args)
+		{ Grp!(Row, _M_, _L_, T, Args)(title, fun, args); } 
+		void Grp(alias Cntr, string _M_=__MODULE__, size_t _L_=__LINE__, T, A...)
 			(T title, void delegate() fun, in A args)
 		{
 			Container!GrpContainer
@@ -8992,14 +9008,30 @@ struct im
 				}
 			); 
 		} 
+		
+		private
+		{
+			struct SplitterState
+			{
+				vec2 startMousePos; 
+				float startTargetSize = 0; 
+				Id draggedSplitterId; 
+			} 
+			SplitterState splitterState; 
+		} 
 		
-		HitInfo Splitter(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)
-			(ref float targetSize, float targetMinSize, float targetMaxSize, in Args args)
+		bool Splitter(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)
+		(ref float targetSize, float targetMinSize, float targetMaxSize, in Args args)
 		{
 			setIncomingId!(_M_, _L_)(); 
+			return _Splitter(targetSize, targetMinSize, targetMaxSize, args); 
+		} 
+		
+		private bool _Splitter(Args...)(ref float targetSize, float targetMinSize, float targetMaxSize, in Args args)
+		{
 			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
 			{
-				mixin ContainerScript_Init!(.Container, q{panelPosition hit}, (表([[],])), (表([[],]))); 
+				mixin ContainerScript_Init!(.Container, q{dockAlignment hit}, (表([[],])), (表([[],]))); 
 				mixin(SCR.Create); 
 			}
 			
@@ -9011,65 +9043,65 @@ struct im
 			
 			version(/+$DIDE_REGION Do custom behavior+/all)
 			{
-				const 	isHorz 	= !!panelPosition.among(mixin(舉!((DockAlignment),q{leftClient})), mixin(舉!((DockAlignment),q{rightClient}))),
-					isVert 	= !!panelPosition.among(mixin(舉!((DockAlignment),q{topClient})), mixin(舉!((DockAlignment),q{bottomClient}))); 
+				const 	isHorz 	= !!dockAlignment.among(mixin(舉!((DockAlignment),q{leftClient})), mixin(舉!((DockAlignment),q{rightClient}))),
+					isVert 	= !!dockAlignment.among(mixin(舉!((DockAlignment),q{topClient})), mixin(舉!((DockAlignment),q{bottomClient}))); 
 				enforce(
 					isHorz || isVert, 
-					"Splitter: invalid panelPosition: `"~panelPosition.text~"`"
+					"Splitter: invalid panelPosition: `"~dockAlignment.text~"`"
 				); 
 				
 				const siz = fh/6; 
 				if(isHorz) outerWidth = siz; if(isVert) outerHeight = siz; 
 				
-				static vec2 startMousePos; 
-				auto actMousePos() => targetView.mousePos.vec2; 
-				
-				static float startTargetSize = 0; 
-				
-				static bool dragging; 
-				
-				if(canProcessUserInput && hit.pressed)
+				with(splitterState)
 				{
-					startMousePos = actMousePos; 
-					startTargetSize = targetSize; 
-					dragging = true; 
-				}
-				
-				if(dragging)
-				{
-					if(!(canProcessUserInput && inputs.LMB.down))
-					{ dragging = false; }
-					else
+					auto actMousePos() => targetView.mousePos.vec2; 
+					bool dragging() => draggedSplitterId == _id; 
+					void setDragging(bool b) { draggedSplitterId = ((b)?(_id):(Id.init)); } 
+					
+					if(canProcessUserInput && hit.pressed)
 					{
-						const ofs = actMousePos - startMousePos; 
-						float a = startTargetSize; 
-						with(DockAlignment)
-						switch(panelPosition)
-						{
-							case leftClient: 	a += ofs.x; 	break; 
-							case rightClient: 	a -= ofs.x; 	break; 
-							default: 
-						}
-						targetSize = a.clamp(targetMinSize, targetMaxSize.max(targetMinSize)); 
+						startMousePos = actMousePos; 
+						startTargetSize = targetSize; 
+						setDragging = true; 
 					}
+					
+					if(dragging)
+					{
+						if(!(canProcessUserInput && inputs.LMB.down))
+						{ setDragging = false; }
+						else
+						{
+							const ofs = actMousePos - startMousePos; 
+							float a = startTargetSize; 
+							with(DockAlignment)
+							switch(dockAlignment)
+							{
+								case leftClient: 	a += ofs.x; 	break; 
+								case rightClient: 	a -= ofs.x; 	break; 
+								default: 
+							}
+							targetSize = a.clamp(targetMinSize, targetMaxSize.max(targetMinSize)); 
+						}
+					}
+					
+					if(dragging || canProcessUserInput && hit.hover)
+					mouseCursor = MouseCursor.SIZEWE; 
+					
+					background = ((dragging)?(clAccent) :(
+						mix(
+							clWinBackground, clWinBtnPressed, 
+							hit.hover_smooth
+						)
+					)); 
+					
+					version(/+$DIDE_REGION Handle the recursive composition+/all)
+					{ mixin(SCR.ProcessComposition); }
+					
+					version(/+$DIDE_REGION Return custom results+/all)
+					{ return dragging; }
 				}
-				
-				if(dragging || canProcessUserInput && hit.hover)
-				mouseCursor = MouseCursor.SIZEWE; 
-				
-				background = ((dragging)?(clAccent) :(
-					mix(
-						clWinBackground, clWinBtnPressed, 
-						hit.hover_smooth
-					)
-				)); 
 			}
-			
-			version(/+$DIDE_REGION Handle the recursive composition+/all)
-			{ mixin(SCR.ProcessComposition); }
-			
-			version(/+$DIDE_REGION Return custom results+/all)
-			{ return hit; }
 		} 
 		
 		
@@ -10567,7 +10599,6 @@ struct im
 		
 		version(/+$DIDE_REGION+/all)
 		{
-			//AdvancedSlider //////////////////////////////
 			void AdvancedSlider_impl(T)(T prop, void delegate() fun=null) if(is(T==FloatProperty) || is(T==IntProperty))
 			{
 				//slider, min/max/act value display, default, edit/inc/dec
@@ -10649,11 +10680,12 @@ struct im
 			
 			void AdvancedSliderChkBox(Property p, Property pBool, string capt="")
 			{ AdvancedSlider(p, { ChkBox(pBool, capt); }); } 
-			auto Node(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(ref bool state, void delegate() title, void delegate() contents, Args args)
+			auto Node(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)
+				(ref bool state, void delegate() title, void delegate() contents, Args args)
 			{
-				 //Node ////////////////////////////
 				HitInfo hit; 
-				Column!(_M_, _L_)(
+				Column!(_M_, _L_)
+				(
 					{
 						border.width = 1; //Todo: ossze kene tudni kombinalni a szomszedos node-ok bordereit.
 						border.color = mix(style.bkColor, style.fontColor, state ? .1f : 0); 
@@ -10676,14 +10708,13 @@ struct im
 								Column({ contents(); }); 
 							}
 						); 
-						
-						
 					}, args
 				); 
 				return hit; 
 			} 
 			
-			auto Node(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(ref bool state, string title, void delegate() contents, Args args)
+			auto Node(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)
+				(ref bool state, string title, void delegate() contents, Args args)
 			{ return Node!(_M_, _L_)(state, { Text(title); }, contents, args); } 
 			
 			/// A node header that usually connects to a server, can have an error message and a state of refreshing. It can has a refresh button too
@@ -10722,12 +10753,14 @@ struct im
 					
 					Cell[] cells; 
 					
-					cache.update(
+					cache.update
+					(
 						ext, 
 						{
 							Container(
 								{
-									Text(tag(format!`img "icon:\%s" height=%f`(ext, iconHeight)));  //Note: this is fucking slow, but works
+									Text(tag(format!`img "icon:\%s" height=%f`(ext, iconHeight))); 
+									//Note: this is fucking slow, but works
 								}
 							); 
 							auto cntr = removeLastContainer; 
@@ -11765,10 +11798,10 @@ version(/+$DIDE_REGION Dead code 260813+/none)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x522D6EB16D5C4).檢(hit.toJson)); 
+					((0x5285CEB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x52310EB16D5C4).檢(localMouse)); 
+					((0x52896EB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
