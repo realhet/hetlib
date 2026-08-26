@@ -5088,6 +5088,8 @@ version(/+$DIDE_REGION+/all)
 		
 		bounds2 clientArea; //must be initialized before receiving contained cells.
 		
+		im.SplittedAreaState splittedAreaState; 
+		
 		void beforeDock(.Container cntr, in DockAlignment da)
 		{
 			with(DockAlignment)
@@ -5096,7 +5098,7 @@ version(/+$DIDE_REGION+/all)
 				if(da)
 				{
 					if(da.among(client, topClient, bottomClient))	cntr.outerWidth = clientArea.width; 
-					else if(da.among(client, leftClient, rightClient))	cntr.outerHeight = clientArea.height; 
+					if(da.among(client, leftClient, rightClient))	cntr.outerHeight = clientArea.height; 
 				}
 			}
 		} 
@@ -5136,7 +5138,10 @@ version(/+$DIDE_REGION+/all)
 							case leftClient: 	cntr.outerPos     = clientArea.topLeft; 	clientArea.left += cntr.outerWidth; 	break; 
 							case rightClient: 	clientArea.right   -= cntr.outerWidth; 	cntr.outerPos = clientArea.topRight; 	break; 
 							case client: 	cntr.outerPos     = clientArea.topLeft; 	cntr.outerSize = clientArea.size,
-							clientArea = bounds2.init; 	break; 
+							clientArea = bounds2(
+								clientArea.center, 
+								clientArea.center
+							); 	break; 
 							default: 	ERR("invalid DockAlignment"); 
 						}
 					}
@@ -8259,8 +8264,8 @@ struct im
 			.Container thisContainer, lastContainer; //top of the containerStack for faster access
 			auto thisRow()
 			=> (cast(.Row)(thisContainer)); auto thisColumn()
-			=> (cast(.Column)(thisContainer)); DockSite thisDockSite()
-			=> (cast(DockSite)(thisContainer)); 
+			=> (cast(.Column)(thisContainer)); auto thisDockSite()
+			=> (cast(.DockSite)(thisContainer)); 
 			
 			auto thisId()
 			=> thisContainer.id; 
@@ -8279,8 +8284,8 @@ struct im
 			{
 				if(stack.length<2) enforce(0, "im.Stack underflow."); 
 				return stack[$-2].container; 
-			}  DockSite parentDockSite()
-			=> (cast(DockSite)(parentContainer)); 
+			}  auto parentDockSite()
+			=> (cast(.DockSite)(parentContainer)); 
 			
 			auto subCells()
 			=> thisContainer.subCells; 
@@ -9008,18 +9013,20 @@ struct im
 				}
 			); 
 		} 
+		
 		
 		private
 		{
+			SplitterState splitterState; 
 			struct SplitterState
 			{
 				vec2 startMousePos; 
 				float startTargetSize = 0; 
 				Id draggedSplitterId; 
 			} 
-			SplitterState splitterState; 
 		} 
 		
+		///Splitter is a thin stripe shaped container used to resize other containers.
 		bool Splitter(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)
 		(ref float targetSize, float targetMinSize, float targetMaxSize, in Args args)
 		{
@@ -9103,6 +9110,193 @@ struct im
 				}
 			}
 		} 
+		
+		private
+		{
+			static struct SplittedAreaState
+			{
+				bool active; 
+				
+				.DockSite dockSite; 
+				
+				bool isHorz, isVert; 
+				float fullSize, totalResizableSize, totalStaticSize; 
+				size_t lastDockSiteSubCellCount; 
+				float minRemainingSize; 
+				
+				float*[] sizePtrs; 
+				
+				void reset()
+				{ this = typeof(this).init; } 
+				
+				
+				void beginArea()
+				{
+					enforce(!active, "Already inside a SplitterArea."); 
+					active = true; 
+					dockSite = im.thisDockSite.enforce("Resizable!Container requires a DockSite."); 
+				} 
+				
+				float addUpSubCellSizes()
+				{
+					enforce(lastDockSiteSubCellCount <= dockSite.subCells.length); 
+					float res = 0; 
+					while(lastDockSiteSubCellCount < dockSite.subCells.length)
+					{
+						with(subCells[lastDockSiteSubCellCount].outerSize) res += ((isHorz)?(x):(y)); 
+						lastDockSiteSubCellCount++; 
+					}
+					return res; 
+				} 
+				
+				void beforeResizableContainer(in DockAlignment dockAlignment, ref float actSize)
+				{
+					enforce(im.thisDockSite is dockSite, "Resizable!Container's DockSite lost."); 
+					
+					const 	isDockAlignmentHorz 	= !!dockAlignment.among(mixin(舉!((DockAlignment),q{leftClient})), mixin(舉!((DockAlignment),q{rightClient}))),
+						isDockAlignmentVert 	= !!dockAlignment.among(mixin(舉!((DockAlignment),q{topClient})), mixin(舉!((DockAlignment),q{bottomClient}))); 
+					if(!(isHorz || isVert))
+					{
+						isHorz 	= isDockAlignmentHorz,
+						isVert 	= isDockAlignmentVert; 
+						enforce(
+							isHorz!=isVert /+either one or another+/,
+							"Invalid DockAlignment in Resizable!Container "~dockAlignment.text
+						); 
+						
+						//Now that orientation is known, fullSize can be determined.
+						with(dockSite.clientArea.size) fullSize = ((isHorz)?(x):(y)); 
+						lastDockSiteSubCellCount = dockSite.subCells.length; 
+						totalResizableSize = totalStaticSize = 0; 
+					}
+					else
+					{
+						enforce(
+							(isHorz && isDockAlignmentHorz) || (isVert && isDockAlignmentVert),
+							((isHorz)?("Horizontal"):("Vertical"))
+							~" DockAlignment expected Resizable!Container "~dockAlignment.text
+						); 
+						totalStaticSize += addUpSubCellSizes; 
+					}
+					
+					sizePtrs ~= &actSize; 
+				} 
+				
+				void afterResizableContainer()
+				{
+					enforce(im.thisDockSite is dockSite, "Resizable!Container's DockSite lost."); 
+					totalResizableSize += addUpSubCellSizes; 
+				} 
+				
+				void endArea()
+				{
+					enforce(active, "Not inside SplitterArea. Nothing to end."); 
+					enforce(im.thisDockSite is dockSite, "Resizable!Container's DockSite lost."); 
+					
+					if(const N = sizePtrs.length)
+					{
+						enum minRemainingSize = 32; 
+						
+						const 	remainingSize 	= fullSize - totalResizableSize - totalStaticSize,
+							invN 	= 1.0f/N,
+							minSize 	= min(minRemainingSize, fullSize * invN); 
+						
+						const at = calcAnimationT(deltaTime/+1.0f/60+/, .01), sd = .01f; 
+						
+						if(remainingSize < minSize)
+						{
+							const adjust = (remainingSize - minSize) * invN; 
+							foreach(pSize; sizePtrs)
+							{
+								ref size = *pSize; 
+								size.follow(size + adjust, at, sd); 
+							}
+						}
+						
+						foreach(pSize; sizePtrs)
+						{
+							ref size = *pSize; 
+							if(size<minSize) size.follow(minSize, at, sd); 
+						}
+					}
+					
+					reset; 
+				} 
+			} 
+		} 
+		
+		
+		
+		///Containers can dock into a DockSite, bye specifying DockAlignment.
+		void DockSite(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
+		{
+			setIncomingId!(_M_, _L_)(); 
+			_DockSite(args); 
+		} 
+		
+		void _DockSite(Args...)(in Args args)
+		{
+			mixin ContainerScript_Init!(.DockSite, q{dockAlignment}, (表([[],])), (表([[],]))); 
+			mixin(SCR.Create); 
+			mixin(SCR.ProcessProperties); 
+			
+			version(/+$DIDE_REGION Do custom behavior+/all)
+			{
+				enforce(outerSize, "DockSite's outerSize muse be specified."); 
+				(cast(.DockSite)(_container)).clientArea = bounds2(0, innerSize); 
+			}
+			
+			mixin(SCR.ProcessComposition); 
+		} 
+		
+		///Inside a DockSite, this creates a block for Resizable!Containers.
+		static void SplittedArea(void delegate() fun)
+		{
+			ref splittedAreaState = thisDockSite.splittedAreaState; 
+			
+			splittedAreaState.beginArea; 
+			
+			scope(exit) splittedAreaState.endArea; 
+			
+			fun(); 
+		} 
+		
+		/+
+			Resizable!Container can be placed inside a DockSite's SplittedArea. 
+				It creates and synchronizes Splitters.
+		+/
+		static void Resizable(alias Cntr, string _M_=__MODULE__, size_t _L_=__LINE__, Args...)
+			(in DockAlignment dockAlignment, ref float actSize, in Args args)
+		{
+			//Cntr: For specials Containers, make a dedicated function. Must start with _M_, _L_!
+			
+			ref splittedAreaState = thisDockSite.splittedAreaState; 
+			
+			enforce(splittedAreaState.active, "Resizable!Container called without active SplittedArea."); 
+			
+			splittedAreaState.beforeResizableContainer(dockAlignment, actSize); 
+			scope(exit) splittedAreaState.afterResizableContainer; 
+			
+			const fullSize = splittedAreaState.fullSize; 
+			enforce(!fullSize.isnan, "Resizable!Container's fullSize is nan."); 
+			
+			enum defaultSize = 32; if(actSize.isnan) actSize = defaultSize; 
+			
+			Cntr!(_M_, _L_)(dockAlignment, ((actSize).名!q{outerWidth}), args); 
+			
+			enum extraId = Id("Splitter")
+			/+So the splitter id will be not the same as the content's id.+/; 
+			float nextSize = actSize; 
+			if(Splitter!(_M_, _L_)(nextSize, 0, splittedAreaState.fullSize, dockAlignment, ((extraId).名!q{id})))
+			{
+				const at = calcAnimationT(deltaTime/+1.0f/60+/, .7), sd = .01f; 
+				if(!nextSize.isnan) actSize.follow(nextSize, at, sd); 
+			}
+			
+			
+		} 
+		
+		
 		
 		
 		void Text(Args...)(in Args args)
@@ -11798,10 +11992,10 @@ version(/+$DIDE_REGION Dead code 260813+/none)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x5285CEB16D5C4).檢(hit.toJson)); 
+					((0x53FEBEB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x52896EB16D5C4).檢(localMouse)); 
+					((0x54025EB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
