@@ -1144,6 +1144,153 @@ version(/+$DIDE_REGION+/all)
 		} 
 		
 	} 
+	
+	
+	version(/+$DIDE_REGION ImStorage+/all)
+	{
+		//ImStorage ///////////////////////////////////////////////
+		
+		//Usage:  ImStorage!float.set(srcId!("module", 123)(名!"id"(456)), newValue)  //this is the most complicated one
+		
+		/+
+			ImStorageManager.purge(10);
+					
+			struct MyInt{ int value; }
+			auto a = ImStorage!MyInt.access(srcId(名!"id"("fuck"))).value++;
+			if(inputs.Shift.down) ImStorage!int.access(srcId(名!"id"("shit"))) += 10;
+					
+			print(ImStorageManager.detailedStats);
+		+/
+		
+		
+		interface ImStorageInfo {
+			void purge(uint maxAge); 
+					
+			string name(); 
+			string infoSummary(); 
+			string[] infoDetails(); 
+		} 
+		
+		struct ImStorageManager
+		{
+			static: 
+			__gshared ImStorageInfo[string] storages; 
+			
+			void registerStorage(ImStorageInfo info)
+			{ storages[info.name] = info; } 
+			
+			void purge(uint maxAge)
+			{ storages.values.each!(s => s.purge(maxAge)); } 
+			
+			string stats(string details="")
+			{
+				auto _間=init間; 
+				string res = i"application.tick = $(application.tick)\n".text; 
+				foreach(name; storages.keys.sort)
+				{
+					const maskOk = name.isWild(details); 
+					if(maskOk || details=="") res ~= storages[name].infoSummary ~ '\n'; 
+					if(maskOk) res ~= storages[name].infoDetails.join('\n') ~ '\n'; 
+				}
+				((0x880DEB16D5C4).檢((update間(_間)))); 
+				return res; 
+			} 
+			
+			string detailedStats() { return stats("*"); } 
+		} 
+		
+		struct ImStorage(T)
+		{
+			static: 
+			alias Id = SrcId; 
+			
+			struct Item {
+				T data; 
+				Id id; 
+				uint tick; 
+			} 
+			
+			Item[Id] items; //by Id
+			
+			void purge(uint maxAge)
+			{
+				//age = 0 purge all
+				uint limit = application.tick-maxAge; 
+				auto toRemove = items.byKeyValue.filter!((a) => a.value.tick<=limit).map!"a.key".array; 
+				toRemove.each!(k => items.remove(k)); 
+			} 
+			
+			class InfoClass : ImStorageInfo
+			{
+				string name()
+				{ return ImStorage!T.stringof; } 
+				string infoSummary()
+				{
+					return format!("%s(apptick:%s, count: %s, minAge = %s, maxAge = %s")
+					(
+						application.tick, name, items.length,
+						application.tick - items.values.map!(a => a.tick).minElement(uint.max),
+						application.tick - items.values.map!(a => a.tick).maxElement(uint.min)
+					); 
+				} 
+				string[] infoDetails()
+				{
+					return items.byKeyValue.map!(
+						(in a) => format!"  apptick=%s | valuetick=%s | age=%-4d | id=%18s | %s"
+						(application.tick, a.value.tick, application.tick-a.value.tick, a.key, a.value.data)
+					).array.sort.array; 
+				} 
+				void purge(uint maxAge)
+				{ ImStorage!T.purge(maxAge); } 
+			} 
+			
+			auto ref access(in Id id, lazy T default_ = T.init)
+			{
+				ensureRegistered(); 
+				auto p = id in items; 
+				if(!p) {
+					items[id] = Item.init; 
+					p = id in items; 
+					p.data = default_; 
+					p.id = id; 
+				}
+				p.tick = application.tick; 
+				return p.data; 
+			} 
+			
+			private static __gshared bool registered = false; 
+			
+			private static void ensureRegistered()
+			{
+				if(registered) return; 
+				registered = true; 
+				ImStorageManager.registerStorage(new InfoClass); 
+			} 
+			
+			void set(in Id id, T data)
+			{ access(id) = data; } 
+			
+			bool exists(in Id id)
+			{ return (id in items) !is null; } 
+			
+			uint age(in Id id)
+			{ if(auto p = id in items) { return application.tick-p.tick; }else return typeof(return).max; } 
+			
+			//Todo: ez egy nagy bug: ha static this, akkor cyclic module initialization. ha shared static this, akkor meg 3 masodperc utan eled csak fel.
+			/+260827 A static shared mukodik! Megjavitották. A package.d forditasi ideje is gyors volt.+/
+			/+shared static this() { ImStorageManager.registerStorage(new InfoClass); } +/
+		} 
+		
+		
+		///note: This has been moved here to avoid circular module initialization in uiBase
+		
+		//Todo: Fix this circular module initialization mess
+		
+	}
+	
+	ref auto imstVisibleBounds(in SrcId id)
+	{ return ImStorage!bounds2.access(id.combine("VisibleBounds")); }  ref auto imstOuterBounds(in SrcId id)
+	{ return ImStorage!bounds2.access(id.combine("OuterBounds")); } 
 	
 	class Cell
 	{
@@ -3638,6 +3785,8 @@ version(/+$DIDE_REGION+/all)
 		/// returns: If it was effective. So it could do more things recursively.
 		bool needMeasure()
 		{
+			/+Todo: 260827: It's so fucked up!+/
+			
 			flags._measureOnlyOnce = true; 
 			
 			if(flags._measured)
@@ -5149,6 +5298,12 @@ version(/+$DIDE_REGION+/all)
 			}
 		} 
 	} 
+	
+	class Splitter : Container/+should be just a Cell... No children.+/
+	{} 
+	
+	static struct SplitterInfo { string name; } 
+	
 	
 	class SelectionManager(T : Cell)
 	{
@@ -7060,10 +7215,10 @@ struct im
 				//inject stuff into het.uibase. So no import het.ui is needed there.
 				//Todo: het.uibase was merged with het.ui. This is no longer needed.
 				static auto getActFontHeight()
-				{ return float(textStyle.fontHeight); 	} 	.g_actFontHeightFunct	= &getActFontHeight; 
+				=> float(textStyle.fontHeight); 	.g_actFontHeightFunct	= &getActFontHeight; 
 				static auto getActFontColor ()
-				{ return textStyle.fontColor; 	} 	.g_actFontColorFunct	= &getActFontColor; 
-				version(/+$DIDE_REGION+/none) { .g_getOverlayDrawingFunct = &getOverlayDrawing; }
+				=> textStyle.fontColor; 	.g_actFontColorFunct	= &getActFontColor; 
+				
 				.g_getDrawCallbackFunct = &getDrawCallback; 
 				
 				//update building/measuring/drawing state
@@ -7088,12 +7243,24 @@ struct im
 				
 				ImStorageManager.purge(200/+maxAge 200? Why?+/); 
 				
+				/+
+					Todo: 260718 Flooding >1KB text at 60FPS is bad!!! 
+					In the debugger is does .5 sec lagspikes. Not affecting small texts, though.
+				+/
+				version(/+$DIDE_REGION+/none) {
+					auto _間=init間; ((0x3238AEB16D5C4).檢(application.tick)); 	((0x323B6EB16D5C4).檢((update間(_間)))); 
+					const storageStats = ImStorageManager.detailedStats; 	((0x3241FEB16D5C4).檢((update間(_間)))); 
+					if(0 ||(application.tick%64==0)) ((0x32473EB16D5C4).檢 (storageStats.replicate(10))); 	((0x324AAEB16D5C4).檢((update間(_間)))); 
+					((0x324DDEB16D5C4).檢 (storageStats.until('\n'))); 	((0x32512EB16D5C4).檢((update間(_間)))); 
+					((0x32545EB16D5C4).檢 (storageStats.hashOf)); 	((0x32575EB16D5C4).檢((update間(_間)))); 
+				}
+				
 				{
-					static uint	tbmp; if(tbmp.chkSet((QPS.value(second).ifloor  )/2))
-					bitmaps	.garbageCollect; 
+					static uint tbmp; if(tbmp.chkSet((QPS.value(second).ifloor  )/2))
+					bitmaps.garbageCollect; 
 				}
 				{
-					static uint tvf; if(tvf .chkSet((QPS.value(second).ifloor+1)/2))
+					static uint tvf; if(tvf.chkSet((QPS.value(second).ifloor+1)/2))
 					virtualFiles.garbageCollect; 
 				}
 				
@@ -9038,12 +9205,15 @@ struct im
 		{
 			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
 			{
-				mixin ContainerScript_Init!(.Container, q{dockAlignment hit}, (表([[],])), (表([[],]))); 
+				mixin ContainerScript_Init!(.Splitter, q{dockAlignment hit}, (表([[],])), (表([[],]))); 
 				mixin(SCR.Create); 
 			}
 			
 			version(/+$DIDE_REGION Local variable declarations+/all)
 			{}
+			
+			if(inputs.Shift.down) ImStorage!SplitterInfo.access(_id).name = "Hello"; 
+			
 			
 			version(/+$DIDE_REGION Load all properties+/all)
 			{ mixin(SCR.ProcessProperties); }
@@ -11992,10 +12162,10 @@ version(/+$DIDE_REGION Dead code 260813+/none)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x53FEBEB16D5C4).檢(hit.toJson)); 
+					((0x553FAEB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x54025EB16D5C4).檢(localMouse)); 
+					((0x55434EB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 

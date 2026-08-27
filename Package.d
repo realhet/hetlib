@@ -3197,6 +3197,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 					{ dbg.sendLog("LOG:INSP_TXT:"~location.to!string(16)~":"~txt); }
 					else
 					{
+						/+
+							Todo: 260718 Flooding >1KB text at 60FPS is bad!!! 
+							In the debugger is does .5 sec lagspikes. Not affecting small texts, though.
+						+/
+						
 						auto blobAddress = dbg.setBlob(location, cast(void[])txt); 
 						dbg.sendLog("LOG:INSP_TXT_BLB:"~location.to!string(16)~":"~blobAddress.to!string(16)); 
 					}
@@ -3369,15 +3374,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1A9A159F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1AA4E59F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1AA6959F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1AB1659F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1AB1359F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1AB8859F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1ABC059F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1AC3559F156A1})); 
 						+/
 					+/
 				+/
@@ -6760,131 +6765,8 @@ version(/+$DIDE_REGION Containers+/all)
 		alias BigText = /*shared*/ BigArray!char; 
 		alias BigStream = /*shared*/ BigStream_; 
 		
-	}version(/+$DIDE_REGION ImStorage+/all)
-	{
-		//ImStorage ///////////////////////////////////////////////
-		
-		//Usage:  ImStorage!float.set(srcId!("module", 123)(名!"id"(456)), newValue)  //this is the most complicated one
-		
-		/+
-			ImStorageManager.purge(10);
-					
-			struct MyInt{ int value; }
-			auto a = ImStorage!MyInt.access(srcId(名!"id"("fuck"))).value++;
-			if(inputs.Shift.down) ImStorage!int.access(srcId(名!"id"("shit"))) += 10;
-					
-			print(ImStorageManager.detailedStats);
-		+/
-		
-		
-		interface ImStorageInfo {
-			void purge(uint maxAge); 
-					
-			string name(); 
-			string infoSummary(); 
-			string[] infoDetails(); 
-		} 
-		
-		struct ImStorageManager
-		{
-			static: 
-			__gshared ImStorageInfo[string] storages; 
-			
-			void registerStorage(ImStorageInfo info)
-			{ storages[info.name] = info; } 
-			
-			void purge(uint maxAge)
-			{ storages.values.each!(s => s.purge(maxAge)); } 
-			
-			string stats(string details="")
-			{
-				string res; 
-				foreach(name; storages.keys.sort)
-				{
-					const maskOk = name.isWild(details); 
-					if(maskOk || details=="") res ~= storages[name].infoSummary ~ '\n'; 
-					if(maskOk) res ~= storages[name].infoDetails.join('\n') ~ '\n'; 
-				}
-				return res; 
-			} 
-			
-			string detailedStats() { return stats("*"); } 
-		} 
-		
-		struct ImStorage(T)
-		{
-			static: 
-			alias Id = SrcId; 
-			
-			struct Item {
-				T data; 
-				Id id; 
-				uint tick; 
-			} 
-			
-			Item[Id] items; //by Id
-			
-			void purge(uint maxAge)
-			{
-				 //age = 0 purge all
-				uint limit = application.tick-maxAge; 
-				auto toRemove = items.byKeyValue.filter!((a) => a.value.tick<=limit).map!"a.key".array; 
-				toRemove.each!(k => items.remove(k)); 
-			} 
-			
-			class InfoClass : ImStorageInfo
-			{
-				string name()
-				{ return ImStorage!T.stringof; } 
-				string infoSummary()
-				{
-					return format!("%s(count: %s, minAge = %s, maxAge = %s")(
-						name, items.length,
-						application.tick - items.values.map!(a => a.tick).minElement(uint.max),
-						application.tick - items.values.map!(a => a.tick).maxElement(uint.min)
-					); 
-				} 
-				string[] infoDetails()
-				{ return items.byKeyValue.map!((in a) => format!"  age=%-4d | id=%18s | %s"(application.tick-a.value.tick, a.key, a.value.data)).array.sort.array; } 
-				void purge(uint maxAge)
-				{ ImStorage!T.purge(maxAge); } 
-			} 
-			
-			auto ref access(in Id id, lazy T default_ = T.init)
-			{
-				auto p = id in items; 
-				if(!p) {
-					items[id] = Item.init; 
-					p = id in items; 
-					p.data = default_; 
-					p.id = id; 
-				}
-				p.tick = application.tick; 
-				return p.data; 
-			} 
-			
-			void set(in Id id, T data)
-			{ access(id) = data; } 
-			
-			bool exists(in Id id)
-			{ return (id in items) !is null; } 
-			
-			uint age(in Id id)
-			{ if(auto p = id in items) { return application.tick-p.tick; }else return typeof(return).max; } 
-			
-			//Todo: ez egy nagy bug: ha static this, akkor cyclic module initialization. ha shared static this, akkor meg 3 masodperc utan eled csak fel.
-			//shared static this(){ ImStorageManager.registerStorage(new InfoClass); }
-		} 
-		
-		
-		///note: This has been moved here to avoid circular module initialization in uiBase
-		ref auto imstVisibleBounds(in SrcId id)
-		{ return ImStorage!bounds2.access(id.combine("VisibleBounds")); } 
-		ref auto imstOuterBounds(in SrcId id)
-		{ return ImStorage!bounds2.access(id.combine("OuterBounds")); } 
-		//Todo: Fix this circular module initialization mess
-		
-	}class DynCharMap
+	}
+	class DynCharMap
 	{
 		private: 
 			mixin CustomEnforce!"DynCharMap"; 
