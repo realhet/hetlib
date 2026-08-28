@@ -4180,7 +4180,7 @@ class VulkanWindow: Window, IGfxContentDestination
 				
 				if(chkClear(view._mustZoomAll)) view.zoomAll; 
 				
-				//afterPaint; 
+				im._finalizeFrame!"system call only"; 
 			} 
 			//navigate 2D view with the keyboard and the mouse
 			//it optionally calls invalidate
@@ -5568,18 +5568,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2ADB782886ADB).檢(
+					((0x2ADCF82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2AE2982886ADB))))
+				if((互!((bool),(0),(0x2AE4182886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2AEBD82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2AED482886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2AED582886ADB).檢((互!((float/+w=12+/),(1.000),(0x2AEEC82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5592,8 +5592,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2B0A982886ADB).檢 (imVG)),
-					((0x2B0CF82886ADB).檢 (imFPS)); 
+					((0x2B0C182886ADB).檢 (imVG)),
+					((0x2B0E782886ADB).檢 (imFPS)); 
 				}
 			}
 			

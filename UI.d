@@ -1164,8 +1164,7 @@ version(/+$DIDE_REGION+/all)
 		
 		
 		interface ImStorageInfo {
-			void purge(uint maxAge); 
-					
+			void purge(); 
 			string name(); 
 			string infoSummary(); 
 			string[] infoDetails(); 
@@ -1179,20 +1178,18 @@ version(/+$DIDE_REGION+/all)
 			void registerStorage(ImStorageInfo info)
 			{ storages[info.name] = info; } 
 			
-			void purge(uint maxAge)
-			{ storages.values.each!(s => s.purge(maxAge)); } 
+			void purge()
+			{ storages.byValue.each!((s){ s.purge; }); } 
 			
 			string stats(string details="")
 			{
-				auto _間=init間; 
-				string res = i"application.tick = $(application.tick)\n".text; 
+				string res; 
 				foreach(name; storages.keys.sort)
 				{
 					const maskOk = name.isWild(details); 
 					if(maskOk || details=="") res ~= storages[name].infoSummary ~ '\n'; 
 					if(maskOk) res ~= storages[name].infoDetails.join('\n') ~ '\n'; 
 				}
-				((0x880DEB16D5C4).檢((update間(_間)))); 
 				return res; 
 			} 
 			
@@ -1206,57 +1203,52 @@ version(/+$DIDE_REGION+/all)
 			
 			struct Item {
 				T data; 
-				Id id; 
-				uint tick; 
+				uint endTick; /+inclusive+/
 			} 
 			
 			Item[Id] items; //by Id
 			
-			void purge(uint maxAge)
+			void purge()
 			{
-				//age = 0 purge all
-				uint limit = application.tick-maxAge; 
-				auto toRemove = items.byKeyValue.filter!((a) => a.value.tick<=limit).map!"a.key".array; 
-				toRemove.each!(k => items.remove(k)); 
+				const limit = application.tick; 
+				const toRemove = items.byKeyValue.filter!((a)=>(a.value.endTick<=limit)).map!"a.key".array; 
+				foreach(k; toRemove) items.remove(k); 
 			} 
 			
 			class InfoClass : ImStorageInfo
 			{
 				string name()
-				{ return ImStorage!T.stringof; } 
+				{ return T.stringof; } 
 				string infoSummary()
 				{
-					return format!("%s(apptick:%s, count: %s, minAge = %s, maxAge = %s")
-					(
-						application.tick, name, items.length,
-						application.tick - items.values.map!(a => a.tick).minElement(uint.max),
-						application.tick - items.values.map!(a => a.tick).maxElement(uint.min)
-					); 
+					const	cnt = items.length,
+						siz = items.byValue.map!((a)=>(a.estimateTotalSize)).sum.shortSizeText!1024~'B',
+						lifeMin =  items.values.map!"a.endTick".minElement(uint.max) - application.tick,
+						lifeMax = items.values.map!"a.endTick".maxElement(uint.min) - application.tick,
+						lifeInfo = "life:"~((lifeMin==lifeMax)?(lifeMin.text) :(i"[$(lifeMin)..$(lifeMax)]".text)); 
+					return i"$(name)	|$(cnt)	|$(((cnt)?(siz):("")))	|$(((cnt)?(lifeInfo):("")))".text; 
 				} 
 				string[] infoDetails()
 				{
 					return items.byKeyValue.map!(
-						(in a) => format!"  apptick=%s | valuetick=%s | age=%-4d | id=%18s | %s"
-						(application.tick, a.value.tick, application.tick-a.value.tick, a.key, a.value.data)
+						(in a) => format!"endTick=%s | life=%-4d | id=%18s | %s"
+						(a.value.endTick, a.value.endTick - application.tick, a.key, a.value.data)
 					).array.sort.array; 
 				} 
-				void purge(uint maxAge)
-				{ ImStorage!T.purge(maxAge); } 
+				void purge()
+				{ ImStorage!T.purge; } 
 			} 
 			
-			auto ref access(in Id id, lazy T default_ = T.init)
+			auto ref access(in Id id, lazy T def=T.init, uint life=1)
 			{
-				ensureRegistered(); 
-				auto p = id in items; 
-				if(!p) {
-					items[id] = Item.init; 
-					p = id in items; 
-					p.data = default_; 
-					p.id = id; 
-				}
-				p.tick = application.tick; 
+				ensureRegistered; 
+				auto p = (id in items).ifz(&(items[id] = Item(def))); 
+				p.endTick = application.tick + life; 
 				return p.data; 
 			} 
+			
+			auto ref opCall(in Id id, lazy T def=T.init, uint life=1)
+			=> access(__traits(parameters)); 
 			
 			private static __gshared bool registered = false; 
 			
@@ -1273,24 +1265,27 @@ version(/+$DIDE_REGION+/all)
 			bool exists(in Id id)
 			{ return (id in items) !is null; } 
 			
-			uint age(in Id id)
-			{ if(auto p = id in items) { return application.tick-p.tick; }else return typeof(return).max; } 
+			uint life(in Id id)
+			{ if(auto p = id in items) { return p.endTick - application.tick; }else return 0; } 
 			
-			//Todo: ez egy nagy bug: ha static this, akkor cyclic module initialization. ha shared static this, akkor meg 3 masodperc utan eled csak fel.
-			/+260827 A static shared mukodik! Megjavitották. A package.d forditasi ideje is gyors volt.+/
-			/+shared static this() { ImStorageManager.registerStorage(new InfoClass); } +/
+			/+Renovated: 260828+/
 		} 
 		
 		
-		///note: This has been moved here to avoid circular module initialization in uiBase
 		
-		//Todo: Fix this circular module initialization mess
+		
+		
 		
 	}
 	
-	ref auto imstVisibleBounds(in SrcId id)
-	{ return ImStorage!bounds2.access(id.combine("VisibleBounds")); }  ref auto imstOuterBounds(in SrcId id)
-	{ return ImStorage!bounds2.access(id.combine("OuterBounds")); } 
+	alias imStorage(T) = ImStorage!T; 
+	struct VisibleBounds
+	{ bounds2 value; alias this=value; } ref auto imstVisibleBounds(in SrcId id)
+	=> imStorage!VisibleBounds(id);  
+	struct OuterBounds
+	{ bounds2 value; alias this=value; } ref auto imstOuterBounds(in SrcId id)
+	=> imStorage!OuterBounds(id); 
+	
 	
 	class Cell
 	{
@@ -7240,31 +7235,6 @@ struct im
 				
 				static DeltaTimer dt; 
 				deltaTime = dt.update; 
-				
-				ImStorageManager.purge(200/+maxAge 200? Why?+/); 
-				
-				/+
-					Todo: 260718 Flooding >1KB text at 60FPS is bad!!! 
-					In the debugger is does .5 sec lagspikes. Not affecting small texts, though.
-				+/
-				version(/+$DIDE_REGION+/none) {
-					auto _間=init間; ((0x3238AEB16D5C4).檢(application.tick)); 	((0x323B6EB16D5C4).檢((update間(_間)))); 
-					const storageStats = ImStorageManager.detailedStats; 	((0x3241FEB16D5C4).檢((update間(_間)))); 
-					if(0 ||(application.tick%64==0)) ((0x32473EB16D5C4).檢 (storageStats.replicate(10))); 	((0x324AAEB16D5C4).檢((update間(_間)))); 
-					((0x324DDEB16D5C4).檢 (storageStats.until('\n'))); 	((0x32512EB16D5C4).檢((update間(_間)))); 
-					((0x32545EB16D5C4).檢 (storageStats.hashOf)); 	((0x32575EB16D5C4).檢((update間(_間)))); 
-				}
-				
-				{
-					static uint tbmp; if(tbmp.chkSet((QPS.value(second).ifloor  )/2))
-					bitmaps.garbageCollect; 
-				}
-				{
-					static uint tvf; if(tvf.chkSet((QPS.value(second).ifloor+1)/2))
-					virtualFiles.garbageCollect; 
-				}
-				
-				resourceMonitor.update; 
 			} 
 			
 			void _endFrame()
@@ -7430,6 +7400,40 @@ struct im
 				//Todo: ezt tesztelni kene sor cell-el is! Hogy mekkorak a gc spyke-ok, ha manualisan destroyozok.
 				
 				//Todo: if window resizing, draw is called without update!!!  canDraw = false; can detect it.
+			} 
+			
+			void _finalizeFrame(string restrict="")()
+			{
+				
+				/+
+					Todo: 260718 Flooding >1KB text at 60FPS is bad!!! 
+					In the debugger is does .5 sec lagspikes. Not affecting small texts, though.
+				+/
+				static if(0)
+				{
+					if(application.tick % 15 == 0)
+					{
+						if(inputs.Ctrl.down)
+						{
+							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
+							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
+						}
+						((0x336E1EB16D5C4).檢 (ImStorageManager.stats)); 
+					}
+				}
+				
+				ImStorageManager.purge; 
+				
+				{
+					static uint tbmp; if(tbmp.chkSet((QPS.value(second).ifloor  )/2))
+					bitmaps.garbageCollect; 
+				}
+				{
+					static uint tvf; if(tvf.chkSet((QPS.value(second).ifloor+1)/2))
+					virtualFiles.garbageCollect; 
+				}
+				
+				resourceMonitor.update; 
 			} 
 		}
 		version(/+$DIDE_REGION HitTest+/all)
@@ -12162,10 +12166,10 @@ version(/+$DIDE_REGION Dead code 260813+/none)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x553FAEB16D5C4).檢(hit.toJson)); 
+					((0x551DAEB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x55434EB16D5C4).檢(localMouse)); 
+					((0x55214EB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
