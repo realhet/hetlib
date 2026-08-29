@@ -2226,7 +2226,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	} 
 	
 	string appendGenericIds(string idVariable)
-	{ return processGenericArgs(`static if(N=="id") `~idVariable~`.appendIdx(a.value);`); } 
+	{ return processGenericArgs(`static if(N=="id") `~idVariable~`.appendToSrcId(a.value);`); } 
 	
 	
 	auto genericId(T)(in T a)
@@ -2255,7 +2255,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		T value; 
 		this(in T a) { value = a; } 
-		this(in string srcModule, in size_t srcLine) { this = srcId2(srcModule, srcLine); } 
+		this(in string srcModule, in size_t srcLine) { this = createSrcId(srcModule, srcLine); } 
 		
 		bool opCast(B : bool)() const { return value != T.init; } 
 		
@@ -2269,14 +2269,14 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	
 	static if(is(SrcId.T==uint) || is(SrcId.T==ulong))
 	{
-		auto combine(T)(in SrcId i1, in T i2) { return SrcId(cast(SrcId.T)hashOf(i2, i1.value)); } 
-		void appendIdx(T)(ref SrcId id, in T idx) { id = combine(id, idx); } 
+		auto extendSrcId(T)(in SrcId i1, in T i2) { return SrcId(cast(SrcId.T)hashOf(i2, i1.value)); } 
+		void appendToSrcId(T)(ref SrcId id, in T idx) { id = extendSrcId(id, idx); } 
 		
-		SrcId srcId2(string srcModule, size_t srcLine)
+		SrcId createSrcId(string srcModule, size_t srcLine)
 		=> SrcId(cast(SrcId.T)hashOf(srcLine, hashOf(srcModule))); 
 		
 		//Note: string hash is 32 bit only, so the proper way to combine line and module is hash(line, hash(module))
-		auto srcId(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
+		auto srcIdFromArgs(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
 		{
 			auto id = SrcId(cast(SrcId.T)hashOf(_L_, hashOf(_M_))); 
 			//Note: direkt van 2 hashOf, mert a hashOf(srcModule, x), az csak 32 bites!!!!
@@ -2288,14 +2288,14 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	{
 		//auto srcId(in SrcId i1, in SrcId i2) { return SrcId(i1.value ~ '.' ~ i2.value); }
 		
-		auto combine(T)(in SrcId i1, in T i2) { return SrcId(i1.value ~ '.' ~ i2.text); } 
-		void appendIdx(T)(ref SrcId id, in T idx) { id ~= '[' ~ idx.text ~ ']'; } 
+		auto extendSrcId(T)(in SrcId i1, in T i2) { return SrcId(i1.value ~ '.' ~ i2.text); } 
+		void appendToSrcId(T)(ref SrcId id, in T idx) { id ~= '[' ~ idx.text ~ ']'; } 
 		//for clarity string uses the [idx] form, instead of a.b;
 		
-		SrcId srcId2(string srcModule, size_t srcLine)
+		SrcId createSrcId(string srcModule, size_t srcLine)
 		=> SrcId(srcLocationStr2(srcModule, srcLine)); 
 		
-		auto srcId(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
+		auto srcIdFromArgs(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
 		{
 			auto id = SrcId(srcLocationStr!(_M_, _L_)); 
 			//.d is included to make sourceModule detection easier
@@ -2318,10 +2318,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			} 
 			
 			//newlines in source do matter here!!!!
-			/+1+/ enum i1 = srcId; enum i2 = srcId; 
-			/+2+/ enum i3 = srcId; auto i4 = srcId(genericArg!"id"("Hello"), genericArg!"id"(123)), i5 = srcId(genericArg!"id"("Hello")); 
-			/+3+/ auto i6 = i5.combine("Test"); 
-			/+4+/ auto i7 = i6.combine(0); 
+			/+1+/ enum i1 = srcIdFromArgs; enum i2 = srcIdFromArgs; 
+			/+2+/ enum i3 = srcIdFromArgs; auto i4 = srcIdFromArgs(genericArg!"id"("Hello"), genericArg!"id"(123)), i5 = srcIdFromArgs(genericArg!"id"("Hello")); 
+			/+3+/ auto i6 = i5.extendSrcId("Test"); 
+			/+4+/ auto i7 = i6.extendSrcId(0); 
 			enforce(i1==i2 && i2!=i3 && i3!=i4 && i4!=i5 && i5!=i6 && i6!=i7); 
 		}
 	} 
@@ -3455,15 +3455,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B44659F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B4AD59F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B50E59F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B57559F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B5B859F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B62D59F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B61F59F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B69459F156A1})); 
 						+/
 					+/
 				+/

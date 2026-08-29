@@ -3000,7 +3000,7 @@ version(/+$DIDE_REGION+/all) {
 					); 
 					incVertexCount(2); //add extra to be sure
 				}
-			} 
+			} 
 			
 			version(/+$DIDE_REGION+/none) {
 				protected void emitPathCmd(A...)(in char cmd, in Opcode op, in A args)
@@ -3180,7 +3180,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 					}); 
 				}
 			} 
-			
+			
 			void emitSvgPathItem(const ref SvgPathItem item)
 			{
 				//this is a dumb interpeter to emitSvgCmd from SvgPathItem
@@ -3237,7 +3237,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 			} 
 			
 			alias drawPath = drawPathNew; 
-			
+			
 			void drawC64Sprite(V)(in V pos, in int idx)
 			{
 				if(idx.inRange(0, 255))
@@ -3268,7 +3268,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 					mixin(舉!((Opcode),q{drawTexRectStretchY}))	, assemblePoint(bnd.bottomRight),
 					assembleHandle(texHandle), vec2(ty0, ty1).to_unorm
 				); 
-			} 
+			} 
 			
 			void drawShape(in bounds2 bnd, in ShapeParams shape, in BevelParams bevel=BevelParams.init)
 			{
@@ -3460,7 +3460,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1B41B82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1B41D82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -3953,7 +3953,7 @@ class VulkanWindow: Window, IGfxContentDestination
 			/+Todo: Old crap, just workin'!!! Must refactor!!!+/
 			
 			//views
-			View2D view, viewGUI; 
+			View2D viewWorld, viewGUI; 
 			float guiScale = 1; 
 			
 			//this is the latest swapchain size, not the actual window size.
@@ -3962,13 +3962,13 @@ class VulkanWindow: Window, IGfxContentDestination
 			
 			void initializeViewsAndMouseState()
 			{
-				view = new View2D; view.centerCorrection = true; 
+				viewWorld = new View2D; viewWorld.centerCorrection = true; 
 				viewGUI = new View2D; 
 				mouse = new MouseState; 
 			} 
 			
 			override void onInitialZoomAll()
-			{ if(!view.workArea.empty) { view.zoomAll_immediate; }} 
+			{ if(!viewWorld.workArea.empty) { viewWorld.zoomAll_immediate; }} 
 			
 			override void onMouseUpdate()
 			{
@@ -3983,15 +3983,16 @@ class VulkanWindow: Window, IGfxContentDestination
 					alt	= k("Alt"	); 
 					ctrl	= k("Ctrl"	); 
 					screen	= screenToClient(inputs.mouseAct).iround; 
-					world	= view.screenToWorld(vec2(screen)); 
+					world	= viewWorld.screenToWorld(vec2(screen)); 
 					wheel	= inputs["MW"].delta.iround; 
 				}
 				mouse._updateInternal(a); 
 				
 				mouse.screenRect = ibounds2(ivec2(0), swapchainClientSize); 
-				mouse.worldRect = bounds2(
-					view.screenToWorld(vec2(mouse.screenRect.topLeft)),
-					view.screenToWorld(vec2(mouse.screenRect.bottomRight))
+				mouse.worldRect = bounds2
+					(
+					viewWorld.screenToWorld(vec2(mouse.screenRect.topLeft)),
+					viewWorld.screenToWorld(vec2(mouse.screenRect.bottomRight))
 				); 
 				
 				//Todo: bad names: worldRect is "screenBounds in world coords"
@@ -4000,7 +4001,7 @@ class VulkanWindow: Window, IGfxContentDestination
 			
 			override void onUpdateViewAnimation()
 			{
-				if(view.updateAnimation(deltaTime.value(second))) invalidate; 
+				if(viewWorld.updateAnimation(deltaTime.value(second))) invalidate; 
 				
 				version(/+$DIDE_REGION+/all) {
 					//viewGUI.scale = (互!((float/+w=6+/),(0.000),(0x18F0C82886ADB)))*7+.5; 
@@ -4011,11 +4012,11 @@ class VulkanWindow: Window, IGfxContentDestination
 				
 				version(/+$DIDE_REGION+/all)
 				{
-					//set extra info about mouse and bounds for view and viewGUI
+					//set extra info about mouse and bounds for viewWorld and viewGUI
 					const mp = View2D.V(mouse.act.screen); 
 					const bnd = View2D.B(ibounds2(ivec2(0), swapchainClientSize)); 
 					
-					static foreach(v; AliasSeq!(view, viewGUI))
+					static foreach(v; AliasSeq!(viewWorld, viewGUI))
 					with(v)
 					{
 						v.clientSize = bnd.size.vec2; 
@@ -4088,7 +4089,7 @@ class VulkanWindow: Window, IGfxContentDestination
 			override void onUpdateUIBeginFrame()
 			{
 				import het.ui:im; 
-				im._beginFrame(view, viewGUI); 
+				im._beginFrame(viewWorld, viewGUI); 
 			} 
 			
 			override void onUpdateUIEndFrame()
@@ -4102,30 +4103,30 @@ class VulkanWindow: Window, IGfxContentDestination
 			
 			void afterImDraw(IDrawing drWorld, IDrawing drGui)
 			{} 
-			
-			protected DrawingProxy staticDr, staticDrGUI; 
+			
+			protected DrawingProxy staticDrWorld, staticDrGUI; //`static` in the names means -> long term reusability
 			protected void imDrawFrame()
 			{
 				void resetBuilders()
 				{
-					if(!staticDr)
-					staticDr 	= new DrawingProxy	(new GfxBuilder((cast(IGfxContentDestination)(this)))), 
+					if(!staticDrWorld)
+					staticDrWorld 	= new DrawingProxy	(new GfxBuilder((cast(IGfxContentDestination)(this)))), 
 					staticDrGUI 	= new DrawingProxy	(new GfxBuilder((cast(IGfxContentDestination)(this)))); 
 					
-					staticDr.reset; 
+					staticDrWorld.reset; 
 					staticDrGUI.reset; 
 					
 					{
-						auto vv = View2D.fromViewToView(view, viewGUI); 
-						staticDr.gfx.TR.transXY = vv.origin.vec2; 
-						staticDr.gfx.TR.scaleXY = vv.scale; 
+						auto vv = View2D.fromViewToView(viewWorld, viewGUI); 
+						staticDrWorld.gfx.TR.transXY = vv.origin.vec2; 
+						staticDrWorld.gfx.TR.scaleXY = vv.scale; 
 						
-						inputTransformFix_invOrigin = -staticDr.gfx.TR.transXY; 
-						inputTransformFix_invScale = 1/staticDr.gfx.TR.scaleXY.x; 
+						inputTransformFix_invOrigin = -staticDrWorld.gfx.TR.transXY; 
+						inputTransformFix_invScale = 1/staticDrWorld.gfx.TR.scaleXY.x; 
 					}
 					
-					staticDr.zoomFactor 	= view.scale_anim, 
-					staticDr.invZoomFactor 	= view.invScale_anim; 
+					staticDrWorld.zoomFactor 	= viewWorld.scale_anim, 
+					staticDrWorld.invZoomFactor 	= viewWorld.invScale_anim; 
 					staticDrGUI.zoomFactor 	= viewGUI.scale_anim, 
 					staticDrGUI.invZoomFactor 	= viewGUI.invScale_anim; 
 				} 
@@ -4138,7 +4139,8 @@ class VulkanWindow: Window, IGfxContentDestination
 				{
 					staticDrGUI.gfx.begin; 
 					/+
-						Todo: /+H1: BUG!!!! 🐞+/
+						Todo: /+H1: BUG!!!! 🐞+/
+						
 						This is a bugfix because the 
 						very last item is sometimes deterministically lost.
 						
@@ -4148,20 +4150,20 @@ class VulkanWindow: Window, IGfxContentDestination
 				
 				im._drawFrame!"system call only"
 				(
-					staticDr, staticDrGUI,
+					staticDrWorld, staticDrGUI,
 					{
 						bugFix; 
-						beforeImDraw(staticDr, staticDrGUI); 
+						beforeImDraw(staticDrWorld, staticDrGUI); 
 						bugFix; 
 					}, 
 					{
 						bugFix; 
-						afterImDraw(staticDr, staticDrGUI); 
+						afterImDraw(staticDrWorld, staticDrGUI); 
 						bugFix; 
 						version(/+$DIDE_REGION Draw optional overlay stuff+/all)
 						{
 							//Todo: implement these later
-							version(/+$DIDE_REGION+/none) { if(showMegaTextures) drawMegaTextures(staticDr); }
+							version(/+$DIDE_REGION+/none) { if(showMegaTextures) drawMegaTextures(staticDrWorld); }
 							if(showFPS) drawFPSGraph(staticDrGUI); 
 						}
 						bugFix; 
@@ -4170,24 +4172,24 @@ class VulkanWindow: Window, IGfxContentDestination
 				
 				version(/+$DIDE_REGION RGNFraw main ang GUI surfaces+/all)
 				{
-					staticDr	.gfx.commit,
+					staticDrWorld	.gfx.commit,
 					staticDrGUI	.gfx.commit; 
 				}
 				
 				resetBuilders; 
 				
-				if(!view.workArea_accum.empty) view.workArea = view.workArea_accum; 
+				if(!viewWorld.workArea_accum.empty) viewWorld.workArea = viewWorld.workArea_accum; 
 				
-				if(chkClear(view._mustZoomAll)) view.zoomAll; 
+				if(chkClear(viewWorld._mustZoomAll)) viewWorld.zoomAll; 
 				
 				im._finalizeFrame!"system call only"; 
 			} 
-			//navigate 2D view with the keyboard and the mouse
+			//navigate 2D viewWorld with the keyboard and the mouse
 			//it optionally calls invalidate
 			bool navigateView(bool keyboardEnabled, bool mouseEnabled)
 			{
 				bool res; 
-				with(view)
+				with(viewWorld)
 				with(this.actions)
 				{
 					enum MULTIPLIER = 6 /+Bug: sometimes the scroll speed is extremely slow.+/; 
@@ -4204,7 +4206,7 @@ class VulkanWindow: Window, IGfxContentDestination
 					
 					const enm = mouseEnabled; 
 					/+
-						Todo: actions are deprecated. This view.navigate function 
+						Todo: actions are deprecated. This viewWorld.navigate function 
 						should be replaced with an IMGUI enable flag and a hidden window.
 					+/
 					
@@ -4257,7 +4259,7 @@ class VulkanWindow: Window, IGfxContentDestination
 				if(res) invalidate; 
 				return res; 
 			} 
-			
+			
 			void drawFPSGraph(IDrawing dr)
 			{
 				with(dr)
@@ -5399,6 +5401,16 @@ class VulkanWindow: Window, IGfxContentDestination
 		
 		void recreateDescriptors()
 		{ descriptorSet.free; descriptorPool.free; createDescriptorPool; createDescriptorSet; /+0.03 ms+/} 
+		
+		void selfTest()
+		{
+			verifyBufferSizeConfigs; 
+			TexSizeFormat.selfTest; 
+			unittest_assembleSize; 
+			unittest_assembleAngle; 
+			unittest_assemblePoint1D; 
+			unittest_assemblePoint2D; 
+		} 
 		
 		auto createCommandBuffer(
 			size_t swapchainIndex, size_t vertexCount,
@@ -5459,16 +5471,6 @@ class VulkanWindow: Window, IGfxContentDestination
 				Opt: Use primary AND secondary command buffers!	
 				On triangle test goes from 1500 to 1300 FPS	with single use buffers.
 			+/
-		} 
-		
-		void selfTest()
-		{
-			verifyBufferSizeConfigs; 
-			TexSizeFormat.selfTest; 
-			unittest_assembleSize; 
-			unittest_assembleAngle; 
-			unittest_assemblePoint1D; 
-			unittest_assemblePoint2D; 
 		} 
 		
 		
@@ -5568,18 +5570,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2ADCF82886ADB).檢(
+					((0x2AED682886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2AE4182886ADB))))
+				if((互!((bool),(0),(0x2AF4882886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2AED582886ADB).檢((互!((float/+w=12+/),(1.000),(0x2AEEC82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2AFDC82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2AFF382886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5592,8 +5594,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2B0C182886ADB).檢 (imVG)),
-					((0x2B0E782886ADB).檢 (imFPS)); 
+					((0x2B1C882886ADB).檢 (imVG)),
+					((0x2B1EE82886ADB).檢 (imFPS)); 
 				}
 			}
 			

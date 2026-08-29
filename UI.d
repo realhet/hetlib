@@ -2025,7 +2025,7 @@ version(/+$DIDE_REGION+/all)
 		this(File file)
 		{
 			this.file = file; 
-			id = srcId(genericId("Img:"~file.fullName)); //Todo: this is not so standard...
+			id = srcIdFromArgs(genericId("Img:"~file.fullName)); //Todo: this is not so standard...
 		} 
 		
 		this(File file, RGB bkColor)
@@ -7418,7 +7418,7 @@ struct im
 							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
 							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
 						}
-						((0x336E1EB16D5C4).檢 (ImStorageManager.stats)); 
+						((0x336E9EB16D5C4).檢 (ImStorageManager.stats)); 
 					}
 				}
 				
@@ -8231,7 +8231,7 @@ struct im
 					
 					const bool userModified = im.Slider
 						(
-						normValue, linRange(0, 1), ((combine(info.container.id, orientation)).名!q{id}),
+						normValue, linRange(0, 1), ((extendSrcId(info.container.id, orientation)).名!q{id}),
 						((orientation=='H')?(SliderOrientation.horz):(SliderOrientation.vert)),
 						SliderType.scrollBar, ((normThumbSize).名!q{normThumbSize}),
 						((
@@ -8904,8 +8904,8 @@ struct im
 			
 			string Create() /+Note: Step 1.+/ /+Use ContainerScript_Init!+/
 			=> iq{
-				auto _id = combine(thisContainer.id, fetchIncomingId); 
-				static foreach(a; args) static if(isGenericArg!(typeof(cast()a), "id")) _id.appendIdx(a.value); 
+				auto _id = extendSrcId(thisContainer.id, fetchIncomingId); 
+				static foreach(a; args) static if(isGenericArg!(typeof(cast()a), "id")) _id.appendToSrcId(a.value); 
 				
 				const parentEnabled = imEnabled; //Inherit `enabled` from parent.
 				
@@ -12166,10 +12166,10 @@ version(/+$DIDE_REGION Dead code 260813+/none)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x551DAEB16D5C4).檢(hit.toJson)); 
+					((0x551EEEB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x55214EB16D5C4).檢(localMouse)); 
+					((0x55228EB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 

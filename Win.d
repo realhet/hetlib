@@ -558,7 +558,7 @@ version(/+$DIDE_REGION+/all) {
 			}; 
 			
 			protected void onMouseUpdate()
-			{/+forwarded to GLWindow. Must be called right after view.update+/} 
+			{/+forwarded to GLWindow. Must be called right after viewWorld.update+/} 
 			protected void onUpdateViewAnimation() 
 			{/+forwarded to GLWindow+/} 
 			
@@ -1075,7 +1075,10 @@ version(/+$DIDE_REGION+/all) {
 				//update the local mouse struct
 				onMouseUpdate; 
 				
-				//update the smooth scolling of the fullscreen 'view'. Navigation using actions must be issued manually -> view.navigate
+				/+
+					update the smooth scolling of the fullscreen 'viewWorld'. 
+							Navigation using actions must be issued manually -> viewWorld.navigate
+				+/
 				onUpdateViewAnimation; 
 				
 				//UI integration: prepare and finalize the IMGUI for every frame
