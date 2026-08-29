@@ -5293,12 +5293,6 @@ version(/+$DIDE_REGION+/all)
 			}
 		} 
 	} 
-	
-	class Splitter : Container/+should be just a Cell... No children.+/
-	{} 
-	
-	static struct SplitterInfo { string name; } 
-	
 	
 	class SelectionManager(T : Cell)
 	{
@@ -7252,6 +7246,26 @@ struct im
 					
 					if(dropdownState.dropdownContainer)
 					imAppend(dropdownState.dropdownContainer); 
+					
+					{
+						/+
+							- it receives no HitInfo, because hitManager was stepped to next frame before this.
+							- it may add hitinfo to the next frame.
+						+/
+						/+
+							260829: Hint generation was positioned up here, after the dropdown window. 
+								It was at the very bottom.
+						+/
+						const guiBounds = view_gui.screenBounds_anim.bounds2; 
+						/+Todo: What if the hint comes from viewWorld?+/
+						generateHints(guiBounds); 
+						
+						/+
+							Todo: Hint generation should be refactored! Only the choosen hint's renderer should be stored.
+							Currently every hint goes into an assoc array as a markup text. It's bad. 
+							It should be much better: losing a frame, but only dealing with the only hint visible.
+						+/
+					}
 				}
 				
 				auto rc = rootContainers(true); 
@@ -7272,7 +7286,6 @@ struct im
 						+/
 					}
 				}
-				
 				
 				dropdownState.doAlign; 
 				
@@ -7337,9 +7350,6 @@ struct im
 				}
 				wantKeys = textEditorState.active; 
 				/+Todo: dialog key handling: Make it completely disabled in DIDE where the main attraction is the editor always receives all the keys.+/
-				
-				const guiBounds = view_gui.screenBounds_anim.bounds2; 
-				generateHints(guiBounds); 
 				
 				//update building/measuring/drawing state
 				canDraw = true; 
@@ -7418,7 +7428,7 @@ struct im
 							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
 							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
 						}
-						((0x336E9EB16D5C4).檢 (ImStorageManager.stats)); 
+						((0x3390DEB16D5C4).檢 (ImStorageManager.stats)); 
 					}
 				}
 				
@@ -7483,9 +7493,21 @@ struct im
 			static struct HitTestManager
 			{
 				
+				static float hoverFollow(in float act, in bool target)
+				{
+					/+target: make this dependent on deltaTime!+/
+					enum upSpeed = 0.5f, downSpeed = 0.25f; 
+					if(target)	{ return mix(act, 1, upSpeed); }
+					else	{
+						float res = mix(act, 0, downSpeed); 
+						if(res<0.02f) res = 0; return res; 
+					}
+				} 
+				
+				
 				static struct HitTestRec
 				{
-					Id id; 	//in the	next frame this must be the isSame
+					Id id; 	//in the next frame this must be the isSame
 					bounds2 hitBounds; 	/+
 						absolute bounds on the drawing where the hit test was made, 
 						later must be combined with View's transformation
@@ -7495,17 +7517,15 @@ struct im
 				} 
 				
 				//act frame
-				HitTestRec[] hitStack, lastHitStack; 
+				HitTestRec[] 	hitStack, lastHitStack; 
 				
 				float[Id] smoothHover; 
 				private void updateSmoothHover(ref HitTestRec[] actHitStack)
 				{
-					enum upSpeed = 0.5f, downSpeed = 0.25f; 
-					
 					//raise hover values
 					auto hoveredIds = actHitStack.map!"a.id".filter!"a".array.sort; 
 					foreach(id; hoveredIds)
-					smoothHover[id] = mix(smoothHover.get(id, 0), 1, upSpeed); 
+					smoothHover[id] = hoverFollow(smoothHover.get(id, 0), true); 
 					
 					//lower (and remove) hover values
 					Id[] toRemove; 
@@ -7513,9 +7533,8 @@ struct im
 					{
 						if(!hoveredIds.canFind(id))
 						{
-							value = mix(value, 0, downSpeed); 
-							if(value<0.02f)
-							toRemove ~= id; 
+							value = hoverFollow(value, false); 
+							if(!value) toRemove ~= id; 
 						}
 					}
 					
@@ -9209,38 +9228,61 @@ struct im
 		{
 			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
 			{
-				mixin ContainerScript_Init!(.Splitter, q{dockAlignment hit}, (表([[],])), (表([[],]))); 
+				mixin ContainerScript_Init!(.Container, q{dockAlignment hit}, (表([[],])), (表([[],]))); 
 				mixin(SCR.Create); 
 			}
 			
 			version(/+$DIDE_REGION Local variable declarations+/all)
 			{}
 			
-			if(inputs.Shift.down) ImStorage!SplitterInfo.access(_id).name = "Hello"; 
-			
-			
 			version(/+$DIDE_REGION Load all properties+/all)
 			{ mixin(SCR.ProcessProperties); }
 			
 			version(/+$DIDE_REGION Do custom behavior+/all)
 			{
+				const SplitterBaseSize = fh/9; 
+				enum SplitterExtraSize = 3; //added on the sides
+				
 				const 	isHorz 	= !!dockAlignment.among(mixin(舉!((DockAlignment),q{leftClient})), mixin(舉!((DockAlignment),q{rightClient}))),
 					isVert 	= !!dockAlignment.among(mixin(舉!((DockAlignment),q{topClient})), mixin(舉!((DockAlignment),q{bottomClient}))); 
 				enforce(
 					isHorz || isVert, 
-					"Splitter: invalid panelPosition: `"~dockAlignment.text~"`"
+					"Splitter: invalid DockAlignment: `"~dockAlignment.text~"`"
 				); 
 				
-				const siz = fh/6; 
-				if(isHorz) outerWidth = siz; if(isVert) outerHeight = siz; 
+				if(isHorz)	outerWidth = SplitterBaseSize; 
+				else	outerHeight = SplitterBaseSize; 
+				
+				const actMousePos = targetView.mousePos.vec2; 
+				
+				version(/+$DIDE_REGION Extended hover range+/all)
+				{
+					auto extraHover = false; 
+					if(auto extraBnd = thisOuterBounds)
+					{
+						extraBnd = extraBnd.inflated(((isHorz)?(vec2(SplitterExtraSize, 0)) :(vec2(0, SplitterExtraSize)))); 
+						extraHover = extraBnd.contains!"[)"(actMousePos); 
+						
+						/+Todo: What if the splitter is in a scrollable area and currently invisible?+/
+						/+Todo: What if there is something clickable under the mouse?+/
+					}
+					
+					static struct SplitterExtraHover_smooth { float value=0; } 
+					ref extraHover_smooth = imStorage!SplitterExtraHover_smooth(_id).value; 
+					extraHover_smooth = HitTestManager.hoverFollow(extraHover_smooth, extraHover); 
+				}
+				
+				const 	hover 	= hit.hover || extraHover,
+					hover_smooth 	= max(hit.hover_smooth, extraHover_smooth),
+					pressed 	= hover && inputs.LMB.pressed,
+					down	= inputs.LMB.down; 
 				
 				with(splitterState)
 				{
-					auto actMousePos() => targetView.mousePos.vec2; 
 					bool dragging() => draggedSplitterId == _id; 
 					void setDragging(bool b) { draggedSplitterId = ((b)?(_id):(Id.init)); } 
 					
-					if(canProcessUserInput && hit.pressed)
+					if(canProcessUserInput && pressed)
 					{
 						startMousePos = actMousePos; 
 						startTargetSize = targetSize; 
@@ -9249,7 +9291,7 @@ struct im
 					
 					if(dragging)
 					{
-						if(!(canProcessUserInput && inputs.LMB.down))
+						if(!(canProcessUserInput && down))
 						{ setDragging = false; }
 						else
 						{
@@ -9266,15 +9308,10 @@ struct im
 						}
 					}
 					
-					if(dragging || canProcessUserInput && hit.hover)
+					if(dragging || canProcessUserInput && hover)
 					mouseCursor = MouseCursor.SIZEWE; 
 					
-					background = ((dragging)?(clAccent) :(
-						mix(
-							clWinBackground, clWinBtnPressed, 
-							hit.hover_smooth
-						)
-					)); 
+					background = ((dragging)?(clAccent) :(mix(clWinBackground, clWinBtnPressed, hover_smooth, ))); 
 					
 					version(/+$DIDE_REGION Handle the recursive composition+/all)
 					{ mixin(SCR.ProcessComposition); }
@@ -12166,10 +12203,10 @@ version(/+$DIDE_REGION Dead code 260813+/none)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x551EEEB16D5C4).檢(hit.toJson)); 
+					((0x5589DEB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x55228EB16D5C4).檢(localMouse)); 
+					((0x558D7EB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
