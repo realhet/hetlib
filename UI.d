@@ -8460,7 +8460,7 @@ struct im
 			auto thisId()
 			=> thisContainer.id; 
 			
-			bounds2 thisOuterBounds()
+			bounds2 thisGlobalOuterBounds()
 			{
 				if(thisContainer)
 				{
@@ -8504,14 +8504,14 @@ struct im
 				{
 					if(dockAlignment) {
 						if(auto ds = parentDockSite) ds.beforeDock(thisContainer, dockAlignment); 
-						else WARN("ParentDockSite is null, unable to dock."); 
+						else raise("ParentDockSite is null, unable to dock."); 
 					}
 				} 
 				void imAfterDock(in DockAlignment dockAlignment)
 				{
 					if(dockAlignment) {
 						if(auto ds = parentDockSite) ds.afterDock(thisContainer, dockAlignment); 
-						else WARN("ParentDockSite is null, unable to dock."); 
+						else raise("ParentDockSite is null, unable to dock."); 
 					}
 				} 
 			} 
@@ -9207,7 +9207,8 @@ struct im
 		
 		private
 		{
-			SplitterState splitterState; 
+			SplitterState 	splitterState_horz, 
+				splitterState_vert; 
 			struct SplitterState
 			{
 				vec2 startMousePos; 
@@ -9233,7 +9234,7 @@ struct im
 			}
 			
 			version(/+$DIDE_REGION Local variable declarations+/all)
-			{}
+			{ background = clWinBtn; }
 			
 			version(/+$DIDE_REGION Load all properties+/all)
 			{ mixin(SCR.ProcessProperties); }
@@ -9241,7 +9242,9 @@ struct im
 			version(/+$DIDE_REGION Do custom behavior+/all)
 			{
 				const SplitterBaseSize = fh/9; 
-				enum SplitterExtraSize = 3; //added on the sides
+				
+				enum SplitterExtraSize = 3; /+added on the sides+/
+				//Todo: this should be divided by guiScale!!! Also it works differently in viewWorld!!!
 				
 				const 	isHorz 	= !!dockAlignment.among(mixin(舉!((DockAlignment),q{leftClient})), mixin(舉!((DockAlignment),q{rightClient}))),
 					isVert 	= !!dockAlignment.among(mixin(舉!((DockAlignment),q{topClient})), mixin(舉!((DockAlignment),q{bottomClient}))); 
@@ -9258,9 +9261,15 @@ struct im
 				version(/+$DIDE_REGION Extended hover range+/all)
 				{
 					auto extraHover = false; 
-					if(auto extraBnd = thisOuterBounds)
+					if(auto extraBnd = thisGlobalOuterBounds)
 					{
-						extraBnd = extraBnd.inflated(((isHorz)?(vec2(SplitterExtraSize, 0)) :(vec2(0, SplitterExtraSize)))); 
+						enum extendAllDirs = true; 
+						extraBnd = extraBnd.inflated(
+							vec2(
+								isHorz || extendAllDirs,
+								isVert || extendAllDirs
+							) * SplitterExtraSize
+						); 
 						extraHover = extraBnd.contains!"[)"(actMousePos); 
 						
 						/+Todo: What if the splitter is in a scrollable area and currently invisible?+/
@@ -9277,6 +9286,7 @@ struct im
 					pressed 	= hover && inputs.LMB.pressed,
 					down	= inputs.LMB.down; 
 				
+				ref splitterState = ((isHorz)?(splitterState_horz):(splitterState_vert)); 
 				with(splitterState)
 				{
 					bool dragging() => draggedSplitterId == _id; 
@@ -9302,16 +9312,34 @@ struct im
 							{
 								case leftClient: 	a += ofs.x; 	break; 
 								case rightClient: 	a -= ofs.x; 	break; 
+								case topClient: 	a += ofs.y; 	break; 
+								case bottomClient: 	a -= ofs.y; 	break; 
 								default: 
 							}
 							targetSize = a.clamp(targetMinSize, targetMaxSize.max(targetMinSize)); 
 						}
 					}
 					
-					if(dragging || canProcessUserInput && hover)
-					mouseCursor = MouseCursor.SIZEWE; 
+					if(dragging || hover)
+					{
+						with(MouseCursor)
+						{
+							mouseCursor = /+This combines NS and WE cursors.+/
+							((isHorz)?(
+								((
+									mouseCursor.among
+									(SIZENS, SIZEALL)
+								)?(SIZEALL):(SIZEWE))
+							) :(
+								((
+									mouseCursor.among
+									(SIZEWE, SIZEALL)
+								)?(SIZEALL):(SIZENS))
+							)); 
+						}
+					}
 					
-					background = ((dragging)?(clAccent) :(mix(clWinBackground, clWinBtnPressed, hover_smooth, ))); 
+					background = ((dragging)?(clAccent) :(mix(background, clWinBtnPressed, hover_smooth, ))); 
 					
 					version(/+$DIDE_REGION Handle the recursive composition+/all)
 					{ mixin(SCR.ProcessComposition); }
@@ -9493,7 +9521,16 @@ struct im
 			
 			enum defaultSize = 32; if(actSize.isnan) actSize = defaultSize; 
 			
-			Cntr!(_M_, _L_)(dockAlignment, ((actSize).名!q{outerWidth}), args); 
+			Cntr!(_M_, _L_)(
+				dockAlignment, 
+				((
+					{
+						if(splittedAreaState.isHorz) outerWidth = actSize; 
+						if(splittedAreaState.isVert) outerHeight = actSize; 
+					}
+				).名!q{init})
+				, args
+			); 
 			
 			enum extraId = Id("Splitter")
 			/+So the splitter id will be not the same as the content's id.+/; 
@@ -9904,6 +9941,7 @@ struct im
 				res.focused = focused; 
 				
 				applyEditStyle(imEnabled, focused, res.hit.hover_smooth); 
+				if(hit.hover) mouseCursor = mixin(舉!((MouseCursor),q{IBEAM})); 
 				
 				version(/+$DIDE_REGION Editor data transfer+/all)
 				{
@@ -10120,6 +10158,7 @@ struct im
 					theme.isWhite, imEnabled, focused, imSelected, 
 					hit.captured, hit.hover_smooth
 				); 
+				if(hit.hover) mouseCursor = mixin(舉!((MouseCursor),q{HAND})); 
 			}
 			
 			version(/+$DIDE_REGION Handle the recursive composition+/all)
@@ -10209,6 +10248,7 @@ struct im
 			mixin ContainerScript_Init!(.Row, q{hit focus hint key spaceKey}, (表([[],])), (表([[],]))); 
 			mixin(SCR.Create); mixin(SCR.ProcessProperties); 
 			applyLinkStyle(imEnabled, focused, hit.captured, hit.hover_smooth); 
+			if(hit.hover) mouseCursor = mixin(舉!((MouseCursor),q{HAND})); 
 			mixin(SCR.ProcessComposition); return hit; 
 			
 			//Todo: set the mouse cursor!!!
@@ -10256,6 +10296,8 @@ struct im
 			version(/+$DIDE_REGION Do custom behavior+/all)
 			{
 				if(imEnabled && hit.clicked) { state.toggle; }//update checkbox state
+				
+				if(hit.hover) mouseCursor = mixin(舉!((MouseCursor),q{HAND})); 
 				
 				RGB hoverColor(RGB baseColor, RGB bkColor)
 				{
@@ -10311,6 +10353,7 @@ struct im
 					theme.isWhite, imEnabled, focused, imSelected, 
 					hit.captured, hit.hover_smooth
 				); 
+				if(hit.hover) mouseCursor = mixin(舉!((MouseCursor),q{HAND})); 
 				
 				Text(symbolStr(`Calculator` ~ ((sign>0)?(`Addition`) :(`Subtract`)))); 
 			}
@@ -12203,10 +12246,10 @@ version(/+$DIDE_REGION Dead code 260813+/none)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x5589DEB16D5C4).檢(hit.toJson)); 
+					((0x55D6EEB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x558D7EB16D5C4).檢(localMouse)); 
+					((0x55DA8EB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 

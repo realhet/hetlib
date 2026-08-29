@@ -3954,7 +3954,7 @@ class VulkanWindow: Window, IGfxContentDestination
 			
 			//views
 			View2D viewWorld, viewGUI; 
-			float guiScale = 1; 
+			float guiScale = 2; 
 			
 			//this is the latest swapchain size, not the actual window size.
 			protected ivec2 swapchainClientSize()
