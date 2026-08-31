@@ -4036,8 +4036,6 @@ version(/+$DIDE_REGION+/all)
 		{
 			if(super.internal_hitTest(mouse, ofs))
 			{
-				//flags.hovered = true; //note: can't update 'hovered' flag here because hitTest does NOT evaluate the WHOLE tree.
-				
 				ofs += innerPos; 
 				
 				auto hb = getHScrollBar, vb = getVScrollBar; 
@@ -4060,15 +4058,11 @@ version(/+$DIDE_REGION+/all)
 				ofs -= getScrollOffset; 
 				
 				foreach_reverse(sc; internal_hitTest_filteredSubCells(mouse-ofs))
-				if(sc.internal_hitTest(mouse, ofs))
-				return true; //recursive
+				if(sc.internal_hitTest(mouse, ofs)) return true; //recursive
 				return true; 
 			}
 			else
-			{
-				//flags.hovered = false;
-				return false; 
-			}
+			{ return false; }
 		} 
 		
 		///This version of hit_test is for static stuff. It ignores scrollbars but has a fast optimizes search in rows and columns
@@ -5291,6 +5285,81 @@ version(/+$DIDE_REGION+/all)
 					}
 				}
 			}
+		} 
+	} 
+	
+	class Splitter : Container /+Todo: should inherit from Cell; no children+/
+	{
+		bool isHorz, isVert; 
+		float extraSize = 0; 
+		
+		void extend(float minThickness)
+		{
+			void doit(ref float pos, ref float size)
+			{
+				if(size<minThickness)
+				{
+					const d = minThickness - size; 
+					extraSize += d; 
+					pos -= d/2, size += d; 
+				}
+			} 
+			
+			if(isHorz) doit(outerPos.x, outerSize.x); 
+			if(isVert) doit(outerPos.y, outerSize.y); 
+		} 
+		
+		override void draw(Drawing dr)
+		{
+			if(flags.hidden) return; 
+			
+			auto 	bFull 	= outerBounds,
+				bInner 	= bFull.inflated(
+				((isHorz)?(-extraSize/2):(0)), 
+				((isVert)?(-extraSize/2):(0))
+			); 
+			dr.color = bkColor; 	dr.fillRect(bInner); 
+			static if(0) { dr.color = clFuchsia; 	dr.lineWidth = -1.1; dr.drawRect(bFull); }
+		} 
+		
+		override bool internal_hitTest(in vec2 mouse, vec2 ofs=vec2(0))
+		{
+			auto hitBnd = getHitBounds + ofs; 
+			if(hitBnd.contains!"[)"(mouse))
+			{
+				if(flags.dontHitTest) return false; 
+				
+				im.hitTestManager.addHitRect(id, hitBnd, mouse-(innerPos+ofs), flags.clickable); 
+				
+				with(im.splitterHoverInfo)
+				{
+					if(!mainSplitterId)
+					{
+						/+This is the very first splitter.+/
+						mainSplitterId = id; 
+						mainIsHorz = isHorz, mainIsVert = isVert; 
+						return true; /+Exit now.+/
+					}
+					else
+					{
+						if(mainSplitterId==id)
+						{
+							/+Found the main splitter again. Keep on searching for more.+/
+							return false; 
+						}
+						else
+						{
+							if(isHorz!=mainIsHorz)
+							{
+								/+This is a secondary splitter. Add it to the list and stop.+/
+								appendSecondarySplitterId(id); 
+								return true; 
+							}
+						}
+					}
+				}
+			}
+			return false; 
 		} 
 	} 
 	
@@ -7177,6 +7246,9 @@ struct im
 			private TargetSurface _targetSurfaceBeingDrawn; 
 			@property targetSurfaceBeingDrawn()
 			=> _targetSurfaceBeingDrawn; 
+			
+			@property targetSurfaceScreenPixelSize()
+			=> targetView.invScale_anim; 
 		}
 		float deltaTime=0; 
 		
@@ -7229,7 +7301,92 @@ struct im
 				
 				static DeltaTimer dt; 
 				deltaTime = dt.update; 
-			} 
+			} 
+			
+			struct HitTestSideInfo
+			{
+				bool[TargetSurface.max+1] mouseOverUI; 
+				bool mouseOverDropdownContainer; 
+			} 
+			
+			private HitTestSideInfo performHitTest(vec2 ofs = vec2(0))
+			{
+				HitTestSideInfo si; 
+				foreach_reverse(a; rootSubContainers /+from neares to farthest+/)
+				{
+					const surf = a.flags.targetSurface; //0:world, 1: gui
+					
+					const uiMousePos = targetSurfaceViews[surf].mousePos.vec2 + ofs; 
+					if(a.internal_hitTest(uiMousePos))
+					{
+						si.mouseOverUI[surf] = true; 
+						
+						if(dropdownState.dropdownContainer==a)
+						si.mouseOverDropdownContainer = true; 
+						
+						break; //got a hit, so escape now
+					}
+				}
+				return si; 
+			} 
+			
+			struct SplitterHoverInfo
+			{
+				Id mainSplitterId; 
+				Id[2] secondarySplitterIds; 
+				bool mainIsHorz, mainIsVert; 
+				
+				
+				void reset()
+				{ secondarySplitterIds[] = mainSplitterId = Id.init; } 
+				
+				void appendSecondarySplitterId(Id id)
+				{
+					foreach(ref s; secondarySplitterIds[])
+					if(!s) { s = id; break; }
+				} 
+			} 
+			
+			SplitterHoverInfo splitterHoverInfo; 
+			
+			void performHitTest_findSecondarySplitters()
+			{
+				if(!!splitterHoverInfo.mainSplitterId)
+				{
+					if(hitTestManager.hitStack.length)
+					{
+						const splitterHitRec = hitTestManager.hitStack.back; 
+						
+						const savedHitStackLength = hitTestManager.hitStack.length; 
+						scope(exit) hitTestManager.hitStack.length = savedHitStackLength; 
+						
+						void doSide(bool side)
+						{
+							vec2 ofs; enum εRatio = (1.0f/16); 
+							with(splitterHitRec)
+							{
+								if(splitterHoverInfo.mainIsHorz)
+								{
+									const ε = hitBounds.width * εRatio; 
+									ofs.x = ((side)?(hitBounds.width - localPos.x + ε) :(-localPos.x - ε)); 
+								}
+								else
+								{
+									const ε = hitBounds.height * εRatio; 
+									ofs.y = ((side)?(hitBounds.height - localPos.y + ε) :(-localPos.y - ε)); 
+								}
+							}
+							performHitTest(ofs); 
+						} 
+						
+						doSide(0); doSide(1); 
+					}
+				}
+				
+				//((0x0).檢 (splitterHoverInfo.toJson));
+			} 
+			
+			private .Container[] rootSubContainers /+`_endFrame` generates it, `_drawFrame` reuses and frees is+/; 
 			
 			void _endFrame()
 			{
@@ -7268,16 +7425,16 @@ struct im
 					}
 				}
 				
-				auto rc = rootContainers(true); 
-				
-				//it's not sorted in DIDE... It's a problem...
-				//LOG("ISSORTED", rc.isSorted!((a, b)=>(a.flags.targetSurface < b.flags.targetSurface))); 
-				
-				rc = rc.sort!(((a, b)=>(a.flags.targetSurface < b.flags.targetSurface)), SwapStrategy.stable).array; 
+				rootCells.map!((a)=>(!!(cast(.Container)(a)))).all
+					.enforce("All of rootCells[] must be non null and a descendant of Container."); 
+				rootSubContainers = (cast(.Container[])(rootCells)); 
+				rootSubContainers = rootSubContainers
+					.sort!(((a, b)=>(a.flags.targetSurface < b.flags.targetSurface)), SwapStrategy.stable).array; 
 				
 				version(/+$DIDE_REGION Measure every containers+/all)
 				{
-					foreach(cntr; rc) {
+					foreach(cntr; rootSubContainers)
+					{
 						if(!cntr.flags._measured) cntr.measure; 
 						/+
 							Some panels are already have been measured.
@@ -7296,42 +7453,23 @@ struct im
 				
 				version(/+$DIDE_REGION Perform HitTest+/all)
 				{
-					bool[2] mouseOverUI; 
-					bool mouseOverDropdownContainer; 
-					foreach_reverse(a; rc /+from neares to farthest+/)
-					{
-						const surf = a.flags.targetSurface; //1: gui, 0:view
-						
-						const uiMousePos = targetSurfaceViews[surf].mousePos.vec2; 
-						if(a.internal_hitTest(uiMousePos))
-						{
-							mouseOverUI[surf] = true; 
-							
-							if(dropdownState.dropdownContainer==a)
-							mouseOverDropdownContainer = true; 
-							
-							break; //got a hit, so escape now
-						}
-					}
+					splitterHoverInfo.reset; 
+					HitTestSideInfo si; 
 					
-					version(/+$DIDE_REGION+/none) {
-						if(VisualizeHitStack)
-						{
-							drVisualizeHitStack = new_Drawing; 
-							hitTestManager.draw(drVisualizeHitStack); 
-						}
-					}
+					si = performHitTest; 
 					
-					/+
-						all hitTest are done, move hitTestManager to the next frame. 
-								Latest hittest data will be accessible right after this.
-					+/
-					hitTestManager.nextFrame; 
+					performHitTest_findSecondarySplitters; 
 				}
+				//At this point all hitTest area collection are done for this frame
+				
+				//((0x339F2EB16D5C4).檢 (hitTestManager.hitStack.map!text.join('\n'))); 
+				
+				version(/+$DIDE_REGION Advance HitTest to the next frame. +/all)
+				{ hitTestManager.nextFrame; }//-------------------------------------------------
 				
 				//clicking away from popup closes the popup
 				if(
-					dropdownState.active && !dropdownState.opening && !mouseOverDropdownContainer 
+					dropdownState.active && !dropdownState.opening && !si.mouseOverDropdownContainer 
 					&& (inputs.LMB.pressed || inputs.RMB.pressed)
 				)
 				dropdownState.active = false; 
@@ -7340,7 +7478,7 @@ struct im
 					The IM GUI wants to use the mouse for scrolling or clicking. 
 					Example: It tells the 'view' not to zoom.
 				+/
-				wantMouse = mouseOverUI[1]; 
+				wantMouse = si.mouseOverUI[TargetSurface.gui]; 
 				
 				if(textEditorState.active)
 				{
@@ -7349,14 +7487,17 @@ struct im
 					auto err = textEditorState.processQueue; 
 				}
 				wantKeys = textEditorState.active; 
-				/+Todo: dialog key handling: Make it completely disabled in DIDE where the main attraction is the editor always receives all the keys.+/
+				/+
+					Todo: dialog key handling: Make it completely disabled in DIDE where the 
+						main attraction is the editor always receives all the keys.
+				+/
 				
 				//update building/measuring/drawing state
 				canDraw = true; 
 				inFrame = false; 
 			} 
 			
-			bounds2[2] surfaceBounds; 
+			bounds2[TargetSurface.max+1] surfaceBounds; 
 			
 			void _drawFrame(string restrict="")(
 				Drawing drWorld, Drawing drGUI, 
@@ -7381,7 +7522,7 @@ struct im
 				
 				if(funBefore) funBefore(); 
 				
-				foreach(a; rootContainers(true))
+				foreach(a; rootSubContainers)
 				{
 					const s = a.flags.targetSurface; 
 					surfaceBounds[s] |= a.outerBounds; 
@@ -7428,11 +7569,12 @@ struct im
 							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
 							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
 						}
-						((0x3390DEB16D5C4).檢 (ImStorageManager.stats)); 
+						((0x34769EB16D5C4).檢 (ImStorageManager.stats)); 
 					}
 				}
 				
 				ImStorageManager.purge; 
+				rootSubContainers = []; 
 				
 				{
 					static uint tbmp; if(tbmp.chkSet((QPS.value(second).ifloor  )/2))
@@ -7516,8 +7658,7 @@ struct im
 					bool clickable; 
 				} 
 				
-				//act frame
-				HitTestRec[] 	hitStack, lastHitStack; 
+				HitTestRec[] hitStack, lastHitStack; 
 				
 				float[Id] smoothHover; 
 				private void updateSmoothHover(ref HitTestRec[] actHitStack)
@@ -7602,16 +7743,15 @@ struct im
 					{
 						const idx = lastHitStack.map!"a.id".countUntil(id); 
 						h.id 	= id,
-							h.hover	= lastHitStack.map!"a.id".canFind(id),
-							h.pressed	= pressedId ==id,
-							h.released	= releasedId==id,
-							h.clicked	= clickedId ==id,
-							h.captured	= h.pressed || capturedId==id && h.hover,
-							h.hover_smooth	= smoothHover.get(id, 0),
-							h.captured_smooth 	= max(h.hover_smooth, h.captured),
-							h.hitBounds	= lastHitStack.get(idx).hitBounds,
-							h.localPos	= lastHitStack.get(idx).localPos; 
-						
+						h.hover	= lastHitStack.map!"a.id".canFind(id),
+						h.pressed	= pressedId ==id,
+						h.released	= releasedId==id,
+						h.clicked	= clickedId ==id,
+						h.captured	= h.pressed || capturedId==id && h.hover,
+						h.hover_smooth	= smoothHover.get(id, 0),
+						h.captured_smooth 	= max(h.hover_smooth, h.captured),
+						h.hitBounds	= lastHitStack.get(idx).hitBounds,
+						h.localPos	= lastHitStack.get(idx).localPos; 
 					}
 					return h; 
 					//Todo: architectural bug: captured is delayed by 1 frame according to repeated
@@ -8439,14 +8579,6 @@ struct im
 			
 			ref rootCells() => rootContainer.subCells; 
 			
-			auto rootContainers(bool forceAll)
-			{
-				auto res = rootCells.map!((c)=>((cast(.Container)(c)))).filter!"a".array; 
-				if(forceAll)
-				enforce(rootCells.length == res.length, "FATAL ERROR: All of rootCells[] must be non null and a descendant of Container."); 
-				return res; 
-			} 
-			
 			//double QPS=0, lastQPS=0, dt=0;
 			//Todo: ez qrvara megteveszto igy, jobb azonositokat kell kitalalni QPS helyett
 			
@@ -8573,6 +8705,7 @@ struct im
 				drawCallbacks.clear; 
 				stack = []; 
 				
+				rootSubContainers = []; 
 				rootContainer = new .DockSite; 
 				imPush(rootContainer, Id.init); 
 			} 
@@ -9214,6 +9347,7 @@ struct im
 				vec2 startMousePos; 
 				float startTargetSize = 0; 
 				Id draggedSplitterId; 
+				Id draggedSplitterId_secondary; 
 			} 
 		} 
 		
@@ -9229,12 +9363,15 @@ struct im
 		{
 			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
 			{
-				mixin ContainerScript_Init!(.Container, q{dockAlignment hit}, (表([[],])), (表([[],]))); 
+				mixin ContainerScript_Init!(.Splitter, q{dockAlignment hit}, (表([[],])), (表([[],]))); 
 				mixin(SCR.Create); 
 			}
 			
 			version(/+$DIDE_REGION Local variable declarations+/all)
-			{ background = clWinBtn; }
+			{
+				auto _splitter = (cast(.Splitter)(_container)); 
+				background = clWinBtn; 
+			}
 			
 			version(/+$DIDE_REGION Load all properties+/all)
 			{ mixin(SCR.ProcessProperties); }
@@ -9253,44 +9390,48 @@ struct im
 					"Splitter: invalid DockAlignment: `"~dockAlignment.text~"`"
 				); 
 				
+				_splitter.isHorz = isHorz, _splitter.isVert = isVert; 
+				
 				if(isHorz)	outerWidth = SplitterBaseSize; 
 				else	outerHeight = SplitterBaseSize; 
 				
 				const actMousePos = targetView.mousePos.vec2; 
 				
-				version(/+$DIDE_REGION Extended hover range+/all)
+				version(/+$DIDE_REGION Update secondary hover state+/all)
 				{
-					auto extraHover = false; 
-					if(auto extraBnd = thisGlobalOuterBounds)
-					{
-						enum extendAllDirs = true; 
-						extraBnd = extraBnd.inflated(
-							vec2(
-								isHorz || extendAllDirs,
-								isVert || extendAllDirs
-							) * SplitterExtraSize
-						); 
-						extraHover = extraBnd.contains!"[)"(actMousePos); 
-						
-						/+Todo: What if the splitter is in a scrollable area and currently invisible?+/
-						/+Todo: What if there is something clickable under the mouse?+/
-					}
+					/+
+						A secondary splitter is in 90deg with the main splitter and next to it.
+						There can be 2 secondary splitters at most.
+					+/
 					
-					static struct SplitterExtraHover_smooth { float value=0; } 
-					ref extraHover_smooth = imStorage!SplitterExtraHover_smooth(_id).value; 
-					extraHover_smooth = HitTestManager.hoverFollow(extraHover_smooth, extraHover); 
+					const secondaryHover = splitterHoverInfo.secondarySplitterIds[].canFind(_id); 
+					
+					static struct SplitterSecondaryHover_smooth { float value=0; } 
+					ref secondaryHover_smooth = imStorage!SplitterSecondaryHover_smooth(_id).value; 
+					secondaryHover_smooth = HitTestManager.hoverFollow(secondaryHover_smooth, secondaryHover); 
 				}
 				
-				const 	hover 	= hit.hover || extraHover,
-					hover_smooth 	= max(hit.hover_smooth, extraHover_smooth),
-					pressed 	= hover && inputs.LMB.pressed,
+				const 	hover 	= hit.hover || secondaryHover,
+					hover_smooth 	= max(hit.hover_smooth, secondaryHover_smooth),
+					pressed 	= hit.pressed || (secondaryHover && inputs.LMB.pressed),
 					down	= inputs.LMB.down; 
 				
 				ref splitterState = ((isHorz)?(splitterState_horz):(splitterState_vert)); 
 				with(splitterState)
 				{
-					bool dragging() => draggedSplitterId == _id; 
-					void setDragging(bool b) { draggedSplitterId = ((b)?(_id):(Id.init)); } 
+					bool dragging() => draggedSplitterId 	== _id || 
+					draggedSplitterId_secondary 	== _id; 
+					void setDragging(bool b) 
+					{
+						if(!b)
+						{ draggedSplitterId = draggedSplitterId_secondary = Id.init; }
+						else
+						{
+							if(dragging) return; 
+							if(!draggedSplitterId)	draggedSplitterId = _id; 
+							else	draggedSplitterId_secondary = _id; 
+						}
+					} 
 					
 					if(canProcessUserInput && pressed)
 					{
@@ -9339,7 +9480,7 @@ struct im
 						}
 					}
 					
-					background = ((dragging)?(clAccent) :(mix(background, clWinBtnPressed, hover_smooth, ))); 
+					background = ((dragging)?(clAccent) :(mix(background, clWinBtnPressed, hover_smooth))); 
 					
 					version(/+$DIDE_REGION Handle the recursive composition+/all)
 					{ mixin(SCR.ProcessComposition); }
@@ -9360,7 +9501,7 @@ struct im
 				
 				bool isHorz, isVert; 
 				float fullSize, totalResizableSize, totalStaticSize; 
-				size_t lastDockSiteSubCellCount; 
+				size_t initialDockSiteSubCellCount, lastDockSiteSubCellCount; 
 				float minRemainingSize; 
 				
 				float*[] sizePtrs; 
@@ -9374,6 +9515,7 @@ struct im
 					enforce(!active, "Already inside a SplitterArea."); 
 					active = true; 
 					dockSite = im.thisDockSite.enforce("Resizable!Container requires a DockSite."); 
+					initialDockSiteSubCellCount = dockSite.subCells.length; 
 				} 
 				
 				float addUpSubCellSizes()
@@ -9456,6 +9598,22 @@ struct im
 						{
 							ref size = *pSize; 
 							if(size<minSize) size.follow(minSize, at, sd); 
+						}
+					}
+					
+					version(/+$DIDE_REGION Move splitters to the top of ZOrder and extend their thickness.+/all)
+					{
+						{
+							const SplitterMinThickness = 8 /+* targetSurfaceScreenPixelSize+/; 
+							auto cells = dockSite.subCells[initialDockSiteSubCellCount..$]; 
+							if(cells.length)
+							{
+								auto 	nonSplitters 	= cells.filter!((a)=>((cast(.Splitter)(a)) is null)),
+									splitters 	= cells.filter!((a)=>((cast(.Splitter)(a)) !is null)); 
+								foreach(splitter; splitters.map!((a)=>((cast(.Splitter)(a)))))
+								{ splitter.extend(SplitterMinThickness); }
+								cells[] = chain(nonSplitters, splitters).array; 
+							}
 						}
 					}
 					
@@ -12246,10 +12404,10 @@ version(/+$DIDE_REGION Dead code 260813+/none)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x55D6EEB16D5C4).檢(hit.toJson)); 
+					((0x56E94EB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x55DA8EB16D5C4).檢(localMouse)); 
+					((0x56ECEEB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
