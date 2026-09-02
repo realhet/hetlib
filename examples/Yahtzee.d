@@ -23,14 +23,14 @@ void UI_Die(int num, vec2 ofs = vec2(0))
 				flags.noBackground = true; 
 				flags.clipSubCells = ofs.y!=0; 
 				margin = "4"; 
-				bkColor = clGreen1; //should be inherited
+				background = clGreen1; //should be inherited
 				innerSize = vec2(diceSize + diceBorder*2); 
 				ofs *= innerSize; 
 				Row(
 					{
 						outerPos = ofs; 
 						border.width = diceBorder; 
-						border.color = bkColor = valid ? clWhite : clGreen1; 
+						border.color = background = valid ? clWhite : clGreen1; 
 						innerSize = vec2(diceSize); 
 						if(valid)
 						{
@@ -202,16 +202,16 @@ void UI_Die(int num, vec2 ofs = vec2(0))
 			Panel(
 				DockAlignment.topLeft, 
 				{
-					bkColor = clGreen1; 
+					background = clGreen1; 
 					border.width = 0; 
 					Column(
 						{
 							padding = "16"; 
-							style.bkColor = bkColor = clGreen2; 
+							background = clGreen2; 
 							//style.fontColor = clYellow; fh = 72; Text("Yahtzee");
 							Column(
 								{
-									style.bkColor = bkColor = clGreen1; 
+									background = clGreen1; 
 									padding = "4"; 
 									Row(
 										{
@@ -224,8 +224,8 @@ void UI_Die(int num, vec2 ofs = vec2(0))
 														Btn(
 															{ margin = "4"; Text("HOLD"); }, 
 															genericId(idx), 
-															selected(d.hold), 
-															enable(en && d.num && rollIdx<3 && !gameOver )
+															((d.hold).名!q{selected}), 
+															((en && d.num && rollIdx<3 && !gameOver ).名!q{enabled})
 														)
 													)
 													{ d.hold.toggle; }
@@ -233,7 +233,7 @@ void UI_Die(int num, vec2 ofs = vec2(0))
 											); 
 										}
 									); 
-									if(Btn({ margin = "4"; Text("ROLL"); }, enable(en && rollIdx<3)))
+									if(Btn({ margin = "4"; Text("ROLL"); }, ((en && rollIdx<3).名!q{enabled})))
 									{
 										if(gameOver)
 										{ initialize; unhold; roll; pendingRoll = true; }else
@@ -251,12 +251,12 @@ void UI_Die(int num, vec2 ofs = vec2(0))
 											
 											if(gameOver)
 											{
-												Text("Game Over.  Final score: "~bold(grandTotal.text)~"\n"); 
+												Text("Game Over.  Final score: "~boldStr(grandTotal.text)~"\n"); 
 												Text("You can press ROLL, to start a new game."); 
 											}else
 											{
-												Text("Turn: "~bold((turnIdx+1).text)~" of "~maxTurn.text, "   "); 
-												Text("Roll: "~bold(rollIdx.predSwitch(0, "First", 1, "Second", "Last"))~"\n"); 
+												Text("Turn: "~boldStr((turnIdx+1).text)~" of "~maxTurn.text, "   "); 
+												Text("Roll: "~boldStr(rollIdx.predSwitch(0, "First", 1, "Second", "Last"))~"\n"); 
 												
 												if(animating_y)
 												Text("Rolling..."); 
@@ -269,7 +269,7 @@ void UI_Die(int num, vec2 ofs = vec2(0))
 														"No more rolls, You have to write down a SCORE now."
 													); 
 													foreach(w; ["ROLL", "HOLD", "SCORE"])
-													s = s.replace(w, bold(w)); 
+													s = s.replace(w, boldStr(w)); 
 													Text(s); 
 												}
 											}
@@ -285,7 +285,7 @@ void UI_Die(int num, vec2 ofs = vec2(0))
 							//Score table: https://www.memory-improvement-tips.com/support-files/yahtzee-score-sheets.pdf
 							Column(
 								{
-									style = tsNormal; bkColor = style.bkColor; 
+									style = tsNormal; background = style.bkColor; 
 									fh = 18; 
 									padding = "4"; 
 									
@@ -304,7 +304,7 @@ void UI_Die(int num, vec2 ofs = vec2(0))
 														{
 															padding = "0 4"; 
 															innerHeight = fh+12; 
-															flags.vAlign = VAlign.center; 
+															rowFlags.vAlign = VAlign.center; 
 															border = "1 normal black"; border.extendBottomRight = true; 
 															fun(); 
 														}
@@ -317,12 +317,12 @@ void UI_Die(int num, vec2 ofs = vec2(0))
 														if(hintText.length)
 														{
 															//Todo: make this available in "im" scope.
-															actContainer.id = actContainer.id.combine(genericId(title)); //Todo: give a name to this too
-															auto hit = hitTest(true); //Todo: hint can go out of the client area.
+															thisContainer.id = thisContainer.id.extendSrcId(genericId(title)); //Todo: give a name to this too
+															auto hit = hitTest; //Todo: hint can go out of the client area.
 															if(hit.hover)
 															{
 																auto hr = hint(hintText); 
-																hr.owner = actContainer; 
+																hr.owner = thisContainer; 
 																hr.bounds = hit.hitBounds; 
 																addHint(hr); 
 															}
@@ -332,7 +332,7 @@ void UI_Die(int num, vec2 ofs = vec2(0))
 												); 
 												Cell(
 													{
-															width = fh*2.5; flags.hAlign = HAlign.center; 
+															width = fh*2.5; rowFlags.hAlign = HAlign.center; 
 														fun(); 
 													}
 												); 
@@ -359,7 +359,7 @@ void UI_Die(int num, vec2 ofs = vec2(0))
 											title, hintText, {
 												if(auto sc = title in scoreMap)
 												{
-													Text(bold((*sc).text)); 
+													Text(boldStr((*sc).text)); 
 													scoreAccum += *sc; 
 												}else
 												{
@@ -378,7 +378,7 @@ void UI_Die(int num, vec2 ofs = vec2(0))
 									} 
 									
 									void Summary(string title, string hintText, int sum)
-									{ ScoreRow(title, hintText, { Text(sum ? bold(sum.text) : " "); }); } 
+									{ ScoreRow(title, hintText, { Text(sum ? boldStr(sum.text) : " "); }); } 
 									
 									//Upper section --------------------------------------------
 									scoreAccum = 0; 
@@ -427,7 +427,7 @@ void UI_Die(int num, vec2 ofs = vec2(0))
 											{
 												int b = yahtzeeBonus; 
 												if(b)
-												Text(bold(b.text)); else
+												Text(boldStr(b.text)); else
 												Text(" "); 
 											}
 										}

@@ -5579,7 +5579,89 @@ version(/+$DIDE_REGION+/all)
 		
 		doit(actItem); 
 	} 
-	static class VirtualTreeView(Item) if(is(Item==struct))
+	static class VirtualListBase
+	{
+		float maxRowWidth = 0; 
+		void measureVisibleRows(bool doStretch)
+		{
+			maxRowWidth = 0; 
+			
+			auto rowCtrls() => im.thisContainer.subCells.drop(1).map!((a)=>((cast(het.ui.Row)(a)))); 
+			foreach(r; rowCtrls) { r.needMeasure; r.measure; maxRowWidth.maximize(r.outerWidth); }
+			
+			if(doStretch) foreach(r; rowCtrls) { r.outerWidth = maxRowWidth; }
+		} 
+	} 
+	
+	static class VirtualListView(Item) : VirtualListBase 
+	{
+		Item[] items; 
+		
+		void UI_contents(void delegate(Item*) onItem = null)
+		{
+			with(im)
+			{
+				const float 	fh 		= style.fontHeight,
+					rowHeight 		= fh,
+					invRowHeight 		= 1/rowHeight; 
+				
+				/+ total content size placeholder +/
+				imAppend(new Cell(vec2(maxRowWidth, items.length*rowHeight), vec2(0))); 
+				
+				flags._saveVisibleBounds = true; 
+				if(const visibleBounds = imstVisibleBounds(thisId))
+				{
+					foreach(
+						i;
+						(ifloor(visibleBounds.top    * invRowHeight    )).max(0) ..
+						(iceil(visibleBounds.bottom * invRowHeight + 1)).clamp(0, items.length.to!int)
+					)
+					{
+						Row(
+							((i).名!q{id}),
+							{
+								rowFlags.wordWrap = false; 
+								outerPos = vec2(0, i*rowHeight); 
+								outerHeight = fh; 
+								if(onItem) onItem(&items[i]); 
+								else
+								{
+									static if(__traits(compiles, { items[i].UI(); })) items[i].UI(); 
+									else Text(items[i].text); 
+								}
+							}
+						); 
+					}
+				}
+				
+				measureVisibleRows(doStretch: true); 
+			}
+		} 
+		
+		void UI(string _M_=__MODULE__, size_t _L_=__LINE__)
+			(void delegate() onSetup, void delegate(Item*) onItem = null)
+		{
+			with(im)
+			{
+				Container!(.Container, _M_, _L_)
+				(
+					((this).名!q{id}), Theme.tool,
+					{
+						with(flags)
+						vScrollState	= ScrollState.auto_,
+						hScrollState	= ScrollState.auto_,
+						clipSubCells	= true; 
+						if(onSetup) onSetup(); 
+						
+						UI_contents(onItem); 
+					}
+				); 
+			}
+		} 
+	} 
+	
+	static class VirtualTreeView(Item) : VirtualListBase
+	if(is(Item==struct))
 	{
 		/+
 			Todo: implement keyboard handling: 
@@ -5599,7 +5681,6 @@ version(/+$DIDE_REGION+/all)
 			string prefix; 
 		} 
 		TreeRow[] rows; 
-		float maxRowWidth = 0; 
 		DateTime rowsUpdated, changed; 
 		bool showBullet = true; /+if there is no open/close icon, a bullet mark looks nice in front of the item name+/
 		bool showRoot = true; 
@@ -5652,19 +5733,15 @@ version(/+$DIDE_REGION+/all)
 				else	{ root.open; foreach(ref a; root.subNodes) doit(a, "", false, false); }
 				rowsUpdated = now; 
 			}
-		} 
+		} 
 		
-		this()
-		{} 
-		
-		void UI(
-			void delegate() onSetup/+must set outerSize in onSetup! Optionally can set fontHeight+/,
-			void delegate(Item*) onItem=null
-		)
+		void UI(string _M_=__MODULE__, size_t _L_=__LINE__)
+		(void delegate() onSetup/+must set outerSize in onSetup! Optionally can set fontHeight+/, void delegate(Item*) onItem=null)
 		{
 			with(im)
 			{
-				Container(
+				Container!(.Container, _M_, _L_)
+				(
 					((this).名!q{id}), Theme.tool,
 					{
 						with(flags)
@@ -5689,7 +5766,7 @@ version(/+$DIDE_REGION+/all)
 								with(im)
 								{
 									Row(
-										((identityStr(r.item)).genericArg!q{id}),
+										((identityStr(r.item)/+Opt: this is slowwww+/).名!q{id}),
 										{
 											rowFlags.wordWrap = false; outerPos = vec2(0, i*rowHeight); outerHeight = fh; 
 											
@@ -5752,7 +5829,7 @@ version(/+$DIDE_REGION+/all)
 							} 
 							foreach(
 								i; 	(ifloor(visibleBounds.top    * invRowHeight    )).max(0) ..
-									(iceil(visibleBounds.bottom * invRowHeight + 1)).min(rows.length.to!int)
+									(iceil(visibleBounds.bottom * invRowHeight + 1)).clamp(0, rows.length.to!int)
 							)
 							{
 								doit(i, rows[i]); /+must put inside a function, so the customDraw can capture its stack.+/
@@ -5760,19 +5837,297 @@ version(/+$DIDE_REGION+/all)
 							}
 						}
 						
-						//Arrange the visible rows
-						auto rowCtrls() => thisContainer.subCells.drop(1).map!((a)=>((cast(het.ui.Row)(a)))); 
-						maxRowWidth = 0; 
-						foreach(r; rowCtrls) { r.needMeasure; r.measure; maxRowWidth.maximize(r.outerWidth); }
-						
-						//foreach(r; rowCtrls) { r.outerWidth = maxRowWidth; }
+						measureVisibleRows(doStretch: false); 
 					}
 				); 
 			}
 		} 
 	} 
 	
-	/+AI:+/
+	
+	
+	
+	/+
+		AI: /+
+			User: I have a virtual tree implementation in my custom UI system.
+			I ask you to write a new VirtualListView component from this. You have to remove the tree stuff basicaly.
+			
+			In the ListView, the `TreeRow[] rows;` will turn into `Item[] items`.
+			The row height will be the same: 1*fh (1*fontHeight). So the scrolling operation will be simple in this too.
+			
+			/+
+				Code: static class VirtualTreeView(Item) if(is(Item==struct))
+				{
+					/+
+						Todo: implement keyboard handling: 
+						/+Link: https://wiki.openjdk.org/spaces/OpenJFX/pages/15368267/TreeView+User+Experience+Documentation+/
+					+/
+					
+					Item _root; 
+					@property root(Item a) { if(_root.chkSet(a)) refresh; } 
+					@property ref root() => _root; 
+					
+					void refresh()
+					{ changed = now; } 
+					
+					static struct TreeRow
+					{
+						Item* item; 
+						string prefix; 
+					} 
+					TreeRow[] rows; 
+					float maxRowWidth = 0; 
+					DateTime rowsUpdated, changed; 
+					bool showBullet = true; /+if there is no open/close icon, a bullet mark looks nice in front of the item name+/
+					bool showRoot = true; 
+					
+					Item* getParentItem(Item* child)
+					{
+						/+Opt: this is not so fast.  Items should know their parents...+/
+						//Todo: refactor this crap in functional style
+						foreach(i, ref a; rows)
+						if(a.item is child)
+						{
+							if(i>0) {
+								const desiredPrefixLen = (cast(sizediff_t)(rows[i].prefix.length))-1; 
+								if(desiredPrefixLen>=0)
+								{
+									foreach_reverse(ref b; rows[0..i])
+									if(b.prefix.length==desiredPrefixLen)
+									return b.item; 
+								}
+							}
+						}
+						return null; 
+					} 
+					
+					auto getAllParentItems(Item* child)
+					{
+						Item*[] res; 
+						while(child)
+						{
+							child = getParentItem(child); 
+							if(child) res ~= child; 
+						}
+						return res.retro.array; 
+					} 
+					
+					void makeRows()
+					{
+						void doit(ref Item act, string prefix, bool isLast, bool doPrefix=true)
+						{
+							rows ~= TreeRow(&act, prefix ~ ((doPrefix)?(((isLast)?("L"):("+"))):(""))); 
+							if(act.opened /+recustion+/)
+							{
+								const newPrefix = (prefix ~ ((doPrefix)?(((isLast)?(" "):("I"))):(""))).text; 
+								foreach(i, ref a; act.subNodes) doit(a, newPrefix, (i+1==act.subNodes.length)); 
+							}
+						} 
+						{
+							rows = []; maxRowWidth = 0; 
+							if(showRoot)	{ doit(_root, "", true, false); }
+							else	{ root.open; foreach(ref a; root.subNodes) doit(a, "", false, false); }
+							rowsUpdated = now; 
+						}
+					} 
+					
+					this()
+					{} 
+					
+					void UI(
+						void delegate() onSetup/+must set outerSize in onSetup! Optionally can set fontHeight+/,
+						void delegate(Item*) onItem=null
+					)
+					{
+						with(im)
+						{
+							Container(
+								((this).名!q{id}), Theme.tool,
+								{
+									with(flags)
+									vScrollState 	= ScrollState.auto_,
+									hScrollState 	= ScrollState.auto_,
+									clipSubCells 	= true; 
+									if(rowsUpdated<changed) makeRows; 
+									if(onSetup) onSetup(); 
+									
+									//total size placeholder
+									const float 	fh 	= style.fontHeight/+For faster access. Many things depend on 'fh'.+/, 
+										rowHeight 	= fh, 
+										invRowHeight 	= 1/rowHeight; 
+									imAppend(new Cell(vec2(maxRowWidth, rows.length*rowHeight), vec2(0))); 
+									/+Container({ outerPos = vec2(maxRowWidth, rows.length*rowHeight); outerSize = vec2(0); }); +/
+									
+									flags._saveVisibleBounds = true; 
+									if(const visibleBounds = imstVisibleBounds(thisId))
+									{
+										void doit(int i, TreeRow r)
+										{
+											with(im)
+											{
+												Row(
+													((identityStr(r.item)).genericArg!q{id}),
+													{
+														rowFlags.wordWrap = false; outerPos = vec2(0, i*rowHeight); outerHeight = fh; 
+														
+														version(/+$DIDE_REGION Tree graphics+/all)
+														{
+															Row(
+																{
+																	outerSize = vec2(r.prefix.length, 1)*fh; 
+																	const float siz = fh; 
+																	void customDraw(Drawing dr, .Container cntr)
+																	{
+																		dr.color = clGray; dr.lineWidth = 1.0625f; 
+																		float x = siz*.5f; 
+																		foreach(ch; r.prefix.byChar)
+																		{
+																			if(ch.among('+', 'I')) dr.vLine(x, 0, siz); 
+																			if(ch.among('+', 'L')) {
+																				dr.circle(vec2(x+.5*siz, 0), siz*.5f, -π/2, 0); 
+																				if(showBullet) dr.hLine(x+.5f*siz, siz*.5f, x+.75f*siz); 
+																			}
+																			x += fh; 
+																		}
+																	} 
+																	addDrawCallback(&customDraw); 
+																}
+															); 
+														}
+														
+														version(/+$DIDE_REGION Tree Open/Close Button+/all)
+														{
+															if(r.item.canOpen)
+															{
+																if(
+																	Btn(
+																		Margin.init, VAlign.center,
+																		{
+																			outerSize = vec2(fh); fh = 14; 
+																			Text(symbolStr((r.item.opened)?("ChevronDown") :("ChevronRight"))); 
+																		}
+																	).pressed
+																) {
+																	r.item.toggle; 
+																	this.changed = now; 
+																}
+															}
+															else
+															{ if(showBullet) { Spacer(fh*0.275f); Text("●"); Spacer(fh*0.275f); }}
+														}
+														
+														Spacer(fh*.25f); 
+														
+														if(onItem)	onItem(r.item); 
+														else	{
+															static if(__traits(compiles, { r.item.UI(); }))	r.item.UI(); 
+															else	Text(r.item.text); 
+														}
+													}
+												); 
+											}
+										} 
+										foreach(
+											i; 	(ifloor(visibleBounds.top    * invRowHeight    )).max(0) ..
+												(iceil(visibleBounds.bottom * invRowHeight + 1)).min(rows.length.to!int)
+										)
+										{
+											doit(i, rows[i]); /+must put inside a function, so the customDraw can capture its stack.+/
+											/+Todo: Do it with a better way that dr.addDrawCallback()+/
+										}
+									}
+									
+									//Arrange the visible rows
+									auto rowCtrls() => thisContainer.subCells.drop(1).map!((a)=>((cast(het.ui.Row)(a)))); 
+									maxRowWidth = 0; 
+									foreach(r; rowCtrls) { r.needMeasure; r.measure; maxRowWidth.maximize(r.outerWidth); }
+									
+									//foreach(r; rowCtrls) { r.outerWidth = maxRowWidth; }
+								}
+							); 
+						}
+					} 
+				} 
+			+/
+		+/
+		/+
+			Assistant: /+
+				Structured: /+ VirtualListView: remove tree logic, plain item list. +/
+				static class VirtualListView(Item) if(is(Item==struct))
+				{
+					Item[] items; 
+					float maxRowWidth = 0; 
+						
+					void UI(
+						void delegate() onSetup,
+						void delegate(Item*) onItem = null
+					)
+					{
+						with(im)
+						{
+							Container(
+								((this).名!q{id}), Theme.tool,
+								{
+									with(flags)
+									vScrollState	= ScrollState.auto_,
+									hScrollState	= ScrollState.auto_,
+									clipSubCells	= true; 
+									if(onSetup) onSetup(); 
+										
+									const float fh 			= style.fontHeight,
+										rowHeight 			= fh,
+										invRowHeight 		= 1/rowHeight; 
+										
+									/+ total content size placeholder +/
+									imAppend(new Cell(vec2(maxRowWidth, items.length*rowHeight), vec2(0))); 
+										
+									flags._saveVisibleBounds = true; 
+									if(const visibleBounds = imstVisibleBounds(thisId))
+									{
+										foreach(
+											i;
+											(ifloor(visibleBounds.top * invRowHeight)).max(0) ..
+											(iceil(visibleBounds.bottom * invRowHeight + 1)).min(items.length.to!int)
+										)
+										{
+											with(im)
+											{
+												Row(
+													(identityStr(&items[i])).genericArg!q{id},
+													{
+														rowFlags.wordWrap = false; 
+														outerPos = vec2(0, i*rowHeight); 
+														outerHeight = fh; 
+														Spacer(fh*.25f); 
+														if(onItem) onItem(&items[i]); 
+														else
+														{
+															static if(__traits(compiles, { items[i].UI(); })) items[i].UI(); 
+															else Text(items[i].text); 
+														}
+													}
+												); 
+											}
+										}
+									}
+										
+									/+ measure only visible rows, virtual width is updated lazily +/
+									auto rowCtrls() => thisContainer.subCells.drop(1).map!((a)=>(cast(het.ui.Row)(a))); 
+									maxRowWidth = 0; 
+									foreach(r; rowCtrls)
+									{
+										r.needMeasure; 
+										r.measure; 
+										maxRowWidth.maximize(r.outerWidth); 
+									}
+								}
+							); 
+						}
+					} 
+				} 
+			+/
+		+/
+	+/
 	
 	
 	
@@ -7264,6 +7619,7 @@ struct im
 			//Todo: package visibility is not working as it should -> remains public
 			void _beginFrame(View2D viewWorld, View2D viewGUI)
 			{
+				auto _間=init間; 
 				//called from mainform.update
 				
 				enforce(!inFrame, "im.beginFrame() already called."); 
@@ -7300,7 +7656,7 @@ struct im
 				//Maybe it is the same as the bounds for clipping rects: flags.clipChildren
 				
 				static DeltaTimer dt; 
-				deltaTime = dt.update; 
+				deltaTime = dt.update; ((0x35175EB16D5C4).檢((update間(_間)))); 
 			} 
 			
 			struct HitTestSideInfo
@@ -7390,7 +7746,7 @@ struct im
 			
 			void _endFrame()
 			{
-				//called from end of update
+				auto _間=init間; //called from end of update
 				
 				enforce(inFrame, "im.endFrame(): must call beginFrame() first."); 
 				enforce(stack.length==1, "FATAL ERROR: im.endFrame(): stack is corrupted. 1!="~stack.length.text); 
@@ -7494,7 +7850,7 @@ struct im
 				
 				//update building/measuring/drawing state
 				canDraw = true; 
-				inFrame = false; 
+				inFrame = false; ((0x36905EB16D5C4).檢((update間(_間)))); 
 			} 
 			
 			bounds2[TargetSurface.max+1] surfaceBounds; 
@@ -7504,6 +7860,7 @@ struct im
 				void delegate() funBefore=null, void delegate() funAfter=null
 			)
 			{
+				auto _間=init間; 
 				static assert(restrict=="system call only", "im.draw() is restricted to call by system only."); 
 				enforce(canDraw, "im.draw(): canDraw must be true. Nothing to draw now."); 
 				
@@ -7551,11 +7908,12 @@ struct im
 				//Todo: ezt tesztelni kene sor cell-el is! Hogy mekkorak a gc spyke-ok, ha manualisan destroyozok.
 				
 				//Todo: if window resizing, draw is called without update!!!  canDraw = false; can detect it.
+				((0x37013EB16D5C4).檢((update間(_間)))); 
 			} 
 			
 			void _finalizeFrame(string restrict="")()
 			{
-				
+				auto _間=init間; 
 				/+
 					Todo: 260718 Flooding >1KB text at 60FPS is bad!!! 
 					In the debugger is does .5 sec lagspikes. Not affecting small texts, though.
@@ -7569,7 +7927,7 @@ struct im
 							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
 							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
 						}
-						((0x34769EB16D5C4).檢 (ImStorageManager.stats)); 
+						((0x37287EB16D5C4).檢 (ImStorageManager.stats)); 
 					}
 				}
 				
@@ -7586,6 +7944,7 @@ struct im
 				}
 				
 				resourceMonitor.update; 
+				((0x37427EB16D5C4).檢((update間(_間)))); 
 			} 
 		}
 		version(/+$DIDE_REGION HitTest+/all)
@@ -12404,10 +12763,10 @@ version(/+$DIDE_REGION Dead code 260813+/none)
 						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
 					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
 					
-					((0x56E94EB16D5C4).檢(hit.toJson)); 
+					((0x599E4EB16D5C4).檢(hit.toJson)); 
 					
 					
-					((0x56ECEEB16D5C4).檢(localMouse)); 
+					((0x59A1EEB16D5C4).檢(localMouse)); 
 					
 					
 					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 

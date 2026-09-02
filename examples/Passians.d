@@ -472,7 +472,7 @@ class FrmMain: UIWindow
 		
 		//zoom bounds
 		if(const bnd = validCards.map!"a.targetBounds".fold!"a|b"(bounds2.init))
-		view.zoom(bnd); 
+		viewWorld.zoom(bnd); 
 	} 
 	
 	string[] fullDeck(int numDecks=1)
@@ -542,8 +542,8 @@ class FrmMain: UIWindow
 	override void onUpdate()
 	{
 		if(canProcessUserInput) navigateView(!im.wantKeys, !im.wantMouse); 
-		const canEdit = !im.wantMouse && view.isMouseInside && canProcessUserInput; 
-		caption = i"FPS: $(FPS)  scale: $(view.invScale_anim
+		const canEdit = !im.wantMouse && viewWorld.isMouseInside && canProcessUserInput; 
+		caption = i"FPS: $(FPS)  scale: $(viewWorld.invScale_anim
 .format!"%20.10f")".text; 
 		
 		with(im)
@@ -580,13 +580,13 @@ class FrmMain: UIWindow
 				return cards; 
 			}; 
 			selection.deselectBelow = true; 
-			selection.update(canEdit, view, cards); 
+			selection.update(canEdit, viewWorld, cards); 
 			workspace.subCells = cast(Cell[]) cards; 
 			workspace.rearrange; 
 			im.imAppend(workspace); 
 		}
 		
-		view.subScreenArea = im.clientArea / clientSize; 
+		viewWorld.subScreenArea = (cast(.DockSite)(im.rootContainer)).clientArea / clientSize; 
 		
 		static if(is(typeof(updateCustomShader))) updateCustomShader; 
 		updateCards; 

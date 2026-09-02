@@ -35,7 +35,7 @@ class FrmTestVulkanUI : UIWindow
 								if(Btn("Press me!")) flag.toggle; 
 								ChkBox(flag, "Check me!"); 
 								Edit(str); 
-								Slider(val, range(0, 1)); 
+								Slider(val, RANGE(0, 1)); 
 								Row(
 									{
 										Text(`🤓`); Img(File(`icon:\.exe`)); 

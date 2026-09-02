@@ -56,7 +56,7 @@ class FrmTetris: UIWindow
 		{ field[y][x] = x==0 || x==FieldWidth-1 || y==FieldHeight-1 ? 1 : 0; }
 	} 
 	
-	auto dr() => staticDr; 
+	auto dr() => staticDrWorld; 
 	
 	void drawCell(int x, int y, int c)
 	{
@@ -251,7 +251,7 @@ class FrmTetris: UIWindow
 	override void onUpdate()
 	{
 		//set the view to fixed
-		view.zoom(bounds2(-1, 0, FieldWidth+8, FieldHeight)); 
+		viewWorld.zoom(bounds2(-1, 0, FieldWidth+8, FieldHeight)); 
 		
 		
 		updateKeys; 
