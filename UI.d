@@ -5208,7 +5208,137 @@ version(/+$DIDE_REGION+/all)
 			}
 		} 
 	} 
-	
+	private
+	{
+		static struct SplittedAreaState
+		{
+			bool active; 
+			
+			.DockSite dockSite; 
+			
+			bool isHorz, isVert; 
+			float fullSize, totalResizableSize, totalStaticSize; 
+			size_t initialDockSiteSubCellCount, lastDockSiteSubCellCount; 
+			float minRemainingSize; 
+			
+			float*[] sizePtrs; 
+			
+			void reset()
+			{ this = typeof(this).init; } 
+			
+			
+			void beginArea()
+			{
+				enforce(!active, "Already inside a SplitterArea."); 
+				active = true; 
+				dockSite = im.thisDockSite.enforce("Resizable!Container requires a DockSite."); 
+				initialDockSiteSubCellCount = dockSite.subCells.length; 
+			} 
+			
+			float addUpSubCellSizes()
+			{
+				enforce(lastDockSiteSubCellCount <= dockSite.subCells.length); 
+				float res = 0; 
+				while(lastDockSiteSubCellCount < dockSite.subCells.length)
+				{
+					with(im.subCells[lastDockSiteSubCellCount].outerSize) res += ((isHorz)?(x):(y)); 
+					lastDockSiteSubCellCount++; 
+				}
+				return res; 
+			} 
+			
+			void beforeResizableContainer(in DockAlignment dockAlignment, ref float actSize)
+			{
+				enforce(im.thisDockSite is dockSite, "Resizable!Container's DockSite lost."); 
+				
+				const 	isDockAlignmentHorz 	= !!dockAlignment.among(mixin(舉!((DockAlignment),q{leftClient})), mixin(舉!((DockAlignment),q{rightClient}))),
+					isDockAlignmentVert 	= !!dockAlignment.among(mixin(舉!((DockAlignment),q{topClient})), mixin(舉!((DockAlignment),q{bottomClient}))); 
+				if(!(isHorz || isVert))
+				{
+					isHorz 	= isDockAlignmentHorz,
+					isVert 	= isDockAlignmentVert; 
+					enforce(
+						isHorz!=isVert /+either one or another+/,
+						"Invalid DockAlignment in Resizable!Container "~dockAlignment.text
+					); 
+					
+					//Now that orientation is known, fullSize can be determined.
+					with(dockSite.clientArea.size) fullSize = ((isHorz)?(x):(y)); 
+					lastDockSiteSubCellCount = dockSite.subCells.length; 
+					totalResizableSize = totalStaticSize = 0; 
+				}
+				else
+				{
+					enforce(
+						(isHorz && isDockAlignmentHorz) || (isVert && isDockAlignmentVert),
+						((isHorz)?("Horizontal"):("Vertical"))
+						~" DockAlignment expected Resizable!Container "~dockAlignment.text
+					); 
+					totalStaticSize += addUpSubCellSizes; 
+				}
+				
+				sizePtrs ~= &actSize; 
+			} 
+			
+			void afterResizableContainer()
+			{
+				enforce(im.thisDockSite is dockSite, "Resizable!Container's DockSite lost."); 
+				totalResizableSize += addUpSubCellSizes; 
+			} 
+			
+			void endArea()
+			{
+				enforce(active, "Not inside SplitterArea. Nothing to end."); 
+				enforce(im.thisDockSite is dockSite, "Resizable!Container's DockSite lost."); 
+				
+				if(const N = sizePtrs.length)
+				{
+					enum minRemainingSize = 32; 
+					
+					const 	remainingSize 	= fullSize - totalResizableSize - totalStaticSize,
+						invN 	= 1.0f/N,
+						minSize 	= min(minRemainingSize, fullSize * invN); 
+					
+					const at = calcAnimationT(im.deltaTime/+1.0f/60+/, .01), sd = .01f; 
+					
+					if(remainingSize < minSize)
+					{
+						const adjust = (remainingSize - minSize) * invN; 
+						foreach(pSize; sizePtrs)
+						{
+							ref size = *pSize; 
+							size.follow(size + adjust, at, sd); 
+						}
+					}
+					
+					foreach(pSize; sizePtrs)
+					{
+						ref size = *pSize; 
+						if(size<minSize) size.follow(minSize, at, sd); 
+					}
+				}
+				
+				version(/+$DIDE_REGION Move splitters to the top of ZOrder and extend their thickness.+/all)
+				{
+					{
+						const SplitterMinThickness = 8 /+* targetSurfaceScreenPixelSize+/; 
+						auto cells = dockSite.subCells[initialDockSiteSubCellCount..$]; 
+						if(cells.length)
+						{
+							auto 	nonSplitters 	= cells.filter!((a)=>((cast(.Splitter)(a)) is null)),
+								splitters 	= cells.filter!((a)=>((cast(.Splitter)(a)) !is null)); 
+							foreach(splitter; splitters.map!((a)=>((cast(.Splitter)(a)))))
+							{ splitter.extend(SplitterMinThickness); }
+							cells[] = chain(nonSplitters, splitters).array; 
+						}
+					}
+				}
+				
+				reset; 
+			} 
+		} 
+	} 
+	
 	enum DockAlignment
 	{
 		none, 
@@ -5226,7 +5356,7 @@ version(/+$DIDE_REGION+/all)
 		
 		bounds2 clientArea; //must be initialized before receiving contained cells.
 		
-		im.SplittedAreaState splittedAreaState; 
+		SplittedAreaState* splittedAreaState; 
 		
 		void beforeDock(.Container cntr, in DockAlignment da)
 		{
@@ -5778,694 +5908,9 @@ version(/+$DIDE_REGION+/all)
 		} 
 	} 
 	
-	/+
-		260718: Size reduction
-		Border: 20, Cell: 32, Glyph: 61, Container: 136, Row: 153, Column: 136
-		
-		After refactoring Border:
-		Border: 8, Cell:32, Glyph:61, Container:128, Row:145, Column:128
-		
-		Further refactor: 16bit upper float:
-		Border: 6, Cell:32, Glyph:61, Container:128, Row:145, Column:128
-		
-		Padding, Border uses UpperFloats:
-		Border: 6, Cell:32, Glyph:61, Container:112, Row:129, Column:112
-		
-		FlexValue -> UpperFloat
-		Border: 6, Cell:32, Glyph:61, Container:104, Row:121, Column:104 
-		
-		260805: Can't remember
-		Border: 6, Cell:32, Glyph:61, Container:96, Row:113, Column:96, TextStyle: 32
-		
-		260809: TextStyle.font:  string -> FontId
-		Border: 6, Cell:32, Glyph:61, Container:96, Row:113, Column:97, TextStyle: 9
-		
-		260810: realigning fields in Container
-		Border: 6, Padding:8, Cell:32, Glyph:61, Container:91, Row:113, Column:91, Style: 9
-		
-		260821: split flags to -> flags, rowFlags, colFlags
-		Border: 6, Padding:8, Cell:32, Glyph:61, Container:88, Row:106, Column:88, Style: 9
-	+/
 	
-	pragma(msg,i"Border: $(Border.sizeof), Padding:$(Padding.sizeof), Cell:$(__traits(classInstanceSize, Cell)), Glyph:$(__traits(classInstanceSize, Glyph)), Container:$(__traits(classInstanceSize, Container)), Row:$(__traits(classInstanceSize, Row)), Column:$(__traits(classInstanceSize, Column)), Style: $(TextStyle.sizeof)".text.注); 
 	
-	alias SliderOrientation = Slider.Orientation, SliderType = Slider.Type; 
-	class Slider : Container
-	{
-		//Note: must be a Container because hitTest works on Containers only.
-		
-		//Todo: shift precise mode: must use float knob position to improve the precision
-		
-		enum Orientation { horz, vert, round, auto_} 
-		enum Type { slider, scrollBar} 
-		
-		Orientation orientation; 
-		Type type; 
-		RGB /+bkColor, <-already defined in Container+/clLine, clThumb, clRuler; 
-		float baseSize; //this is calculated from current fontHeight and theme.
-		float normThumbSize; //if it is a scrollbar, this is not nan and specifies the normalized size of the thumb.
-		//these are the derived sizes
-		float rulerOfs	()
-		{ return baseSize*0.5f; } 
-		float lwLine	()
-		{ return baseSize*(2.0f*InvDefaultFontHeight); } 
-		float lwRuler	()
-		{ return lwLine*0.5f; } 
-		
-		static isRound(in Orientation orientation)
-		=> orientation==Orientation.round; 
-		static isLinear(in Orientation orientation)
-		=> !!orientation.among(Orientation.horz, Orientation.vert); 
-		static getActualSliderOrientation(Orientation orientation, in bounds2 r, in Type type)
-		{
-			//scrollbar can only be horz or vert.
-			if(type==Type.scrollBar && !isLinear(orientation))
-			orientation = Orientation.auto_; 
-			
-			if(orientation != Orientation.auto_)
-			return orientation; 
-			//decide orientation by the shape
-			enum THRESHOLD = 1.5f; 
-			float aspect = safeDiv(r.width/r.height, 1); 
-			return aspect>=THRESHOLD	? Orientation.horz:
-			aspect<=(1/THRESHOLD)	? Orientation.vert:
-				Orientation.round; 
-		} 
-		
-		/// this is the half thickness of the thumb in the active direction
-		float calcLwThumb	(Orientation ori)
-		{
-			if(type == Type.scrollBar && !isnan(normThumbSize))
-			{
-				const minSizePixels = min(innerWidth, MinScrollThumbSize); 
-				return max((ori==Orientation.horz ? innerWidth : innerHeight) * normThumbSize.clamp(0, 1), minSizePixels) * .5f; 
-			}else
-			{ return baseSize*(1.0f/3); }
-		} 
-		
-		
-		int rulerDiv0 = 9, rulerDiv1 = 4; 
-		ubyte rulerSides=3; 
-		
-		float nPos, nCenter=0;  //center is the start of the marking on the line
-		int wrapCnt; //for endless, to see if there was a wrapping or not. Used to reconstruct actual value
-		
-		bounds2 hitBounds; 
-		
-		void setupAppearance(bool enabled, bool focused, float hover_smooth, float captured_smooth, float baseSize)
-		{
-			const hoverOrFocus = enabled ? max(hover_smooth*.5f, focused ? 1.0f : 0) : 0; 
-			
-			final switch(type)
-			{
-				case Type.slider: 
-					clThumb = mix(mix(clSliderThumb, clSliderThumbHover, hoverOrFocus), clSliderThumbPressed, captured_smooth); 
-					clLine = mix(mix(clSliderLine , clSliderLineHover , hoverOrFocus), clSliderLinePressed , captured_smooth); 
-					clRuler = clGray/+mix(bkColor, ts.fontColor, 0.5)+/; //disable ruler for now
-				
-					if(focused) { clThumb = clBlack; clLine = clBlack; }//Todo: lame logic
-				
-					rulerSides = 0; 
-				break; 
-				case Type.scrollBar: 
-					clThumb = mix(clScrollThumb, clScrollThumbPressed, hoverOrFocus); 
-					bkColor = mix(clScrollBk, clScrollThumb, min(hoverOrFocus, .5f)); 
-				
-					if(focused) { clThumb = clBlack; }//Todo: lame logic
-				
-					//clThumb = mix(clWinBtn, clWinBtnPressed, max(hit.hover_smooth*.5f, sliderState.pressed_id==id ? 1 : 0));
-					rulerSides = 0; 
-				break; 
-			}
-			
-			if(!enabled) clLine = clThumb = clGray; //Todo: nem clGray ez, hanem clDisabledText vagy ilyesmi
-			
-			this.baseSize = baseSize; 
-			if(!outerSize) outerSize = vec2(baseSize*6, baseSize); //default size
-		} 
-		
-		
-		override bounds2 getHitBounds()
-		{ return outerBounds; } 
-		
-		private void drawThumb(Drawing dr, vec2 a, vec2 t, float lwThumb)
-		{
-			final switch(type)
-			{
-				case Type.slider: 
-					dr.lineWidth = lwThumb; dr.color = clThumb; 
-					const t90 = t.rotate90; 
-					dr.line(a-t90, a+t90); 
-				break; 
-				case Type.scrollBar: 
-					dr.color = clThumb; 
-					const 	horz 	= orientation==Orientation.horz,
-					halfSize 	= horz ? vec2(lwThumb, innerHeight*.5f) : vec2(innerWidth*.5f, lwThumb),
-					bnd 	= bounds2(a, a).inflated(halfSize); 
-					dr.fillRect(bnd); 
-				break; 
-			}
-		} 
-		
-		private void drawLine(Drawing dr, vec2 a, vec2 b, RGB cl)
-		{ dr.lineWidth = lwLine; dr.color = cl; dr.line(a, b); } 
-		
-		
-		override void draw(Drawing dr)
-		{
-			dr.color = bkColor; dr.fillRect(borderBounds_inner); 
-			drawBorder(dr); 
-			
-			dr.alpha = 1; dr.lineStyle = LineStyle.normal; dr.arrowStyle = ArrowStyle.none; 
-			
-			auto b = innerBounds; 
-			const 	actOrientation = getActualSliderOrientation(orientation, b, type),
-				lwThumb = calcLwThumb(actOrientation); 
-			
-			if(isLinear(actOrientation))
-			{
-				const 	horz 	= actOrientation == Orientation.horz,
-					thumbOfs 	= (horz ? vec2(1,	0) : vec2(0, -1)) * lwThumb,
-					p0 	= (horz ? b.leftCenter	: b.bottomCenter) + thumbOfs,
-					p1 	= (horz ? b.rightCenter	: b.topCenter  ) - thumbOfs; 
-				
-				if(type==Type.slider && rulerSides)
-				{
-					const 	rp0 	= horz ? p0 : p1,
-						rp1 	= horz ? p1 : p0,
-						ro0 	= horz ? vec2(0, rulerOfs) : vec2(rulerOfs, 0),
-						ro1 	= ro0*.4f; 
-					if(rulerSides&1)
-					drawStraightRuler(dr, bounds2(rp0-ro0, rp1-ro1), rulerDiv0, rulerDiv1, true ); 
-					if(rulerSides&2)
-					drawStraightRuler(dr, bounds2(rp0+ro1, rp1+ro0), rulerDiv0, rulerDiv1, false); 
-				}
-				
-				if(type==Type.slider)
-				drawLine(dr, p0, p1, clLine); 
-				
-				if(!isnan(nPos))
-				{
-					auto p = mix(p0, p1, nPos); 
-					if(!isnan(nCenter) && type==Type.slider)
-					drawLine(dr, mix(p0, p1, nCenter), p, clThumb); 
-					
-					drawThumb(dr, p, thumbOfs, lwThumb); 
-					
-					if(im.sliderState.canCallAfterActiveSliderDraw(id, hitBounds))
-					{
-						vec2 thumbHalfSize; 
-						if(type==Type.slider) {
-							thumbHalfSize = lwThumb * vec2(0.5f, 1.5f); 
-							if(!horz)
-							swap(thumbHalfSize.x, thumbHalfSize.y); 
-						}
-						else { thumbHalfSize = ((horz)?(vec2(lwThumb, outerHeight*.5f)) :(vec2(outerWidth*.5f, lwThumb))); }
-						const thumbRect = bounds2(p, p).inflated(thumbHalfSize); 
-						
-						if(im.sliderState.canCallAfterActiveSliderDraw(id, hitBounds))
-						{
-							im.sliderState.afterActiveSliderDraw
-								(
-								id, actOrientation, dr.inputTransform(p0), 
-								dr.inputTransform(p1), dr.inputTransform(thumbRect)
-							); 
-						}
-					}
-				}
-				
-			}
-			else if(isRound(actOrientation))
-			{
-				//center square
-				bool endless = false; 
-				
-				b = b.fittingSquare; 
-				if(im.sliderState.canCallAfterActiveSliderDraw(id, hitBounds))
-				{
-					im.sliderState.afterActiveSliderDraw
-						(
-						id, actOrientation, dr.inputTransform(b.center), 
-						dr.inputTransform(b.center), dr.inputTransform(b)
-					); 
-				}
-				
-				auto c = b.center, r = b.width*0.4f; 
-				
-				if(rulerSides)
-				drawRoundRuler(dr, c, r, rulerDiv0, rulerDiv1, endless); 
-				r *= 0.8f; 
-				
-				float a0 = (endless ? 0 : 0.25f)*PIf; 
-				float a1 = (endless ? 2 : 1.75f)*PIf; 
-				
-				dr.lineWidth = lwLine; 
-				dr.color = clLine; 
-				dr.circle(c, r, a0, a1); 
-				
-				if(!isnan(nPos))
-				{
-					float n = 1-nPos; 
-					n = endless ? n.fract : n.clamp(0, 1);  //Todo: ezt megcsinalni a range-val
-					float a = mix(a0, a1, n); 
-					if(!endless && !isnan(nCenter))
-					{
-						float ac = mix(a0, a1, (1-nCenter).clamp(0, 1)); 
-						dr.color = clThumb; 
-						if(ac>=a)
-						dr.circle(c, r, a, ac); 
-						else dr.circle(c, r, ac, a); 
-					}
-					
-					dr.lineWidth = lwThumb; 
-					dr.color = clThumb; 
-					auto v = vec2(sin(a), cos(a)); 
-					dr.line(c, c+v*r); 
-				}
-			}
-			
-			drawDebug(dr); 
-		} 
-		//Draw Rulers
-		protected void drawStraightRuler(
-			Drawing dr, in bounds2 r, int cnt, 
-			int cnt2=-1, bool topleft=true
-		)
-		{
-			cnt--; 
-			if(cnt<=0) return; 
-			if(cnt2<0) cnt2 = cnt; 
-			dr.color = clRuler; dr.lineWidth = lwRuler; 
-			if(r.height < r.width)
-			{
-				float 	c 	= r.center.y,
-					b 	= r.top,
-					t 	= r.bottom,
-					j 	= r.left,
-					ja 	= r.width/cnt; 
-				if(!topleft) swap(b, t); 
-				foreach(i; 0..cnt+1)
-				{
-					dr.vLine(j, b, cnt2 && i%cnt2==0 ? t : c); 
-					j += ja; 
-				}
-			}else
-			{
-				float 	c 	= r.center.x,
-					b 	= r.left,
-					t 	= r.right,
-					j 	= r.top,
-					ja 	= r.height/cnt; 
-				if(!topleft) swap(b, t); 
-				foreach(i; 0..cnt+1)
-				{
-					dr.hLine(b, j, cnt2 && i%cnt2==0 ? t : c); 
-					j += ja; 
-				}
-			}
-		} 
-		
-		protected void drawRoundRuler(
-			Drawing dr, in vec2 center, float radius, 
-			int cnt, int cnt2=-1, bool endless=false
-		)
-		{
-			cnt--; 
-			if(cnt<=0) return; 
-			if(cnt2<0) cnt2 = cnt; 
-			//radius *= (1/1.25f);
-			dr.color = clRuler; dr.lineWidth = lwRuler; 
-			foreach(i; 0..cnt+1)
-			{
-				float a = endless 	? 2*PIf*i/cnt
-					: -0.25f*PIf + 1.5f*PIf*i/cnt; 
-				float co = -cos(a), si = -sin(a); 
-				dr.moveTo(center.x+co*radius, center.y+si*radius); 
-				float radius2 = radius*(
-					!endless && (cnt2 && i%cnt2==0) 
-					? 1.25f : 1.125f
-				); 
-				dr.lineTo(center.x+co*radius2, center.y+si*radius2); 
-			}
-		} 
-	} 
-	
-	class DateTimeRuler : Container
-	{
-		//Note: must be a Container because hitTest works on Containers only.
-		
-		RGB clText, clRedText, clMajorTick, clMinorTick; 
-		DateTime tMin, tMax, t0, t1, t0_draw, t1_draw; 
-		bounds2 hitBounds; 
-		
-		bool mouseAtTopHalf; 
-		@property mouseAtBottomHalf() => !mouseAtTopHalf; 
-		
-		bool focused; float hoverOrFocus=0; 
-		
-		DateTime highlighted_t; 
-		bool show_highlighted_t; 
-		
-		void sanitizeRanges()
-		{
-			//both ranges must be always valid
-			if(tMax<=tMin)
-			{
-				tMax = tMin; 
-				if(tMin.raw==ulong.max) tMin.raw--; 
-				tMax.raw = tMin.raw+1; 
-			}
-			t0 = t0.clamp(tMin, tMax); 
-			t1 = t1.clamp(t0, tMax); 
-			if(t0==t1)
-			{ if(t0==tMax) t0.raw--; else t1.raw++; }
-		} 
-		
-		static struct NormalizedSliderData
-		{
-			ulong w, w_outer; 
-			float nPos; 
-			float pageSize; 
-			ValueRange rng; 
-			
-			int wrapCnt; 
-			
-			bool changed_kb, changed_m; 
-			
-			this(
-				DateTime tMin, DateTime tMax, 
-				DateTime t0, DateTime t1
-			)
-			{
-				w = t1.raw - t0.raw; 
-				w_outer = tMax.raw - tMin.raw; 
-				
-				nPos = (((float(t0.raw - tMin.raw)))/(w_outer - w)); 
-				pageSize = (((float(w)))/(w_outer)); 
-				rng = ValueRange(0, 1, pageSize / 8); 
-			} 
-			
-			bool handleKeyboard()
-			{
-				const b = im.sliderState.handleKeyboard(nPos, rng, pageSize); 
-				if(b) changed_kb = true; return b; 
-			} 
-			
-			bool handleMouse(in im.Id id, in im.HitInfo hit, in vec2 mousePos)
-			{
-				const b = im.sliderState.handleMouse	(
-					id, hit, nPos, mousePos,
-					rng, wrapCnt
-				); 
-				if(b) changed_m = true; return b; 
-			} 
-			
-			@property changed() => changed_kb || changed_m; 
-		} 
-		
-		auto getNormalizedSliderData()
-		=> NormalizedSliderData(tMin, tMax, t0, t1); 
-		
-		bool jumpTo(float nPos)
-		{
-			if(nPos.isnan) return false; nPos = nPos.clamp(0, 1); 
-			const 	w 	= t1.raw 	- t0.raw,
-				w_outer 	= tMax.raw 	- tMin.raw; 
-			const t0_prev = t0, t1_prev = t1; 
-			t0 = tMin .shift(w_outer - w, nPos, tMin, tMax), 
-			t1 = t0   .shift(w, 1, tMin, tMax); 
-			sanitizeRanges; return (t0!=t0_prev) || (t1!=t1_prev); 
-		} 
-		
-		bool scrollByTime(DateTime startT0, Time Δt)
-		{
-			const len = t1.raw - t0.raw; const t0_prev = t0, t1_prev = t1; 
-			t0 = startT0             .scroll(Δt, tMin.raw, tMax.raw-len),
-			t1 = startT0.add_raw(len).scroll(Δt, tMin.raw+len, tMax.raw); 
-			sanitizeRanges; return (t0!=t0_prev) || (t1!=t1_prev); 
-		} 
-		
-		bool zoomAround(DateTime center, float amount)
-		{
-			if(amount.isnan || !amount) return false; 
-			
-			float sc = 1 + inputs.MW.delta.abs * .25; 
-			if(inputs.MW.delta>0) sc = 1/sc; 
-			
-			bool tryZoom()
-			{
-				auto calcLen() => t1.raw-t0.raw; 
-				const len = calcLen; 
-				t0 = t0.scale(center, sc, tMin, tMax); 
-				t1 = t1.scale(center, sc, tMin, tMax); 
-				sanitizeRanges; 
-				return len!=calcLen; 
-			} 
-			
-			if(!tryZoom)
-			{
-				if(sc>1/+zoom out attempt failed?+/)
-				{
-					sc = 2/+increase coom out amount+/; 
-					if(!tryZoom)
-					{
-						/+
-							Maybe it is next to tMax, then 
-							zoom away from t1.
-						+/
-						center = t1; 
-						if(!tryZoom)
-						{
-							t0 = tMin, t1 = tMax; 
-							/+return home as a last resort.+/
-						}
-					}
-				}
-			}
-			
-			return true; 
-		} 
-		
-		
-		
-		
-		/+Note: Step 1.+/
-		void setup(
-			const 	DateTime tMin_, 	const 	DateTime tMax_, 
-			ref 	DateTime t0_, 	ref 	DateTime t1_, 
-			vec2 mousePos, ref im.HitInfo hit
-		)
-		{
-			tMin 	= tMin_,
-			tMax 	= tMax_,
-			t0 	= t0_,
-			t1 	= t1_; 
-			sanitizeRanges; 
-			
-			hitBounds = hit.hitBounds; 
-			
-			mouseAtTopHalf = !hitBounds || mousePos.y < hitBounds.center.y; 
-			
-			const 	norm_mouseX 	= ((
-				hitBounds && 
-				hitBounds.width
-			)?(((mousePos.x-hitBounds.left)/(hitBounds.width))):(0)),
-				t_hovered_top 	= tMin.shift(tMax.raw-tMin.raw, norm_mouseX, tMin, tMax),
-				t_hovered_bottom 	= t0.shift(t1.raw-t0.raw, norm_mouseX, tMin, tMax); 
-			
-			show_highlighted_t = mouseAtBottomHalf; 
-			highlighted_t = t_hovered_bottom; 
-		} 
-		
-		/+Note: Step 2.+/
-		void perform(
-			bool focused_, const ref TextStyle ts, vec2 mousePos, const ref im.HitInfo hit,
-			ref bool userModified, ref 	DateTime t0_, 	ref 	DateTime t1_
-		)
-		{
-			this.focused = focused_; 
-			ref rss = im.dateTimeRulerScrollState; 
-			
-			if(focused && im.canProcessUserInput)
-			{
-				//mouse and kbd handling on the top half as a scrollbar slider
-				{
-					auto nsd = getNormalizedSliderData; 
-					
-					nsd.handleKeyboard; 
-					
-					if(hit.pressed && mouseAtBottomHalf)
-					{/+beep; +//+left button pressed at highlighted_t+/}
-					else { nsd.handleMouse(id, hit, mousePos); }
-					
-					if(nsd.changed)
-					{ if(jumpTo(nsd.nPos)) userModified = true; }
-				}
-				
-				//Zooming
-				if(hitBounds && mouseAtBottomHalf && inputs.MW.delta)
-				{
-					if(zoomAround(highlighted_t, inputs.MW.delta))
-					userModified = true; 
-				}
-				
-				//Scrolling
-				{
-					if(hitBounds && mouseAtBottomHalf && inputs.MMB.pressed)
-					{ rss.startScroll(mousePos, t0, t1); }
-					
-					if(hitBounds && rss.scrolling)
-					{
-						//It can be only measured inside the hitbox.
-						rss.updateScroll((t1-t0)/hitBounds.width); 
-					}
-					
-					if(rss.scrolling)
-					{
-						if(
-							scrollByTime(
-								rss.startT0,
-								rss.currentDelta(mousePos)
-							)
-						)
-						userModified = true; 
-					}
-				}
-			}
-			
-			if(!focused || !inputs.MMB.down) rss.scrolling = false; 
-			
-			bkColor = ts.bkColor; 
-			clText = ts.fontColor; 
-			
-			hoverOrFocus = hit.enabled ? max(hit.hover_smooth*.33f, focused ? 1.0f : 0) : 0; 
-			
-			clRedText = clRed; 
-			clMajorTick = clText; 
-			clMinorTick = mix(clMajorTick, bkColor, .125f); 
-			
-			const fh = ts.fontHeight; 
-			innerSize = vec2(fh*20, fh*2.5*2) /+default size+/; 
-			
-			if(userModified)
-			{ t0_ = t0, t1_ = t1; }
-		} 
-		
-		override void draw(Drawing dr)
-		{
-			const t0 = t0_draw, t1 = t1_draw; 
-			
-			const b = innerBounds/+ + innerPos <- FUUUUUUUUUUUUUUCK!!!!+/; 
-			const fh = b.height/5.625f, rh = fh*5/2; 
-			auto 	bTop 	= bounds2(b.left, b.top, b.right, b.top+rh),
-				bBottom 	= bounds2(b.left, b.bottom-rh, b.right, b.bottom); 
-			bounds2 bCenter, bThumb; 
-			float t0x, t1x; 
-			
-			{
-				dr.pushClipBounds(b); scope(exit) dr.popClipBounds; 
-				
-				import het.ui_ruler; 
-				const 	topIsFine 	= drawHRuler(dr, bTop, tMin, tMax, shiftUpwards: true),
-					bottomIsFine 	= drawHRuler(dr, bBottom, t0, t1); 
-				if(!topIsFine) bTop.bottom -= fh; 
-				if(!bottomIsFine) bBottom.top += fh; 
-				bCenter = bounds2(b.left, bTop.bottom, b.right, bBottom.top); 
-				
-				{
-					dr.color = clAccent; dr.alpha = .25; scope(exit) dr.alpha = 1; 
-					void fill(float leftX0, float leftX1, float rightX0, float rightX1, int y0, int y1)
-					{
-						const step = 1.0f/(y1-y0); float t=step/2; 
-						foreach(i; 0..y1-y0)
-						{
-							const y = i+y0, tt = (1-cos(t*(float(π))).signedpow(0.0625))/2; 
-							dr.fillRect(
-								bounds2(
-									mix(leftX0 , leftX1 , tt), y, 
-									mix(rightX0, rightX1, tt), y+1
-								)
-							); 
-							t += step; 
-						}
-					} 
-					
-					float remap(DateTime t)
-					=> b.left + ((b.width*(t.raw.clamp(tMin.raw, tMax.raw) - tMin.raw))/(tMax.raw - tMin.raw)); 
-					t0x = remap(t0), t1x = remap(t1); 
-					
-					dr.fillRect(bounds2(b.left, b.top, t0x, bCenter.top.ifloor)); 
-					dr.fillRect(bounds2(t1x, b.top, b.right, bCenter.top.ifloor)); 
-					fill(bCenter.left, bCenter.left, t0x, bCenter.left, bCenter.top.ifloor, bCenter.bottom.iceil); 
-					fill(t1x, bCenter.right, bCenter.right, bCenter.right, bCenter.top.ifloor, bCenter.bottom.iceil); 
-					
-					bThumb = bounds2(t0x, bTop.top, t1x, bTop.bottom); 
-				}
-			}
-			
-			drawBorder(dr); 
-			if(hoverOrFocus)
-			{
-				dr.alpha = hoverOrFocus; scope(exit) dr.alpha = 1; 
-				dr.color = clBlack; dr.lineWidth = 2; 
-				dr.drawRect(b.inflated(vec2(-1, 0/+Todo: A bit lame, but looks good+/))); 
-				
-				
-				if(!mouseAtTopHalf) dr.alpha = hoverOrFocus/2; 
-				const bt = bThumb.inflated(vec2(-1,0)); 
-				if(false)
-				{ dr.color = clAccent; dr.drawRect(bt); }
-				else
-				with(bt)
-				{
-					dr.line(topLeft, bottomLeft); 
-					dr.line(topRight, bottomRight); 
-					dr.line(bottomLeft, bottomRight); 
-				}
-				
-				if(show_highlighted_t)
-				{
-					dr.alpha = hoverOrFocus; 
-					
-					const t = highlighted_t; 
-					const xTop = b.left + ((b.width*(t.raw.clamp(tMin.raw, tMax.raw) - tMin.raw))/(tMax.raw - tMin.raw)); 
-					const xBottom = b.left + ((b.width*(t.raw.clamp(t0.raw, t1.raw) - t0.raw))/(t1.raw - t0.raw)); 
-					
-					dr.lineWidth = 1.05f; dr.color = clRedText; 
-					
-					const 	A = vec2(xTop, bTop.top), 
-						B = vec2(xTop, bCenter.top),
-						C = vec2(xBottom, bCenter.center.y), 
-						D = vec2(xBottom, bBottom.bottom); 
-					dr.line(A, B); /+dr.line(B, C);+/ dr.line(C, D); 
-					
-					version(/+$DIDE_REGION+/none) {
-						//curver line is ugly
-						dr.line(A, B); 
-						enum N = 10; 
-						const P = iota(N).map!
-							((i){
-							const t = i*(1.0f/(N-1)); 
-							const tt = (1-cos(t*(float(π))).signedpow(0.0625))/2; 
-							return vec2(mix(B.x, C.x, tt), mix(B.y, C.y, t)); 
-						}).array; 
-						foreach(i; 1..P.length) dr.line(P[i-1], P[i]); 
-						dr.line(C, D); 
-					}
-				}
-			}
-			
-			if(im.sliderState.canCallAfterActiveSliderDraw(id, hitBounds))
-			im.sliderState.afterActiveSliderDraw(
-				id, SliderOrientation.horz, 
-				dr.inputTransform(bTop.topLeft     + bThumb.size/2), 
-				dr.inputTransform(bTop.bottomRight - bThumb.size/2), 
-				dr.inputTransform(bThumb)
-			); 
-			
-			drawDebug(dr); 
-		} 
-	} 
+	
 	
 	//Todo: Unqual is not needed to check a type. Try to push this idea through a whole testApp.
 	//Todo: form resize eseten remeg a viewGUI-ra rajzolt cucc.
@@ -7202,6 +6647,1496 @@ version(/+$DIDE_REGION+/all)
 	
 	
 }
+version(/+$DIDE_REGION+/all) {
+	alias SliderOrientation = Slider.Orientation, SliderType = Slider.Type; 
+	class Slider : Container
+	{
+		//Note: must be a Container because hitTest works on Containers only.
+		
+		//Todo: shift precise mode: must use float knob position to improve the precision
+		
+		enum Orientation { horz, vert, round, auto_} 
+		enum Type { slider, scrollBar} 
+		
+		Orientation orientation; 
+		Type type; 
+		RGB /+bkColor, <-already defined in Container+/clLine, clThumb, clRuler; 
+		float baseSize; //this is calculated from current fontHeight and theme.
+		float normThumbSize; //if it is a scrollbar, this is not nan and specifies the normalized size of the thumb.
+		//these are the derived sizes
+		float rulerOfs	()
+		{ return baseSize*0.5f; } 
+		float lwLine	()
+		{ return baseSize*(2.0f*InvDefaultFontHeight); } 
+		float lwRuler	()
+		{ return lwLine*0.5f; } 
+		
+		static isRound(in Orientation orientation)
+		=> orientation==Orientation.round; 
+		static isLinear(in Orientation orientation)
+		=> !!orientation.among(Orientation.horz, Orientation.vert); 
+		static getActualSliderOrientation(Orientation orientation, in bounds2 r, in Type type)
+		{
+			//scrollbar can only be horz or vert.
+			if(type==Type.scrollBar && !isLinear(orientation))
+			orientation = Orientation.auto_; 
+			
+			if(orientation != Orientation.auto_)
+			return orientation; 
+			//decide orientation by the shape
+			enum THRESHOLD = 1.5f; 
+			float aspect = safeDiv(r.width/r.height, 1); 
+			return aspect>=THRESHOLD	? Orientation.horz:
+			aspect<=(1/THRESHOLD)	? Orientation.vert:
+				Orientation.round; 
+		} 
+		
+		/// this is the half thickness of the thumb in the active direction
+		float calcLwThumb	(Orientation ori)
+		{
+			if(type == Type.scrollBar && !isnan(normThumbSize))
+			{
+				const minSizePixels = min(innerWidth, MinScrollThumbSize); 
+				return max((ori==Orientation.horz ? innerWidth : innerHeight) * normThumbSize.clamp(0, 1), minSizePixels) * .5f; 
+			}else
+			{ return baseSize*(1.0f/3); }
+		} 
+		
+		
+		int rulerDiv0 = 9, rulerDiv1 = 4; 
+		ubyte rulerSides=3; 
+		
+		float nPos, nCenter=0;  //center is the start of the marking on the line
+		int wrapCnt; //for endless, to see if there was a wrapping or not. Used to reconstruct actual value
+		
+		bounds2 hitBounds; 
+		
+		void setupAppearance(bool enabled, bool focused, float hover_smooth, float captured_smooth, float baseSize)
+		{
+			const hoverOrFocus = enabled ? max(hover_smooth*.5f, focused ? 1.0f : 0) : 0; 
+			
+			final switch(type)
+			{
+				case Type.slider: 
+					clThumb = mix(mix(clSliderThumb, clSliderThumbHover, hoverOrFocus), clSliderThumbPressed, captured_smooth); 
+					clLine = mix(mix(clSliderLine , clSliderLineHover , hoverOrFocus), clSliderLinePressed , captured_smooth); 
+					clRuler = clGray/+mix(bkColor, ts.fontColor, 0.5)+/; //disable ruler for now
+				
+					if(focused) { clThumb = clBlack; clLine = clBlack; }//Todo: lame logic
+				
+					rulerSides = 0; 
+				break; 
+				case Type.scrollBar: 
+					clThumb = mix(clScrollThumb, clScrollThumbPressed, hoverOrFocus); 
+					bkColor = mix(clScrollBk, clScrollThumb, min(hoverOrFocus, .5f)); 
+				
+					if(focused) { clThumb = clBlack; }//Todo: lame logic
+				
+					//clThumb = mix(clWinBtn, clWinBtnPressed, max(hit.hover_smooth*.5f, sliderState.pressed_id==id ? 1 : 0));
+					rulerSides = 0; 
+				break; 
+			}
+			
+			if(!enabled) clLine = clThumb = clGray; //Todo: nem clGray ez, hanem clDisabledText vagy ilyesmi
+			
+			this.baseSize = baseSize; 
+			if(!outerSize) outerSize = vec2(baseSize*6, baseSize); //default size
+		} 
+		
+		
+		override bounds2 getHitBounds()
+		{ return outerBounds; } 
+		
+		private void drawThumb(Drawing dr, vec2 a, vec2 t, float lwThumb)
+		{
+			final switch(type)
+			{
+				case Type.slider: 
+					dr.lineWidth = lwThumb; dr.color = clThumb; 
+					const t90 = t.rotate90; 
+					dr.line(a-t90, a+t90); 
+				break; 
+				case Type.scrollBar: 
+					dr.color = clThumb; 
+					const 	horz 	= orientation==Orientation.horz,
+					halfSize 	= horz ? vec2(lwThumb, innerHeight*.5f) : vec2(innerWidth*.5f, lwThumb),
+					bnd 	= bounds2(a, a).inflated(halfSize); 
+					dr.fillRect(bnd); 
+				break; 
+			}
+		} 
+		
+		private void drawLine(Drawing dr, vec2 a, vec2 b, RGB cl)
+		{ dr.lineWidth = lwLine; dr.color = cl; dr.line(a, b); } 
+		
+		
+		override void draw(Drawing dr)
+		{
+			dr.color = bkColor; dr.fillRect(borderBounds_inner); 
+			drawBorder(dr); 
+			
+			dr.alpha = 1; dr.lineStyle = LineStyle.normal; dr.arrowStyle = ArrowStyle.none; 
+			
+			auto b = innerBounds; 
+			const 	actOrientation = getActualSliderOrientation(orientation, b, type),
+				lwThumb = calcLwThumb(actOrientation); 
+			
+			if(isLinear(actOrientation))
+			{
+				const 	horz 	= actOrientation == Orientation.horz,
+					thumbOfs 	= (horz ? vec2(1,	0) : vec2(0, -1)) * lwThumb,
+					p0 	= (horz ? b.leftCenter	: b.bottomCenter) + thumbOfs,
+					p1 	= (horz ? b.rightCenter	: b.topCenter  ) - thumbOfs; 
+				
+				if(type==Type.slider && rulerSides)
+				{
+					const 	rp0 	= horz ? p0 : p1,
+						rp1 	= horz ? p1 : p0,
+						ro0 	= horz ? vec2(0, rulerOfs) : vec2(rulerOfs, 0),
+						ro1 	= ro0*.4f; 
+					if(rulerSides&1)
+					drawStraightRuler(dr, bounds2(rp0-ro0, rp1-ro1), rulerDiv0, rulerDiv1, true ); 
+					if(rulerSides&2)
+					drawStraightRuler(dr, bounds2(rp0+ro1, rp1+ro0), rulerDiv0, rulerDiv1, false); 
+				}
+				
+				if(type==Type.slider)
+				drawLine(dr, p0, p1, clLine); 
+				
+				if(!isnan(nPos))
+				{
+					auto p = mix(p0, p1, nPos); 
+					if(!isnan(nCenter) && type==Type.slider)
+					drawLine(dr, mix(p0, p1, nCenter), p, clThumb); 
+					
+					drawThumb(dr, p, thumbOfs, lwThumb); 
+					
+					if(im.sliderState.canCallAfterActiveSliderDraw(id, hitBounds))
+					{
+						vec2 thumbHalfSize; 
+						if(type==Type.slider) {
+							thumbHalfSize = lwThumb * vec2(0.5f, 1.5f); 
+							if(!horz)
+							swap(thumbHalfSize.x, thumbHalfSize.y); 
+						}
+						else { thumbHalfSize = ((horz)?(vec2(lwThumb, outerHeight*.5f)) :(vec2(outerWidth*.5f, lwThumb))); }
+						const thumbRect = bounds2(p, p).inflated(thumbHalfSize); 
+						
+						if(im.sliderState.canCallAfterActiveSliderDraw(id, hitBounds))
+						{
+							im.sliderState.afterActiveSliderDraw
+								(
+								id, actOrientation, dr.inputTransform(p0), 
+								dr.inputTransform(p1), dr.inputTransform(thumbRect)
+							); 
+						}
+					}
+				}
+				
+			}
+			else if(isRound(actOrientation))
+			{
+				//center square
+				bool endless = false; 
+				
+				b = b.fittingSquare; 
+				if(im.sliderState.canCallAfterActiveSliderDraw(id, hitBounds))
+				{
+					im.sliderState.afterActiveSliderDraw
+						(
+						id, actOrientation, dr.inputTransform(b.center), 
+						dr.inputTransform(b.center), dr.inputTransform(b)
+					); 
+				}
+				
+				auto c = b.center, r = b.width*0.4f; 
+				
+				if(rulerSides)
+				drawRoundRuler(dr, c, r, rulerDiv0, rulerDiv1, endless); 
+				r *= 0.8f; 
+				
+				float a0 = (endless ? 0 : 0.25f)*PIf; 
+				float a1 = (endless ? 2 : 1.75f)*PIf; 
+				
+				dr.lineWidth = lwLine; 
+				dr.color = clLine; 
+				dr.circle(c, r, a0, a1); 
+				
+				if(!isnan(nPos))
+				{
+					float n = 1-nPos; 
+					n = endless ? n.fract : n.clamp(0, 1);  //Todo: ezt megcsinalni a range-val
+					float a = mix(a0, a1, n); 
+					if(!endless && !isnan(nCenter))
+					{
+						float ac = mix(a0, a1, (1-nCenter).clamp(0, 1)); 
+						dr.color = clThumb; 
+						if(ac>=a)
+						dr.circle(c, r, a, ac); 
+						else dr.circle(c, r, ac, a); 
+					}
+					
+					dr.lineWidth = lwThumb; 
+					dr.color = clThumb; 
+					auto v = vec2(sin(a), cos(a)); 
+					dr.line(c, c+v*r); 
+				}
+			}
+			
+			drawDebug(dr); 
+		} 
+		//Draw Rulers
+		protected void drawStraightRuler(
+			Drawing dr, in bounds2 r, int cnt, 
+			int cnt2=-1, bool topleft=true
+		)
+		{
+			cnt--; 
+			if(cnt<=0) return; 
+			if(cnt2<0) cnt2 = cnt; 
+			dr.color = clRuler; dr.lineWidth = lwRuler; 
+			if(r.height < r.width)
+			{
+				float 	c 	= r.center.y,
+					b 	= r.top,
+					t 	= r.bottom,
+					j 	= r.left,
+					ja 	= r.width/cnt; 
+				if(!topleft) swap(b, t); 
+				foreach(i; 0..cnt+1)
+				{
+					dr.vLine(j, b, cnt2 && i%cnt2==0 ? t : c); 
+					j += ja; 
+				}
+			}else
+			{
+				float 	c 	= r.center.x,
+					b 	= r.left,
+					t 	= r.right,
+					j 	= r.top,
+					ja 	= r.height/cnt; 
+				if(!topleft) swap(b, t); 
+				foreach(i; 0..cnt+1)
+				{
+					dr.hLine(b, j, cnt2 && i%cnt2==0 ? t : c); 
+					j += ja; 
+				}
+			}
+		} 
+		
+		protected void drawRoundRuler(
+			Drawing dr, in vec2 center, float radius, 
+			int cnt, int cnt2=-1, bool endless=false
+		)
+		{
+			cnt--; 
+			if(cnt<=0) return; 
+			if(cnt2<0) cnt2 = cnt; 
+			//radius *= (1/1.25f);
+			dr.color = clRuler; dr.lineWidth = lwRuler; 
+			foreach(i; 0..cnt+1)
+			{
+				float a = endless 	? 2*PIf*i/cnt
+					: -0.25f*PIf + 1.5f*PIf*i/cnt; 
+				float co = -cos(a), si = -sin(a); 
+				dr.moveTo(center.x+co*radius, center.y+si*radius); 
+				float radius2 = radius*(
+					!endless && (cnt2 && i%cnt2==0) 
+					? 1.25f : 1.125f
+				); 
+				dr.lineTo(center.x+co*radius2, center.y+si*radius2); 
+			}
+		} 
+	} 
+	
+	private
+	{
+		auto extremeDateTime(int year)
+		=> RawDateTime(((year<2000)?(0):(ulong.max))); 
+		
+		struct YearMonthDay
+		{ ushort year; ubyte month, day; } 
+		
+		DateTime localDateTime_impl(in YearMonthDay dt)
+		=> DateTime(Local, dt.year, dt.month, dt.day).ifThrown(extremeDateTime(dt.year)); 
+		alias cachedLocalDateTime_impl = memoize!localDateTime_impl; 
+		/+Opt: This uses AssocArray so it is bad for the GC.+/
+		
+		DateTime cachedLocalDateTime(int year, int month=1, int day=1)
+		=> cachedLocalDateTime_impl(YearMonthDay((cast(ushort)(year)), (cast(ubyte)(month)), (cast(ubyte)(day)))); 
+		
+		ubyte dayOfWeek_impl(in YearMonthDay dt)
+		{
+			int y = dt.year, m = dt.month, d = dt.day; 
+			/+
+				Tomohiko Sakamoto's algorithm
+				Returns: 0=Sunday, 1=Monday, ..., 6=Saturday
+				Works for Gregorian calendar (after 1582)
+			+/
+			static immutable t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4]; 
+			if(m < 3) y -= 1; 
+			return (cast(ubyte)((y + y / 4 - y / 100 + y / 400 + t[m - 1] + d) % 7)); 
+		} 
+		alias cachedDayOfWeek_impl = memoize!dayOfWeek_impl; 
+		/+Opt: This uses AssocArray so it is bad for the GC.+/
+		
+		ubyte cachedDayOfWeek(int year, int month, int day)
+		=> cachedDayOfWeek_impl(YearMonthDay((cast(ushort)(year)), (cast(ubyte)(month)), (cast(ubyte)(day)))); 
+		
+		
+		T quantize(T)(T m, uint q=1)
+		=> ((q>1)?((cast(T)((double(m)).stdQuantize!floor(q)))):(m)); 
+		
+		string formatYMD(int y, int m, int d)
+		=> format!"%d %s %d"(y, MonthNames[m-1], d); 
+		/+format!"%d.%02d.%02d"(y, m, d)+/
+		
+		string formatH(int h)
+		=> format!"%02d:"(h); 
+		string formatHM(int h, int m)
+		=> format!"%02d:%02d"(h, m); 
+		string formatHMS(int h, int m, int s)
+		=> format!"%02d:%02d:%02d"(h, m, s); 
+		
+		enum FULL_YMD = 
+		q{((isFull)?(formatYMD(wYear, wMonth, wDay)~" "):(""))},
+		FULL_YMDHMS = 
+		q{
+			((isFull)?(
+				mixin(FULL_YMD) ~ 
+				formatHMS(wHour, wMinute, wSecond)~" "
+			):(""))
+		}; 
+		template YearIterator()
+		{
+			uint init(DateTime dt, uint yearStep)
+			{
+				const y = dt.localSystemTime_fullRange.wYear; 
+				return quantize(y, yearStep); 
+			} 
+			
+			void inc(ref uint y, uint yearStep)
+			{ y += yearStep; } 
+			
+			DateTime dt(uint y)
+			=> cachedLocalDateTime(y); 
+			
+			bool isRed(uint y) => false; 
+			string str(uint y, uint yearStep, bool isFull)
+			=> y.text; 
+		} 
+		
+		template YearMonthIterator()
+		{
+			uint init(DateTime dt, uint monthStep)
+			{
+				const 	st = dt.localSystemTime_fullRange,
+					y = st.wYear,  m = st.wMonth-1; 
+				return y*12 + quantize(m, monthStep); 
+			} 
+			
+			enum decodeYM = q{const y = ym/12, m = (ym%12)+1; }; 
+			
+			void inc(ref uint ym, uint monthStep)
+			{ ym += monthStep; } 
+			
+			DateTime dt(uint ym)
+			{ mixin(decodeYM); return cachedLocalDateTime(y, m); } 
+			
+			bool isRed(uint ym) => false; 
+			string str(uint ym, uint monthStep, bool isFull)
+			{
+				mixin(decodeYM); 
+				return y.text~monthStep.predSwitch
+				(
+					3, format!" Q%d"((m-1)/3+1),
+					6, format!" H%d"((m-1)/6+1),
+					/+format!".%02d"(m)+/
+					' '~MonthNames[m-1]
+				); 
+			} 
+		} 
+		
+		__gshared DayQuantizeBug=false; 
+		
+		template YearMonthDayIterator()
+		{
+			uint init(DateTime dt, uint dayStep)
+			{
+				const 	st = dt.localSystemTime_fullRange,
+					y = st.wYear,  m = st.wMonth, d = st.wDay; 
+				
+				version(/+$DIDE_REGION Apply human quantization "logic"+/all)
+				{
+					int dq = ((dayStep<5)?(quantize(d-1, dayStep)+1) :(quantize(d, dayStep).max(1))); 
+					if(dq>=((m==2)?(28):(30))) dq -= dayStep; 
+				}
+				
+				return (y*16 + m-1/+0based!+/)*32 + dq; 
+			} 
+			
+			enum decodeYMD = q{
+				uint 	ym 	= ymd / 32, 	d 	= ymd % 32,
+					y 	= ym / 16, 	m 	= ym % 16 + 1; 
+			}; 
+			
+			void inc(ref uint ymd, uint dayStep)
+			{
+				mixin(decodeYMD); 
+				int daysInMonth_fast() 
+				=> monthDays[m-1];  int daysInMonth_precise() 
+				=> daysInMonth_fast + (cast(uint)((m==2 && isLeapYear(y)))); 
+				
+				void nextMonth() { if(m>=12)	{ y++; m=1; }	else	m++; d=1; } 
+				
+				switch(dayStep)
+				{
+					case 1: 	{ d+=dayStep; if(d>daysInMonth_precise) nextMonth; }	break; 
+					case 2: 	{ d+=dayStep; if((m==2 && d>27) || d>29) nextMonth; }	break; 
+					case 3: 	{ d+=dayStep; if((m==2 && d>25) || d>28) nextMonth; }	break; 
+					default: 	{ d = ((d==1)?(0):(d))+dayStep; if(d>25) nextMonth; }	break; 
+				}
+				
+				ymd = (y*16 + m-1)*32 + d; 
+			} 
+			
+			DateTime dt(uint ymd)
+			{ mixin(decodeYMD); return cachedLocalDateTime(y, m, d); } 
+			
+			bool isRed(uint ymd)
+			{ mixin(decodeYMD); return !!cachedDayOfWeek(y, m, d).among(0, 6); } 
+			string str(uint ymd, uint dayStep, bool isFull)
+			{ mixin(decodeYMD); return formatYMD(y, m, d); } 
+		} 
+		template HourIterator()
+		{
+			enum unit = DateTime.RawUnit.hour; 
+			
+			void adjust(ref long raw, uint hourStep)
+			{
+				if(raw<=hourStep || hourStep<=1) return; 
+				
+				foreach(i; 0..hourStep-1)
+				{
+					const h = dt(raw).localSystemTime.wHour; 
+					if(h%hourStep==0) break; 
+					raw++; 
+				}
+			} 
+			
+			long init(DateTime dt, uint hourStep)
+			{
+				long raw = dt.raw / unit; 
+				raw -= hourStep-1; 
+				adjust(raw, hourStep); return raw; 
+			} 
+			
+			void inc(ref long raw, uint hourStep)
+			{
+				raw += hourStep; 
+				adjust(raw, hourStep); 
+			} 
+			
+			DateTime dt(long raw)
+			{
+				if(raw<=0) return RawDateTime(0); 
+				if(raw>=ulong.max/unit) return RawDateTime(ulong.max); 
+				return RawDateTime((cast(ulong)(raw)) * unit); 
+			} 
+			
+			bool isRed(long raw) => false; 
+			string str(long raw, uint minuteStep, bool isFull)
+			{
+				with(dt(raw).localSystemTime)
+				return mixin(FULL_YMD)~formatH(wHour); 
+			} 
+		} 
+		
+		template HourMinuteIterator()
+		{
+			enum unit = DateTime.RawUnit.min; 
+			
+			long init(DateTime dt, uint minuteStep)
+			{
+				long raw = dt.raw / unit; 
+				if(minuteStep>1) raw -= raw.modw(minuteStep); return raw; 
+			} 
+			
+			void inc(ref long raw, uint minuteStep)
+			{ raw += minuteStep; } 
+			
+			DateTime dt(long raw)
+			{
+				if(raw>=ulong.max/unit) return RawDateTime(ulong.max); 
+				return RawDateTime((cast(ulong)(raw))*unit); 
+			} 
+			
+			bool isRed(long raw) => false; 
+			string str(long raw, uint minuteStep, bool isFull)
+			{
+				with(dt(raw).localSystemTime)
+				return mixin(FULL_YMD)~formatHM(wHour, wMinute); 
+			} 
+		} 
+		
+		template HourMinuteSecondIterator()
+		{
+			enum unit = DateTime.RawUnit.sec; 
+			
+			long init(DateTime dt, uint secondStep)
+			{
+				long raw = dt.raw / unit; 
+				if(secondStep>1) raw -= raw.modw(secondStep); return raw; 
+			} 
+			
+			void inc(ref long raw, uint secondStep)
+			{ raw += secondStep; } 
+			
+			DateTime dt(long raw)
+			{
+				if(raw>=ulong.max/unit) return RawDateTime(ulong.max); 
+				return RawDateTime((cast(ulong)(raw))*unit); 
+			} 
+			
+			bool isRed(long raw) => false; 
+			string str(long raw, uint secondStep, bool isFull)
+			{
+				with(dt(raw).localSystemTime)
+				return mixin(FULL_YMD)~
+				formatHMS(wHour, wMinute, wSecond); 
+			} 
+		} 
+		
+		template ThousandIterator(string unitStr, ulong unit1000)
+		{
+			enum unit = unit1000/1000.0f; 
+			
+			struct State { ulong base; uint counter; } 
+			
+			State init(DateTime dt, uint thousandStep)
+			{
+				ulong m = dt.raw % unit1000; 
+				int fr = (ifloor(m / unit)).clamp(0, 999); 
+				fr -= fr % thousandStep; 
+				return State(dt.raw - m, fr); 
+			} 
+			
+			void inc(ref State st, uint thousandStep)
+			{
+				void doit()
+				{
+					with(st) {
+						counter += thousandStep; 
+						if(counter>=1000)
+						{
+							counter = 0; 
+							const next = base+unit1000; 
+							base = next>=base ? next : ulong.max; 
+						}
+					}
+				} 
+				enum mustFixRoundingErrors = unit<10; 
+				static if(mustFixRoundingErrors)
+				{
+					/+
+						repeat the increment operation if the raw DateTime 
+						was not changed.
+					+/
+					const prev = dt(st); 
+					doit; if(prev==dt(st)) doit; 
+				}
+				else { doit; /+It has enough precision, just do it once.+/}
+			} 
+			
+			DateTime dt(in State st)
+			{
+				with(st) {
+					const ulong cur = base + (iround(counter * unit)); 
+					return RawDateTime(cur>=base ? cur : ulong.max); 
+				}
+			} 
+			
+			bool isRed(in State st) => false; 
+			string str(in State st, uint thousandStep, bool isFull)
+			{
+				string s; 
+				if(isFull)
+				with(st.base.RawDateTime.localSystemTime)
+				{
+					s = mixin(FULL_YMDHMS); 
+					if(unit1000<=DateTime.RawUnit.ms)
+					{
+						s ~= (st.base/DateTime.RawUnit.ms%1000).text~"ms "; 
+						if(unit1000<=DateTime.RawUnit.us)
+						{ s ~= (st.base/DateTime.RawUnit.us%1000).text~"µs "; }
+					}
+				}
+				return s ~ st.counter.text ~ unitStr; 
+			} 
+		} 
+		alias MilliSecIterator 	= ThousandIterator!("ms", DateTime.RawUnit.sec),
+		MicroSecIterator 	= ThousandIterator!("µs", DateTime.RawUnit.ms),
+		NanoSecIterator 	= ThousandIterator!("ns", DateTime.RawUnit.us); 
+		
+		mixin((
+			(表([
+				[q{/+Note: DateTimeGranularity : ubyte+/},q{/+Note: Iterator#+/},q{/+Note: Steps+/},q{/+Note: AvgTime+/},q{/+Note: NumChars+/},q{/+Note: FullChars+/}],
+				[q{none},q{},q{[]},q{0*second},q{1},q{0}],
+				[q{year},q{YearIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500, 1000]},q{gregorianDaysInYear*day},q{5},q{0}],
+				[q{month},q{YearMonthIterator},q{[1, 2, 3, 6]},q{gregorianDaysInMonth*day},q{9},q{0}],
+				[q{day},q{YearMonthDayIterator},q{[1, 2, 3, 5, 10, 15]},q{day},q{15},q{3}],
+				[q{hour},q{HourIterator},q{[1, 2, 3, 6, 12]},q{hour},q{4},q{0}],
+				[q{minute},q{HourMinuteIterator},q{[1, 2, 5, 10, 15, 30]},q{minute},q{6},q{0}],
+				[q{second},q{HourMinuteSecondIterator},q{[1, 2, 5, 10, 15, 30]},q{second},q{9},q{22}],
+				[q{milliSecond},q{MilliSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{milli(second)},q{6},q{33}],
+				[q{microSecond},q{MicroSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{micro(second)},q{6},q{42}],
+				[q{nanoSecond},q{NanoSecIterator},q{[1, 2, 5, 10, 20, 50, 100, 200, 500]},q{nano(second)},q{6},q{0}],
+				[q{yearWeek},q{},q{[1, 2, 4, 8, 12, 21]},q{7*day},q{4},q{0}],
+				[q{yearWeek_iso},q{},q{[1, 2, 4, 8, 12, 21]},q{7*day},q{4},q{0}],
+				[q{yearDay},q{},q{[1, 2, 3, 7, 14, 28, 56, 91, 182]},q{day},q{4},q{0}],
+			]))
+		).調!(GEN_enumTable)); 
+		
+		struct DateTimeGranularities
+		{
+			private alias _ = DateTimeGranularity; 
+			static immutable
+				yearMonthDay 	= [_.year, _.month, _.day],
+				yearWeek 	= [_.year, _.yearWeek],
+				yearWeek_iso 	= [_.year, _.yearWeek_iso],
+				yearDay 	= [_.year, _.yearDay],
+					
+				hourMin	= [_.hour, _.minute],
+				hourMinSec	= hourMin ~ _.second,
+					
+				subSecond	= [_.milliSecond, _.microSecond, _.nanoSecond],
+					
+				full	= yearMonthDay 	~ hourMinSec ~ subSecond,
+				full_weeks	= yearWeek 	~ hourMinSec ~ subSecond,
+				full_isoWeeks	= yearWeek_iso 	~ hourMinSec ~ subSecond; 
+		} 
+		
+		DateTimeGranularity successorOf(DateTimeGranularity g)
+		{
+			with(DateTimeGranularity)
+			{
+				static immutable sequence = [year, month, day, hour, minute, second, milliSecond, microSecond, nanoSecond]; 
+				const idx = sequence.countUntil(g); 
+				if(mixin(界1(q{0},q{idx+1},q{sequence.length}))) return sequence[idx+1]; 
+				return DateTimeGranularity.none; 
+			}
+		} 
+		
+		struct DateTimeGranularityStep
+		{
+			DateTimeGranularity granularity; 
+			ubyte tickLevel; 
+			ushort step; 
+			
+			bool valid()const => granularity&&step; 
+			bool opCast(B: bool)()const => valid; 
+			
+			bool isTick()const => !!tickLevel; 
+		} 
+		
+		DateTimeGranularityStep[] selectTickGranularities(in DateTimeGranularityStep a)
+		{
+			alias G = DateTimeGranularity, GS = DateTimeGranularityStep; 
+			auto level1(int l)
+			=> [GS(a.granularity, 1, (cast(ushort)(l)))]; 
+			
+			auto level2(int l1, int l2)
+			=> [
+				GS(a.granularity, 2, (cast(ushort)(l1))),
+				GS(a.granularity, 1, (cast(ushort)(l2)))
+			]; 
+			
+			auto level2succ(int l1, int l2)
+			=> [
+				GS(a.granularity          , 2, (cast(ushort)(l1))),
+				GS(a.granularity.successorOf, 1, (cast(ushort)(l2)))
+			]; 
+			
+			auto level2succ2(int l1, int l2)
+			=> [
+				GS(a.granularity.successorOf, 2, (cast(ushort)(l1))),
+				GS(a.granularity.successorOf, 1, (cast(ushort)(l2)))
+			]; 
+			
+			if(a.step<=0) return []; 
+			
+			if(a.step==1000) return level2(500, 100); 
+			if(a.step==500) return level2(100, 50); 
+			if(a.step==200) return level2(100, 20); 
+			if(a.step==100) return level2(50, 10); 
+			if(a.step==50) return level2(10, 5); 
+			if(a.step==20) return level2(10, 2); 
+			if(a.step==30) return level1(10); 
+			if(a.step==15) return level2(5, 1); 
+			if(a.step==12) return level2(6, 1); 
+			if(a.step==10) return level2(5, 1); 
+			if(a.step==8) return level2(4, 1); 
+			if(a.step==5)
+			{
+				if(a.granularity==G.year) return level2succ(1, 6/+month+/); 
+				if(a.granularity==G.day) return level2succ(1, 12/+hour+/); 
+				if(a.granularity==G.minute) return level2succ(1, 30/+second+/); 
+				if(mixin(界3(q{G.second},q{a.granularity},q{G.nanoSecond})))
+				return level2succ(1, 500/+thousandth+/); 
+			}
+			if(a.step==2)
+			{
+				if(a.granularity==G.year) return level2succ(1, 3/+month+/); 
+				if(a.granularity==G.day) return level2succ(1, 6/+hour+/); 
+				if(a.granularity==G.minute) return level2succ(1, 15/+second+/); 
+				if(mixin(界3(q{G.second},q{a.granularity},q{G.nanoSecond})))
+				return level2succ(1, 200/+thousandth+/); 
+			}
+			if(a.step==1)
+			{
+				if(a.granularity==G.year) return level2succ2(3, 1/+month+/); 
+				if(a.granularity==G.day) return level2succ2(6, 2/+hour+/); 
+				if(a.granularity==G.hour) return level2succ2(30, 10/+minute+/); 
+				if(a.granularity==G.minute) return level2succ2(30, 10/+second+/); 
+				if(mixin(界3(q{G.second},q{a.granularity},q{G.nanoSecond})))
+				return level2succ2(500, 100/+thousandth+/); 
+			}
+			if(mixin(界0(q{1},q{a.step},q{10}))) return level1(1); 
+			return []; 
+		} 
+		
+		
+		struct DateTimeIteratedRange
+		{
+			DateTime t0, t1; 
+			float p0=0, p1=0; 
+			uint idx; 
+			DateTimeGranularityStep granularityStep; 
+			ref granularity() => granularityStep.granularity; 
+			ref step() => granularityStep.step; 
+			ref tickLevel() => granularityStep.tickLevel; 
+			
+			//only if tickLevel!=0
+			bool isRed; string label; 
+		} 
+		
+		void iterateLocalDateTimeRanges(
+			DateTime start, DateTime end, 
+			float left, float right, float avgCharWidth,
+			in DateTimeGranularity[] granularities,
+			void delegate(ref DateTimeIteratedRange) onLabel, 
+			void delegate(ref DateTimeIteratedRange) onTick=null,
+			bool fullLabel = false
+		)
+		{
+			if(start>=end) return; 
+			if(left>=right) return; 
+			
+			DateTimeIteratedRange state; 
+			
+			const Time 	fullSpan 	= end - start,
+				charTime 	= ((fullSpan * avgCharWidth)/(right - left)); 
+			
+			const trScale = ((right - left)/((float(end.raw - start.raw)))); 
+			float tr(DateTime dt)
+			=> ((dt.raw>=start.raw)?( (float(dt.raw - start.raw)) * trScale) :(-(float(start.raw - dt.raw)) * trScale)) + left; 
+			
+			float avgSize=0; 
+			findGranularity: 
+			foreach(gr; granularities.retro)
+			{
+				const avgTime = dateTimeGranularityAvgTime[gr]; 
+				const numChars = 	dateTimeGranularityNumChars[gr] +
+					((fullLabel)?(dateTimeGranularityFullChars[gr]):(0)); 
+				const float target = numChars * ((charTime)/(avgTime)); 
+				foreach(step; dateTimeGranularitySteps[gr])
+				{
+					if(target < step) {
+						state.granularity 	= gr, 
+						state.step 	= step.to!ushort; 
+						avgSize = step * avgTime.value(second) * 
+							DateTime.RawUnit.sec * trScale; 
+						break findGranularity; 
+					}
+				}
+			}
+			
+			void doit()
+			{
+				if(!state.step) return; 
+				//print(start, end, state.granularity, state.step); ulong COUNT; 
+				
+				void iterate(alias Iterator)()
+				{
+					static if(__traits(compiles, &Iterator.inc))
+					alias ITER = Iterator; else alias ITER = Iterator!(); 
+					with(ITER)
+					with(state)
+					{
+						version(/+$DIDE_REGION Fetch first boundary+/all)
+						{ auto iState = init(start, step); t0 = dt(iState); p0 = tr(t0); }
+						
+						idx = 0; 
+						while(t0<end)
+						{
+							if(tickLevel==0) {
+								label = str(iState, step, fullLabel); 
+								state.isRed = ITER.isRed(iState); 
+							}
+							
+							version(/+$DIDE_REGION Fetch second boundary+/all)
+							{ inc(iState, step); t1 = dt(iState); p1 = tr(t1); }
+							
+							if(idx==0)	{
+								if(t0.raw==0)
+								p0.minimize(p1-avgSize); 
+							}
+							else	{
+								if(t1.raw==ulong.max)
+								p1.maximize(p0+avgSize); 
+							}
+							
+							if(tickLevel==0) onLabel(state); else onTick(state); 
+							
+							version(/+$DIDE_REGION Shift+/all)
+							{ t0 = t1, p0 = p1; }idx++; 
+						}
+					}
+				} 
+				
+				sw: final switch(state.granularity)
+				{
+					static foreach(g; EnumMembers!DateTimeGranularity)
+					{
+						case g: 
+						static if(dateTimeGranularityIterator[g]!="")
+						mixin(iq{iterate!$(dateTimeGranularityIterator[g]); }.text); 
+						break sw; 
+					}
+				}
+			} 
+			
+			if(state.step)
+			{
+				doit; DayQuantizeBug=false; 
+				
+				if(onTick !is null)
+				{
+					foreach(gs; state.granularityStep.selectTickGranularities)
+					if(gs) { state.granularityStep = gs; doit; }
+				}
+			}
+		} 
+		
+		void dumpIteratorStats(alias Iterator)(int[] steps)
+		{
+			static if(__traits(compiles, &Iterator.inc))
+			alias ITER = Iterator; else alias ITER = Iterator!(); 
+			print("DateTime Iterator statistics for:", ITER.stringof); 
+			foreach(step; steps)
+			{
+				print("Step:", step); 
+				auto state = ITER.init(RawDateTime(0), step); 
+				DateTime prev; 
+				size_t[ulong] diffHist; 
+				foreach(i; 0..int.max)
+				{
+					const act = ITER.dt(state); 
+					const ulong diff = act.raw-prev.raw; 
+					
+					if(i>0) diffHist[diff]++; 
+					if(0)
+					print(
+						i.format!"%6d", state, ITER.str(state, step, isFull:false), 
+						format!"%12.2f"((double(act.raw))/DateTime.RawUnit.day), 
+						format!"%12.2f"((double(diff))/DateTime.RawUnit.day), 
+						act.raw.format!"%016X", 
+						(diff).format!"%16X", 
+						ITER.dt(state).utcText
+					); 
+					
+					ITER.inc(state, step); 
+					if(act.raw==ulong.max) break; 
+					prev = act; 
+				}
+				foreach(k; diffHist.keys.sort)
+				print(
+					diffHist[k].format!"%9d *", k.format!"%16X", 
+					((double(k))/DateTime.RawUnit.day).format!"%18.12f"
+				); 
+				print; 
+			}
+			print; 
+		} 
+		
+		void dumpDateTimeIteratorStats()
+		{
+			dumpIteratorStats!YearMonthDayIterator([1, 2, 3, 5, 10, 15]); 
+			dumpIteratorStats!HourIterator([1, 2, 3, 4, 6, 8]); 
+		} 
+		
+		struct HRulerLayout
+		{
+			DateTimeGranularityStep gr; 
+			
+			float p0, p1, avgCharWidth; 
+			DateTime t0, t1; 
+			
+			bool opEquals(const ref HRulerLayout b) const 
+			=> gr.granularity==b.gr.granularity && gr.step==b.gr.step
+			
+			/+Screen coords match loosely.+/
+			&& isClose(p0, b.p0) && isClose(p1, b.p1) 
+			&& avgCharWidth.isClose(b.avgCharWidth)
+			
+			/+Time points match exactly+/
+			&& t0==b.t0 && t1==b.t1; 
+			
+			size_t toHash() const
+			{
+				auto h = hashOf((cast(int)(gr.granularity)) | gr.step<<8); 
+				h = p0.hashOf(p1.hashOf(avgCharWidth.hashOf(h))); 
+				return t0.hashOf(t1.hashOf(h)); 
+			} 
+			
+			bool valid()const => gr.valid && t1>t0 && p1>p0 && avgCharWidth!=0; 
+			bool opCast(B: bool)()const => valid; 
+			
+			string[] labels; bool[] isRed; 
+			float[] p; DateTime[] t; 
+			
+			struct Tick { align(1): float p; ubyte level; } 
+			Tick[] ticks; 
+		} 
+		
+		
+		HRulerLayout generateHRulerLayout
+			(
+			bounds2 bnd, DateTime start, DateTime end, 
+			in DateTimeGranularity[] granularities = DateTimeGranularities.full,
+			bool fullLabel
+		)
+		{
+			HRulerLayout res; 
+			if(start>=end || bnd.empty) return res; 
+			const float 	h = bnd.height, fh = h*(16.0f/24), 	//fontHeight
+				avgCharWidth = fh * 9.0f/16; 
+			
+			res.p0 = bnd.left, res.p1 = bnd.right, res.avgCharWidth = avgCharWidth, 
+			res.t0 = start, res.t1 = end; 
+			
+			iterateLocalDateTimeRanges
+			(
+				start, end, bnd.left, bnd.right, avgCharWidth, granularities, 
+				((a){
+					if(a.idx==0) {
+						res.gr = a.granularityStep; 
+						res.p ~= a.p0, res.t ~= a.t0; 
+					}
+					
+					res.labels ~= a.label, res.isRed ~= a.isRed; 
+					res.p ~= a.p1, res.t ~= a.t1; 
+				}),
+				((a){ res.ticks ~= HRulerLayout.Tick(a.p1, a.tickLevel); }),
+				fullLabel : fullLabel
+			); 
+			
+			return res; 
+		} 
+		
+		void drawHRuler(IDrawing dr, bounds2 bnd, const ref HRulerLayout ruler, bool isFine)
+		{
+			enum lineWidthScale	= 1.05f,
+			clMajorTick 	= (RGB(0x101010)),
+			clMinorTick 	= (RGB(0x202020)),
+			clText 	= (RGB(0x000000)),
+			clRedText 	= (RGB(0x0000FF)),
+			clBackground	= (RGB(0xFFFFFF)); 
+			
+			if(bnd.empty) return; 
+			const float 	h = bnd.height,
+				defH = ((isFine)?(24):(16)),
+				lw = h/defH, 	//lineWidth;
+				fh = h*(16.0f/defH), 	//fontHeight
+				th = h/6	/+tickHeigh+/; 
+			
+			dr.lineWidth = lw * lineWidthScale, dr.fontHeight = fh; 
+			dr.color = clBackground; dr.fillRect(bnd); 
+			
+			if(!ruler.valid) return; 
+			
+			void drawTick(float x, int size/+1..6+/)
+			{ dr.vLine(x, bnd.bottom-size.predSwitch(2, 2.5f, size)*th, bnd.bottom); } 
+			
+			if(isFine)
+			{ dr.color = clMinorTick; foreach(t; ruler.ticks) drawTick(t.p, t.level); }
+			dr.color = clMajorTick; foreach(x; ruler.p) drawTick(x, 6); 
+			
+			dr.color = clText; bool lastIsRed = false; 
+			void drawLabel(bool isRed, float x, string str)
+			{
+				if(lastIsRed.chkSet(isRed))
+				dr.color = ((isRed)?(clRedText):(clText)); 
+				dr.textOut(vec2(x, bnd.top), str); 
+			} 
+			
+			const pad = lw*3, N = ruler.labels.length; 
+			if(N>=3)
+			{
+				foreach(i, s; ruler.labels)
+				{ drawLabel(ruler.isRed[i], ruler.p[i] + pad, s); }
+			}
+			else if(N==2)
+			{
+				const 	s = ruler.labels[0], tw = dr.textWidth(s),
+					x = min(bnd.left+pad, ruler.p[1] - pad - tw); 
+				drawLabel(ruler.isRed[0], x, s); 
+				drawLabel(ruler.isRed[1], ruler.p[1] + pad, ruler.labels[1]); 
+			}
+			else if(N==1)
+			{
+				const 	s = ruler.labels[0],
+					x = bnd.left + pad; 
+				drawLabel(ruler.isRed[0], x, s); 
+			}
+		} 
+		
+		//returns true it the top rows is filled
+		bool drawHRuler(
+			IDrawing dr, bounds2 bnd, DateTime start, DateTime end,
+			
+			bool shiftUpwards = false
+			/+If there is no coarse text, if goes up 1 fh+/
+		)
+		{
+			const fh = bnd.height * (2.0f/5); 
+			bounds2 coarseBnd = bnd, fineBnd = bnd; 
+			coarseBnd.bottom = fineBnd.top = bnd.top + fh; 
+			
+			alias G = DateTimeGranularity, GS = DateTimeGranularities; 
+			static immutable granularitySets = 
+				[
+				GS.yearMonthDay, GS.hourMinSec, 
+				[G.milliSecond], [G.microSecond], [G.nanoSecond]
+			]; 
+			
+			HRulerLayout fineLayout, coarseLayout; 
+			foreach_reverse(gsIdx; 0..granularitySets.length)
+			{
+				DayQuantizeBug = true; 
+				fineLayout = generateHRulerLayout
+					(
+					fineBnd, start, end, 
+					granularitySets[gsIdx], fullLabel: false
+				); 
+				if(fineLayout)
+				{
+					if(gsIdx>0)
+					{
+						coarseLayout = generateHRulerLayout
+							(
+							coarseBnd, start, end, 
+							granularitySets[gsIdx-1], fullLabel: true
+						); 
+					}
+					break; 
+				}
+			}
+			
+			const hasCoarse = !!coarseLayout; 
+			if(shiftUpwards && !hasCoarse) {
+				coarseBnd 	-= vec2(0, fh),
+				fineBnd 	-= vec2(0, fh); 
+			}
+			
+			drawHRuler(dr, coarseBnd, coarseLayout, isFine: false); 
+			drawHRuler(dr, fineBnd, fineLayout, isFine: true); 
+			
+			return hasCoarse; 
+		} 
+	} 
+	class DateTimeRuler : Container
+	{
+		//Note: must be a Container because hitTest works on Containers only.
+		
+		RGB clText, clRedText, clMajorTick, clMinorTick; 
+		DateTime tMin, tMax, t0, t1, t0_draw, t1_draw; 
+		bounds2 hitBounds; 
+		
+		bool mouseAtTopHalf; 
+		@property mouseAtBottomHalf() => !mouseAtTopHalf; 
+		
+		bool focused; float hoverOrFocus=0; 
+		
+		DateTime highlighted_t; 
+		bool show_highlighted_t; 
+		
+		void sanitizeRanges()
+		{
+			//both ranges must be always valid
+			if(tMax<=tMin)
+			{
+				tMax = tMin; 
+				if(tMin.raw==ulong.max) tMin.raw--; 
+				tMax.raw = tMin.raw+1; 
+			}
+			t0 = t0.clamp(tMin, tMax); 
+			t1 = t1.clamp(t0, tMax); 
+			if(t0==t1)
+			{ if(t0==tMax) t0.raw--; else t1.raw++; }
+		} 
+		
+		static struct NormalizedSliderData
+		{
+			ulong w, w_outer; 
+			float nPos; 
+			float pageSize; 
+			ValueRange rng; 
+			
+			int wrapCnt; 
+			
+			bool changed_kb, changed_m; 
+			
+			this(
+				DateTime tMin, DateTime tMax, 
+				DateTime t0, DateTime t1
+			)
+			{
+				w = t1.raw - t0.raw; 
+				w_outer = tMax.raw - tMin.raw; 
+				
+				nPos = (((float(t0.raw - tMin.raw)))/(w_outer - w)); 
+				pageSize = (((float(w)))/(w_outer)); 
+				rng = ValueRange(0, 1, pageSize / 8); 
+			} 
+			
+			bool handleKeyboard()
+			{
+				const b = im.sliderState.handleKeyboard(nPos, rng, pageSize); 
+				if(b) changed_kb = true; return b; 
+			} 
+			
+			bool handleMouse(in im.Id id, in im.HitInfo hit, in vec2 mousePos)
+			{
+				const b = im.sliderState.handleMouse	(
+					id, hit, nPos, mousePos,
+					rng, wrapCnt
+				); 
+				if(b) changed_m = true; return b; 
+			} 
+			
+			@property changed() => changed_kb || changed_m; 
+		} 
+		
+		auto getNormalizedSliderData()
+		=> NormalizedSliderData(tMin, tMax, t0, t1); 
+		
+		bool jumpTo(float nPos)
+		{
+			if(nPos.isnan) return false; nPos = nPos.clamp(0, 1); 
+			const 	w 	= t1.raw 	- t0.raw,
+				w_outer 	= tMax.raw 	- tMin.raw; 
+			const t0_prev = t0, t1_prev = t1; 
+			t0 = tMin .shift(w_outer - w, nPos, tMin, tMax), 
+			t1 = t0   .shift(w, 1, tMin, tMax); 
+			sanitizeRanges; return (t0!=t0_prev) || (t1!=t1_prev); 
+		} 
+		
+		bool scrollByTime(DateTime startT0, Time Δt)
+		{
+			const len = t1.raw - t0.raw; const t0_prev = t0, t1_prev = t1; 
+			t0 = startT0             .scroll(Δt, tMin.raw, tMax.raw-len),
+			t1 = startT0.add_raw(len).scroll(Δt, tMin.raw+len, tMax.raw); 
+			sanitizeRanges; return (t0!=t0_prev) || (t1!=t1_prev); 
+		} 
+		
+		bool zoomAround(DateTime center, float amount)
+		{
+			if(amount.isnan || !amount) return false; 
+			
+			float sc = 1 + inputs.MW.delta.abs * .25; 
+			if(inputs.MW.delta>0) sc = 1/sc; 
+			
+			bool tryZoom()
+			{
+				auto calcLen() => t1.raw-t0.raw; 
+				const len = calcLen; 
+				t0 = t0.scale(center, sc, tMin, tMax); 
+				t1 = t1.scale(center, sc, tMin, tMax); 
+				sanitizeRanges; 
+				return len!=calcLen; 
+			} 
+			
+			if(!tryZoom)
+			{
+				if(sc>1/+zoom out attempt failed?+/)
+				{
+					sc = 2/+increase coom out amount+/; 
+					if(!tryZoom)
+					{
+						/+
+							Maybe it is next to tMax, then 
+							zoom away from t1.
+						+/
+						center = t1; 
+						if(!tryZoom)
+						{
+							t0 = tMin, t1 = tMax; 
+							/+return home as a last resort.+/
+						}
+					}
+				}
+			}
+			
+			return true; 
+		} 
+		/+Note: Step 1.+/
+		void setup(
+			const 	DateTime tMin_, 	const 	DateTime tMax_, 
+			ref 	DateTime t0_, 	ref 	DateTime t1_, 
+			vec2 mousePos, ref im.HitInfo hit
+		)
+		{
+			tMin 	= tMin_,
+			tMax 	= tMax_,
+			t0 	= t0_,
+			t1 	= t1_; 
+			sanitizeRanges; 
+			
+			hitBounds = hit.hitBounds; 
+			
+			mouseAtTopHalf = !hitBounds || mousePos.y < hitBounds.center.y; 
+			
+			const 	norm_mouseX 	= ((
+				hitBounds && 
+				hitBounds.width
+			)?(((mousePos.x-hitBounds.left)/(hitBounds.width))):(0)),
+				t_hovered_top 	= tMin.shift(tMax.raw-tMin.raw, norm_mouseX, tMin, tMax),
+				t_hovered_bottom 	= t0.shift(t1.raw-t0.raw, norm_mouseX, tMin, tMax); 
+			
+			show_highlighted_t = mouseAtBottomHalf; 
+			highlighted_t = t_hovered_bottom; 
+		} 
+		
+		/+Note: Step 2.+/
+		void perform(
+			bool focused_, const ref TextStyle ts, vec2 mousePos, const ref im.HitInfo hit,
+			ref bool userModified, ref 	DateTime t0_, 	ref 	DateTime t1_
+		)
+		{
+			this.focused = focused_; 
+			ref rss = im.dateTimeRulerScrollState; 
+			
+			if(focused && im.canProcessUserInput)
+			{
+				//mouse and kbd handling on the top half as a scrollbar slider
+				{
+					auto nsd = getNormalizedSliderData; 
+					
+					nsd.handleKeyboard; 
+					
+					if(hit.pressed && mouseAtBottomHalf)
+					{/+beep; +//+left button pressed at highlighted_t+/}
+					else { nsd.handleMouse(id, hit, mousePos); }
+					
+					if(nsd.changed)
+					{ if(jumpTo(nsd.nPos)) userModified = true; }
+				}
+				
+				//Zooming
+				if(hitBounds && mouseAtBottomHalf && inputs.MW.delta)
+				{
+					if(zoomAround(highlighted_t, inputs.MW.delta))
+					userModified = true; 
+				}
+				
+				//Scrolling
+				{
+					if(hitBounds && mouseAtBottomHalf && inputs.MMB.pressed)
+					{ rss.startScroll(mousePos, t0, t1); }
+					
+					if(hitBounds && rss.scrolling)
+					{
+						//It can be only measured inside the hitbox.
+						rss.updateScroll((t1-t0)/hitBounds.width); 
+					}
+					
+					if(rss.scrolling)
+					{
+						if(
+							scrollByTime(
+								rss.startT0,
+								rss.currentDelta(mousePos)
+							)
+						)
+						userModified = true; 
+					}
+				}
+			}
+			
+			if(!focused || !inputs.MMB.down) rss.scrolling = false; 
+			
+			bkColor = ts.bkColor; 
+			clText = ts.fontColor; 
+			
+			hoverOrFocus = hit.enabled ? max(hit.hover_smooth*.33f, focused ? 1.0f : 0) : 0; 
+			
+			clRedText = clRed; 
+			clMajorTick = clText; 
+			clMinorTick = mix(clMajorTick, bkColor, .125f); 
+			
+			const fh = ts.fontHeight; 
+			innerSize = vec2(fh*20, fh*2.5*2) /+default size+/; 
+			
+			if(userModified)
+			{ t0_ = t0, t1_ = t1; }
+		} 
+		
+		override void draw(Drawing dr)
+		{
+			const t0 = t0_draw, t1 = t1_draw; 
+			
+			const b = innerBounds/+ + innerPos <- FUUUUUUUUUUUUUUCK!!!!+/; 
+			const fh = b.height/5.625f, rh = fh*5/2; 
+			auto 	bTop 	= bounds2(b.left, b.top, b.right, b.top+rh),
+				bBottom 	= bounds2(b.left, b.bottom-rh, b.right, b.bottom); 
+			bounds2 bCenter, bThumb; 
+			float t0x, t1x; 
+			
+			{
+				dr.pushClipBounds(b); scope(exit) dr.popClipBounds; 
+				
+				const 	topIsFine 	= drawHRuler(dr, bTop, tMin, tMax, shiftUpwards: true),
+					bottomIsFine 	= drawHRuler(dr, bBottom, t0, t1); 
+				if(!topIsFine) bTop.bottom -= fh; 
+				if(!bottomIsFine) bBottom.top += fh; 
+				bCenter = bounds2(b.left, bTop.bottom, b.right, bBottom.top); 
+				
+				{
+					dr.color = clAccent; dr.alpha = .25; scope(exit) dr.alpha = 1; 
+					void fill(float leftX0, float leftX1, float rightX0, float rightX1, int y0, int y1)
+					{
+						const step = 1.0f/(y1-y0); float t=step/2; 
+						foreach(i; 0..y1-y0)
+						{
+							const y = i+y0, tt = (1-cos(t*(float(π))).signedpow(0.0625))/2; 
+							dr.fillRect(
+								bounds2(
+									mix(leftX0 , leftX1 , tt), y, 
+									mix(rightX0, rightX1, tt), y+1
+								)
+							); 
+							t += step; 
+						}
+					} 
+					
+					float remap(DateTime t)
+					=> b.left + ((b.width*(t.raw.clamp(tMin.raw, tMax.raw) - tMin.raw))/(tMax.raw - tMin.raw)); 
+					t0x = remap(t0), t1x = remap(t1); 
+					
+					dr.fillRect(bounds2(b.left, b.top, t0x, bCenter.top.ifloor)); 
+					dr.fillRect(bounds2(t1x, b.top, b.right, bCenter.top.ifloor)); 
+					fill(bCenter.left, bCenter.left, t0x, bCenter.left, bCenter.top.ifloor, bCenter.bottom.iceil); 
+					fill(t1x, bCenter.right, bCenter.right, bCenter.right, bCenter.top.ifloor, bCenter.bottom.iceil); 
+					
+					bThumb = bounds2(t0x, bTop.top, t1x, bTop.bottom); 
+				}
+			}
+			
+			drawBorder(dr); 
+			if(hoverOrFocus)
+			{
+				dr.alpha = hoverOrFocus; scope(exit) dr.alpha = 1; 
+				dr.color = clBlack; dr.lineWidth = 2; 
+				dr.drawRect(b.inflated(vec2(-1, 0/+Todo: A bit lame, but looks good+/))); 
+				
+				
+				if(!mouseAtTopHalf) dr.alpha = hoverOrFocus/2; 
+				const bt = bThumb.inflated(vec2(-1,0)); 
+				if(false)
+				{ dr.color = clAccent; dr.drawRect(bt); }
+				else
+				with(bt)
+				{
+					dr.line(topLeft, bottomLeft); 
+					dr.line(topRight, bottomRight); 
+					dr.line(bottomLeft, bottomRight); 
+				}
+				
+				if(show_highlighted_t)
+				{
+					dr.alpha = hoverOrFocus; 
+					
+					const t = highlighted_t; 
+					const xTop = b.left + ((b.width*(t.raw.clamp(tMin.raw, tMax.raw) - tMin.raw))/(tMax.raw - tMin.raw)); 
+					const xBottom = b.left + ((b.width*(t.raw.clamp(t0.raw, t1.raw) - t0.raw))/(t1.raw - t0.raw)); 
+					
+					dr.lineWidth = 1.05f; dr.color = clRedText; 
+					
+					const 	A = vec2(xTop, bTop.top), 
+						B = vec2(xTop, bCenter.top),
+						C = vec2(xBottom, bCenter.center.y), 
+						D = vec2(xBottom, bBottom.bottom); 
+					dr.line(A, B); /+dr.line(B, C);+/ dr.line(C, D); 
+					
+					version(/+$DIDE_REGION+/none) {
+						//curver line is ugly
+						dr.line(A, B); 
+						enum N = 10; 
+						const P = iota(N).map!
+							((i){
+							const t = i*(1.0f/(N-1)); 
+							const tt = (1-cos(t*(float(π))).signedpow(0.0625))/2; 
+							return vec2(mix(B.x, C.x, tt), mix(B.y, C.y, t)); 
+						}).array; 
+						foreach(i; 1..P.length) dr.line(P[i-1], P[i]); 
+						dr.line(C, D); 
+					}
+				}
+			}
+			
+			if(im.sliderState.canCallAfterActiveSliderDraw(id, hitBounds))
+			im.sliderState.afterActiveSliderDraw(
+				id, SliderOrientation.horz, 
+				dr.inputTransform(bTop.topLeft     + bThumb.size/2), 
+				dr.inputTransform(bTop.bottomRight - bThumb.size/2), 
+				dr.inputTransform(bThumb)
+			); 
+			
+			drawDebug(dr); 
+		} 
+	} 
+	/+
+		260718: Size reduction
+		Border: 20, Cell: 32, Glyph: 61, Container: 136, Row: 153, Column: 136
+		
+		After refactoring Border:
+		Border: 8, Cell:32, Glyph:61, Container:128, Row:145, Column:128
+		
+		Further refactor: 16bit upper float:
+		Border: 6, Cell:32, Glyph:61, Container:128, Row:145, Column:128
+		
+		Padding, Border uses UpperFloats:
+		Border: 6, Cell:32, Glyph:61, Container:112, Row:129, Column:112
+		
+		FlexValue -> UpperFloat
+		Border: 6, Cell:32, Glyph:61, Container:104, Row:121, Column:104 
+		
+		260805: Can't remember
+		Border: 6, Cell:32, Glyph:61, Container:96, Row:113, Column:96, TextStyle: 32
+		
+		260809: TextStyle.font:  string -> FontId
+		Border: 6, Cell:32, Glyph:61, Container:96, Row:113, Column:97, TextStyle: 9
+		
+		260810: realigning fields in Container
+		Border: 6, Padding:8, Cell:32, Glyph:61, Container:91, Row:113, Column:91, Style: 9
+		
+		260821: split flags to -> flags, rowFlags, colFlags
+		Border: 6, Padding:8, Cell:32, Glyph:61, Container:88, Row:106, Column:88, Style: 9
+	+/
+	
+	pragma(msg,i"Border: $(Border.sizeof), Padding:$(Padding.sizeof), Cell:$(__traits(classInstanceSize, Cell)), Glyph:$(__traits(classInstanceSize, Glyph)), Container:$(__traits(classInstanceSize, Container)), Row:$(__traits(classInstanceSize, Row)), Column:$(__traits(classInstanceSize, Column)), DockSite:$(__traits(classInstanceSize, DockSite)), Style: $(TextStyle.sizeof)".text.注); 
+}
 struct im
 {
 	static: 
@@ -7579,7 +8514,7 @@ struct im
 							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
 							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
 						}
-						((0x34926EB16D5C4).檢 (ImStorageManager.stats)); 
+						((0x3B69AEB16D5C4).檢 (ImStorageManager.stats)); 
 					}
 				}
 				
@@ -8247,8 +9182,7 @@ struct im
 			
 			bool handleMouse(in Id id, in HitInfo hit, ref float nPos, in vec2 mousePos, in ValueRange range_, ref int wrapCnt)
 			{
-				if(nPos.isnan)
-				return false; 
+				if(nPos.isnan) return false; 
 				
 				bool userModified; 
 				
@@ -8667,7 +9601,7 @@ struct im
 					}
 				} 
 			} 
-			
+			
 			
 			TextStyle textStyle;   alias style = textStyle; //Todo: style.opDispatch("fontHeight=0.5x")
 			
@@ -8704,7 +9638,6 @@ struct im
 					}
 				} 
 			} 
-			
 			ThemeState theme; 
 			
 			MouseCursor mouseCursor; 
@@ -8786,7 +9719,7 @@ struct im
 				if(thisContainer !is null)	thisContainer.append(c); 
 				else	{ if(c) rootCells ~= c; }
 			} 
-			
+			
 			.Container removeLastContainer()
 			{
 				//needed for temporary composable building
@@ -9196,16 +10129,7 @@ struct im
 			}.text; 
 			
 			/+/+Note: Step 6.+/ Finalize/deallocate temporary things, measure nested content, etc.+/
-		} 
-		
-	}
-	version(/+$DIDE_REGION+/all)
-	{
-		
-		
-		
-		
-		
+		} 
 		private void _Container(CType_, Args...)(in Args args)
 		{
 			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
@@ -9363,373 +10287,6 @@ struct im
 			); 
 		} 
 		
-		
-		private
-		{
-			SplitterState 	splitterState_horz, 
-				splitterState_vert; 
-			struct SplitterState
-			{
-				vec2 startMousePos; 
-				float startTargetSize = 0; 
-				Id draggedSplitterId; 
-				Id draggedSplitterId_secondary; 
-			} 
-		} 
-		
-		///Splitter is a thin stripe shaped container used to resize other containers.
-		bool Splitter(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)
-		(ref float targetSize, float targetMinSize, float targetMaxSize, in Args args)
-		{
-			setIncomingId!(_M_, _L_)(); 
-			return _Splitter(targetSize, targetMinSize, targetMaxSize, args); 
-		} 
-		
-		private bool _Splitter(Args...)(ref float targetSize, float targetMinSize, float targetMaxSize, in Args args)
-		{
-			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
-			{
-				mixin ContainerScript_Init!(.Splitter, q{dockAlignment hit}, (表([[],])), (表([[],]))); 
-				mixin(SCR.Create); 
-			}
-			
-			version(/+$DIDE_REGION Local variable declarations+/all)
-			{
-				auto _splitter = (cast(.Splitter)(_container)); 
-				background = clWinBtn; 
-			}
-			
-			version(/+$DIDE_REGION Load all properties+/all)
-			{ mixin(SCR.ProcessProperties); }
-			
-			version(/+$DIDE_REGION Do custom behavior+/all)
-			{
-				const SplitterBaseSize = fh/9; 
-				
-				enum SplitterExtraSize = 3; /+added on the sides+/
-				//Todo: this should be divided by guiScale!!! Also it works differently in viewWorld!!!
-				
-				const 	isHorz 	= !!dockAlignment.among(mixin(舉!((DockAlignment),q{leftClient})), mixin(舉!((DockAlignment),q{rightClient}))),
-					isVert 	= !!dockAlignment.among(mixin(舉!((DockAlignment),q{topClient})), mixin(舉!((DockAlignment),q{bottomClient}))); 
-				enforce(
-					isHorz || isVert, 
-					"Splitter: invalid DockAlignment: `"~dockAlignment.text~"`"
-				); 
-				
-				_splitter.isHorz = isHorz, _splitter.isVert = isVert; 
-				
-				if(isHorz)	outerWidth = SplitterBaseSize; 
-				else	outerHeight = SplitterBaseSize; 
-				
-				const actMousePos = targetView.mousePos.vec2; 
-				
-				version(/+$DIDE_REGION Update secondary hover state+/all)
-				{
-					/+
-						A secondary splitter is in 90deg with the main splitter and next to it.
-						There can be 2 secondary splitters at most.
-					+/
-					
-					const secondaryHover = splitterHoverInfo.secondarySplitterIds[].canFind(_id); 
-					
-					static struct SplitterSecondaryHover_smooth { float value=0; } 
-					ref secondaryHover_smooth = imStorage!SplitterSecondaryHover_smooth(_id).value; 
-					secondaryHover_smooth = HitTestManager.hoverFollow(secondaryHover_smooth, secondaryHover); 
-				}
-				
-				const 	hover 	= hit.hover || secondaryHover,
-					hover_smooth 	= max(hit.hover_smooth, secondaryHover_smooth),
-					pressed 	= hit.pressed || (secondaryHover && inputs.LMB.pressed),
-					down	= inputs.LMB.down; 
-				
-				ref splitterState = ((isHorz)?(splitterState_horz):(splitterState_vert)); 
-				with(splitterState)
-				{
-					bool dragging() => draggedSplitterId 	== _id || 
-					draggedSplitterId_secondary 	== _id; 
-					void setDragging(bool b) 
-					{
-						if(!b)
-						{ draggedSplitterId = draggedSplitterId_secondary = Id.init; }
-						else
-						{
-							if(dragging) return; 
-							if(!draggedSplitterId)	draggedSplitterId = _id; 
-							else	draggedSplitterId_secondary = _id; 
-						}
-					} 
-					
-					if(canProcessUserInput && pressed)
-					{
-						startMousePos = actMousePos; 
-						startTargetSize = targetSize; 
-						setDragging = true; 
-					}
-					
-					if(dragging)
-					{
-						if(!(canProcessUserInput && down))
-						{ setDragging = false; }
-						else
-						{
-							const ofs = actMousePos - startMousePos; 
-							float a = startTargetSize; 
-							with(DockAlignment)
-							switch(dockAlignment)
-							{
-								case leftClient: 	a += ofs.x; 	break; 
-								case rightClient: 	a -= ofs.x; 	break; 
-								case topClient: 	a += ofs.y; 	break; 
-								case bottomClient: 	a -= ofs.y; 	break; 
-								default: 
-							}
-							targetSize = a.clamp(targetMinSize, targetMaxSize.max(targetMinSize)); 
-						}
-					}
-					
-					if(dragging || hover)
-					{
-						with(MouseCursor)
-						{
-							mouseCursor = /+This combines NS and WE cursors.+/
-							((isHorz)?(
-								((
-									mouseCursor.among
-									(SIZENS, SIZEALL)
-								)?(SIZEALL):(SIZEWE))
-							) :(
-								((
-									mouseCursor.among
-									(SIZEWE, SIZEALL)
-								)?(SIZEALL):(SIZENS))
-							)); 
-						}
-					}
-					
-					background = ((dragging)?(clAccent) :(mix(background, clWinBtnPressed, hover_smooth))); 
-					
-					version(/+$DIDE_REGION Handle the recursive composition+/all)
-					{ mixin(SCR.ProcessComposition); }
-					
-					version(/+$DIDE_REGION Return custom results+/all)
-					{ return dragging; }
-				}
-			}
-		} 
-		
-		private
-		{
-			static struct SplittedAreaState
-			{
-				bool active; 
-				
-				.DockSite dockSite; 
-				
-				bool isHorz, isVert; 
-				float fullSize, totalResizableSize, totalStaticSize; 
-				size_t initialDockSiteSubCellCount, lastDockSiteSubCellCount; 
-				float minRemainingSize; 
-				
-				float*[] sizePtrs; 
-				
-				void reset()
-				{ this = typeof(this).init; } 
-				
-				
-				void beginArea()
-				{
-					enforce(!active, "Already inside a SplitterArea."); 
-					active = true; 
-					dockSite = im.thisDockSite.enforce("Resizable!Container requires a DockSite."); 
-					initialDockSiteSubCellCount = dockSite.subCells.length; 
-				} 
-				
-				float addUpSubCellSizes()
-				{
-					enforce(lastDockSiteSubCellCount <= dockSite.subCells.length); 
-					float res = 0; 
-					while(lastDockSiteSubCellCount < dockSite.subCells.length)
-					{
-						with(subCells[lastDockSiteSubCellCount].outerSize) res += ((isHorz)?(x):(y)); 
-						lastDockSiteSubCellCount++; 
-					}
-					return res; 
-				} 
-				
-				void beforeResizableContainer(in DockAlignment dockAlignment, ref float actSize)
-				{
-					enforce(im.thisDockSite is dockSite, "Resizable!Container's DockSite lost."); 
-					
-					const 	isDockAlignmentHorz 	= !!dockAlignment.among(mixin(舉!((DockAlignment),q{leftClient})), mixin(舉!((DockAlignment),q{rightClient}))),
-						isDockAlignmentVert 	= !!dockAlignment.among(mixin(舉!((DockAlignment),q{topClient})), mixin(舉!((DockAlignment),q{bottomClient}))); 
-					if(!(isHorz || isVert))
-					{
-						isHorz 	= isDockAlignmentHorz,
-						isVert 	= isDockAlignmentVert; 
-						enforce(
-							isHorz!=isVert /+either one or another+/,
-							"Invalid DockAlignment in Resizable!Container "~dockAlignment.text
-						); 
-						
-						//Now that orientation is known, fullSize can be determined.
-						with(dockSite.clientArea.size) fullSize = ((isHorz)?(x):(y)); 
-						lastDockSiteSubCellCount = dockSite.subCells.length; 
-						totalResizableSize = totalStaticSize = 0; 
-					}
-					else
-					{
-						enforce(
-							(isHorz && isDockAlignmentHorz) || (isVert && isDockAlignmentVert),
-							((isHorz)?("Horizontal"):("Vertical"))
-							~" DockAlignment expected Resizable!Container "~dockAlignment.text
-						); 
-						totalStaticSize += addUpSubCellSizes; 
-					}
-					
-					sizePtrs ~= &actSize; 
-				} 
-				
-				void afterResizableContainer()
-				{
-					enforce(im.thisDockSite is dockSite, "Resizable!Container's DockSite lost."); 
-					totalResizableSize += addUpSubCellSizes; 
-				} 
-				
-				void endArea()
-				{
-					enforce(active, "Not inside SplitterArea. Nothing to end."); 
-					enforce(im.thisDockSite is dockSite, "Resizable!Container's DockSite lost."); 
-					
-					if(const N = sizePtrs.length)
-					{
-						enum minRemainingSize = 32; 
-						
-						const 	remainingSize 	= fullSize - totalResizableSize - totalStaticSize,
-							invN 	= 1.0f/N,
-							minSize 	= min(minRemainingSize, fullSize * invN); 
-						
-						const at = calcAnimationT(deltaTime/+1.0f/60+/, .01), sd = .01f; 
-						
-						if(remainingSize < minSize)
-						{
-							const adjust = (remainingSize - minSize) * invN; 
-							foreach(pSize; sizePtrs)
-							{
-								ref size = *pSize; 
-								size.follow(size + adjust, at, sd); 
-							}
-						}
-						
-						foreach(pSize; sizePtrs)
-						{
-							ref size = *pSize; 
-							if(size<minSize) size.follow(minSize, at, sd); 
-						}
-					}
-					
-					version(/+$DIDE_REGION Move splitters to the top of ZOrder and extend their thickness.+/all)
-					{
-						{
-							const SplitterMinThickness = 8 /+* targetSurfaceScreenPixelSize+/; 
-							auto cells = dockSite.subCells[initialDockSiteSubCellCount..$]; 
-							if(cells.length)
-							{
-								auto 	nonSplitters 	= cells.filter!((a)=>((cast(.Splitter)(a)) is null)),
-									splitters 	= cells.filter!((a)=>((cast(.Splitter)(a)) !is null)); 
-								foreach(splitter; splitters.map!((a)=>((cast(.Splitter)(a)))))
-								{ splitter.extend(SplitterMinThickness); }
-								cells[] = chain(nonSplitters, splitters).array; 
-							}
-						}
-					}
-					
-					reset; 
-				} 
-			} 
-		} 
-		
-		
-		
-		///Containers can dock into a DockSite, bye specifying DockAlignment.
-		void DockSite(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
-		{
-			setIncomingId!(_M_, _L_)(); 
-			_DockSite(args); 
-		} 
-		
-		void _DockSite(Args...)(in Args args)
-		{
-			mixin ContainerScript_Init!(.DockSite, q{dockAlignment}, (表([[],])), (表([[],]))); 
-			mixin(SCR.Create); 
-			mixin(SCR.ProcessProperties); 
-			
-			version(/+$DIDE_REGION Do custom behavior+/all)
-			{
-				enforce(outerSize, "DockSite's outerSize muse be specified."); 
-				(cast(.DockSite)(_container)).clientArea = bounds2(0, innerSize); 
-			}
-			
-			mixin(SCR.ProcessComposition); 
-		} 
-		
-		///Inside a DockSite, this creates a block for Resizable!Containers.
-		static void SplittedArea(void delegate() fun)
-		{
-			ref splittedAreaState = thisDockSite.splittedAreaState; 
-			
-			splittedAreaState.beginArea; 
-			
-			scope(exit) splittedAreaState.endArea; 
-			
-			fun(); 
-		} 
-		
-		/+
-			Resizable!Container can be placed inside a DockSite's SplittedArea. 
-				It creates and synchronizes Splitters.
-		+/
-		static void Resizable(alias Cntr, string _M_=__MODULE__, size_t _L_=__LINE__, Args...)
-			(in DockAlignment dockAlignment, ref float actSize, in Args args)
-		{
-			//Cntr: For specials Containers, make a dedicated function. Must start with _M_, _L_!
-			
-			ref splittedAreaState = thisDockSite.splittedAreaState; 
-			
-			enforce(splittedAreaState.active, "Resizable!Container called without active SplittedArea."); 
-			
-			splittedAreaState.beforeResizableContainer(dockAlignment, actSize); 
-			scope(exit) splittedAreaState.afterResizableContainer; 
-			
-			const fullSize = splittedAreaState.fullSize; 
-			enforce(!fullSize.isnan, "Resizable!Container's fullSize is nan."); 
-			
-			enum defaultSize = 32; if(actSize.isnan) actSize = defaultSize; 
-			
-			Cntr!(_M_, _L_)(
-				dockAlignment, 
-				((
-					{
-						if(splittedAreaState.isHorz) outerWidth = actSize; 
-						if(splittedAreaState.isVert) outerHeight = actSize; 
-					}
-				).名!q{init})
-				, args
-			); 
-			
-			enum extraId = Id("Splitter")
-			/+So the splitter id will be not the same as the content's id.+/; 
-			float nextSize = actSize; 
-			if(Splitter!(_M_, _L_)(nextSize, 0, splittedAreaState.fullSize, dockAlignment, ((extraId).名!q{id})))
-			{
-				const at = calcAnimationT(deltaTime/+1.0f/60+/, .7), sd = .01f; 
-				if(!nextSize.isnan) actSize.follow(nextSize, at, sd); 
-			}
-			
-			
-		} 
-		
-		
-		
 		
 		void Text(Args...)(in Args args)
 		{
@@ -10607,6 +11164,245 @@ struct im
 			); 
 		} 
 		
+	}
+	version(/+$DIDE_REGION+/all)
+	{
+		///Containers can dock into a DockSite, bye specifying DockAlignment.
+		void DockSite(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
+		{
+			setIncomingId!(_M_, _L_)(); 
+			_DockSite(args); 
+		} 
+		
+		void _DockSite(Args...)(in Args args)
+		{
+			mixin ContainerScript_Init!(.DockSite, q{dockAlignment}, (表([[],])), (表([[],]))); 
+			mixin(SCR.Create); 
+			mixin(SCR.ProcessProperties); 
+			
+			version(/+$DIDE_REGION Do custom behavior+/all)
+			{
+				enforce(outerSize, "DockSite's outerSize muse be specified."); 
+				(cast(.DockSite)(_container)).clientArea = bounds2(0, innerSize); 
+			}
+			
+			mixin(SCR.ProcessComposition); 
+		} 
+		
+		///Inside a DockSite, this creates a block for Resizable!Containers.
+		static void SplittedArea(void delegate() fun)
+		{
+			ref splittedAreaState = thisDockSite.splittedAreaState; 
+			
+			enforce(splittedAreaState is null, "SplittedArea: Already active. No recursion allowed."); 
+			
+			splittedAreaState = new SplittedAreaState; 
+			splittedAreaState.beginArea; 
+			
+			scope(exit) { splittedAreaState.endArea; splittedAreaState = null; }
+			
+			fun(); 
+		} 
+		
+		/+
+			Resizable!Container can be placed inside a DockSite's SplittedArea. 
+				It creates and synchronizes Splitters.
+		+/
+		static void Resizable(alias Cntr, string _M_=__MODULE__, size_t _L_=__LINE__, Args...)
+			(in DockAlignment dockAlignment, ref float actSize, in Args args)
+		{
+			//Cntr: For specials Containers, make a dedicated function. Must start with _M_, _L_!
+			
+			ref splittedAreaState = thisDockSite.splittedAreaState; 
+			
+			enforce(splittedAreaState.active, "Resizable!Container called without active SplittedArea."); 
+			
+			splittedAreaState.beforeResizableContainer(dockAlignment, actSize); 
+			scope(exit) splittedAreaState.afterResizableContainer; 
+			
+			const fullSize = splittedAreaState.fullSize; 
+			enforce(!fullSize.isnan, "Resizable!Container's fullSize is nan."); 
+			
+			enum defaultSize = 32; if(actSize.isnan) actSize = defaultSize; 
+			
+			Cntr!(_M_, _L_)(
+				dockAlignment, 
+				((
+					{
+						if(splittedAreaState.isHorz) outerWidth = actSize; 
+						if(splittedAreaState.isVert) outerHeight = actSize; 
+					}
+				).名!q{init})
+				, args
+			); 
+			
+			enum extraId = Id("Splitter")
+			/+So the splitter id will be not the same as the content's id.+/; 
+			float nextSize = actSize; 
+			if(Splitter!(_M_, _L_)(nextSize, 0, splittedAreaState.fullSize, dockAlignment, ((extraId).名!q{id})))
+			{
+				const at = calcAnimationT(deltaTime/+1.0f/60+/, .7), sd = .01f; 
+				if(!nextSize.isnan) actSize.follow(nextSize, at, sd); 
+			}
+			
+			
+		} 
+		
+		private
+		{
+			SplitterState 	splitterState_horz, 
+				splitterState_vert; 
+			struct SplitterState
+			{
+				vec2 startMousePos; 
+				float startTargetSize = 0; 
+				Id draggedSplitterId; 
+				Id draggedSplitterId_secondary; 
+			} 
+		} 
+		
+		///Splitter is a thin stripe shaped container used to resize other containers.
+		bool Splitter(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)
+		(ref float targetSize, float targetMinSize, float targetMaxSize, in Args args)
+		{
+			setIncomingId!(_M_, _L_)(); 
+			return _Splitter(targetSize, targetMinSize, targetMaxSize, args); 
+		} 
+		
+		private bool _Splitter(Args...)(ref float targetSize, float targetMinSize, float targetMaxSize, in Args args)
+		{
+			version(/+$DIDE_REGION Create a new CustomContainer instance+/all)
+			{
+				mixin ContainerScript_Init!(.Splitter, q{dockAlignment hit}, (表([[],])), (表([[],]))); 
+				mixin(SCR.Create); 
+			}
+			
+			version(/+$DIDE_REGION Local variable declarations+/all)
+			{
+				auto _splitter = (cast(.Splitter)(_container)); 
+				background = clWinBtn; 
+			}
+			
+			version(/+$DIDE_REGION Load all properties+/all)
+			{ mixin(SCR.ProcessProperties); }
+			
+			version(/+$DIDE_REGION Do custom behavior+/all)
+			{
+				const SplitterBaseSize = fh/9; 
+				
+				enum SplitterExtraSize = 3; /+added on the sides+/
+				//Todo: this should be divided by guiScale!!! Also it works differently in viewWorld!!!
+				
+				const 	isHorz 	= !!dockAlignment.among(mixin(舉!((DockAlignment),q{leftClient})), mixin(舉!((DockAlignment),q{rightClient}))),
+					isVert 	= !!dockAlignment.among(mixin(舉!((DockAlignment),q{topClient})), mixin(舉!((DockAlignment),q{bottomClient}))); 
+				enforce(
+					isHorz || isVert, 
+					"Splitter: invalid DockAlignment: `"~dockAlignment.text~"`"
+				); 
+				
+				_splitter.isHorz = isHorz, _splitter.isVert = isVert; 
+				
+				if(isHorz)	outerWidth = SplitterBaseSize; 
+				else	outerHeight = SplitterBaseSize; 
+				
+				const actMousePos = targetView.mousePos.vec2; 
+				
+				version(/+$DIDE_REGION Update secondary hover state+/all)
+				{
+					/+
+						A secondary splitter is in 90deg with the main splitter and next to it.
+						There can be 2 secondary splitters at most.
+					+/
+					
+					const secondaryHover = splitterHoverInfo.secondarySplitterIds[].canFind(_id); 
+					
+					static struct SplitterSecondaryHover_smooth { float value=0; } 
+					ref secondaryHover_smooth = imStorage!SplitterSecondaryHover_smooth(_id).value; 
+					secondaryHover_smooth = HitTestManager.hoverFollow(secondaryHover_smooth, secondaryHover); 
+				}
+				
+				const 	hover 	= hit.hover || secondaryHover,
+					hover_smooth 	= max(hit.hover_smooth, secondaryHover_smooth),
+					pressed 	= hit.pressed || (secondaryHover && inputs.LMB.pressed),
+					down	= inputs.LMB.down; 
+				
+				ref splitterState = ((isHorz)?(splitterState_horz):(splitterState_vert)); 
+				with(splitterState)
+				{
+					bool dragging() => draggedSplitterId 	== _id || 
+					draggedSplitterId_secondary 	== _id; 
+					void setDragging(bool b) 
+					{
+						if(!b)
+						{ draggedSplitterId = draggedSplitterId_secondary = Id.init; }
+						else
+						{
+							if(dragging) return; 
+							if(!draggedSplitterId)	draggedSplitterId = _id; 
+							else	draggedSplitterId_secondary = _id; 
+						}
+					} 
+					
+					if(canProcessUserInput && pressed)
+					{
+						startMousePos = actMousePos; 
+						startTargetSize = targetSize; 
+						setDragging = true; 
+					}
+					
+					if(dragging)
+					{
+						if(!(canProcessUserInput && down))
+						{ setDragging = false; }
+						else
+						{
+							const ofs = actMousePos - startMousePos; 
+							float a = startTargetSize; 
+							with(DockAlignment)
+							switch(dockAlignment)
+							{
+								case leftClient: 	a += ofs.x; 	break; 
+								case rightClient: 	a -= ofs.x; 	break; 
+								case topClient: 	a += ofs.y; 	break; 
+								case bottomClient: 	a -= ofs.y; 	break; 
+								default: 
+							}
+							targetSize = a.clamp(targetMinSize, targetMaxSize.max(targetMinSize)); 
+						}
+					}
+					
+					if((dragging || hover) && !sliderState.pressed_id)
+					{
+						with(MouseCursor)
+						{
+							mouseCursor = /+This combines NS and WE cursors.+/
+							((isHorz)?(
+								((
+									mouseCursor.among
+									(SIZENS, SIZEALL)
+								)?(SIZEALL):(SIZEWE))
+							) :(
+								((
+									mouseCursor.among
+									(SIZEWE, SIZEALL)
+								)?(SIZEALL):(SIZENS))
+							)); 
+						}
+					}
+					
+					background = ((dragging)?(clAccent) :(mix(background, clWinBtnPressed, hover_smooth))); 
+					
+					version(/+$DIDE_REGION Handle the recursive composition+/all)
+					{ mixin(SCR.ProcessComposition); }
+					
+					version(/+$DIDE_REGION Return custom results+/all)
+					{ return dragging; }
+				}
+			}
+		} 
+		
+		
+		
 		bool TabsHeader(string _M_=__MODULE__, size_t _L_=__LINE__, T, I, A...)
 			(T[] items, ref I idx, A args)
 			if(isIntegral!I)
@@ -10858,7 +11654,7 @@ struct im
 				mixin ContainerScript_Init!
 				(.DateTimeRuler, q{hit focus hint}, (表([[],])), (表([[],]))); 
 				mixin(SCR.Create); 
-				focusRMB = focusMMB, focusMW = true; 
+				focusRMB = focusMMB = focusMW = true; 
 			}
 			
 			version(/+$DIDE_REGION Local variable declarations+/all)
@@ -11501,7 +12297,9 @@ struct im
 				); 
 			} 
 			
-		}
+		}
+		
+		
 	}
 	version(/+$DIDE_REGION+/all) {
 		
@@ -12149,1059 +12947,4 @@ version(/+$DIDE_REGION Dead code+/none)
 			
 		} 
 	}
-}
-version(/+$DIDE_REGION Dead code 260813+/none)
-{
-	auto Static_old(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(in T0 value, T args)
-	{
-		static if(is(T0 : Property))
-		{
-			auto p = cast(Property)value; 
-			Static!(_M_, _L_)(p.asText, hint(p.hint), args); 
-		}
-		else
-		{
-			Row!(_M_, _L_)
-			(
-				{
-					mixin(prepareId); 
-					actContainer.id = id_; 
-					auto hit = hitTest(enabled); 
-					
-					mixin(hintHandler); 
-					applyEditStyle(true, false, 0); 
-					style = tsNormal; 
-					
-					border.color = mix(border.color, style.bkColor, .5f); 
-					
-					static if(std.traits.isNumeric!T0)
-					flags.hAlign = HAlign.right; 
-					else flags.hAlign = HAlign.left; 
-					
-					static if(__traits(compiles, value()))
-					value(); 
-					else Text(value.text); 
-					
-					static foreach(a; args)
-					static if(__traits(compiles, a()))
-					a(); 
-					
-					//set minimal height for the control if empty
-					if(actContainer.subCells.empty && innerHeight<=0)
-					innerHeight = fh; 
-				}
-			); 
-		}
-	} 
-	
-	
-	auto Btn0(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, T0, T...)(T0 text, T args)
-		if(isSomeString!T0 || __traits(compiles, text()) )
-	{
-		mixin(prepareId, selected.M); 
-		
-		bool focusOnPress = false; 
-		mixin(processGenericArgs(q{static if(N=="focusOnPress")	focusOnPress = a; })); 
-		
-		const isToolBtn = theme=="tool"; 
-		
-		HitInfo hit; 
-		
-		Row(
-			{
-				actContainer.id = id_; 
-				hit = hitTest(enabled); 
-				mixin(hintHandler); 
-				
-				bool focused = focusUpdate
-				(
-					actContainer, id_,
-					enabled, ((focusOnPress)?(hit.pressed) :(hit.clicked)), inputs.Esc.pressed,  //enabled, enter, exit
-					/*onEnter	*/ {},
-					/*onFocus	*/ {},
-					/*onExit	*/ {}
-				); 
-				
-				//flags.wordWrap = false;
-				flags.hAlign = HAlign.center; 
-				
-				applyBtnStyle(isWhite, enabled, focused, _selected, hit.captured, hit.hover_smooth); 
-				
-				static if(isSomeString!T0)
-				Text(text); 
-				else text();  static foreach(a; args)
-				static if(__traits(compiles, a()))
-				a(); 
-			}
-		); 
-		
-		//KeyCombo in click mode.
-		static foreach(a; args)
-		static if(is(typeof(a) == KeyCombo))
-		if(canProcessUserInput && a.pressed)
-		hit.clicked = true; 
-		
-		return hit; 
-	} 
-	
-	version(/+$DIDE_REGION+/all) {
-		auto Btn1(string _M_=__MODULE__, size_t _L_=__LINE__, bool isWhite=false, Args...)(in Args args)
-		{
-			
-			CustomContainer!
-			(
-				.Row, 
-				
-				/+Local variable declarations+/
-				q{
-					bool focusOnPress, _selected; 
-					const isToolBtn = theme=="tool"; 
-					HitInfo hit; 
-				},
-				
-				//Property declarations
-				(表([
-					[q{isG!"focusOnPress"},q{focusOnPress = a; }],
-					[q{isG!"selected"},q{_selected = a; }],
-					[q{isT!selected},q{_selected = a.val; }],
-					[q{isT!HintRec},q{/+Todo: hintHandler+/}],
-					[q{isT!range},q{/+Todo: IncBtn!!!+/}],
-				])),
-				
-				//After properties, before composition
-				q{
-					hit = hitTest(enabled); 
-					//Todo: mixin(hintHandler); 
-					
-					bool focused = focusUpdate
-					(
-						actContainer, id_,
-						enabled, ((focusOnPress)?(hit.pressed) :(hit.clicked)), inputs.Esc.pressed,  //enabled, enter, exit
-						/*onEnter	*/ {},
-						/*onFocus	*/ {},
-						/*onExit	*/ {}
-					); 
-					
-					//flags.wordWrap = false;
-					flags.hAlign = HAlign.center; 
-					
-					applyBtnStyle(
-						false/+Todo: isWhite+/, enabled, focused, 
-						_selected, hit.captured, hit.hover_smooth
-					); 
-				}, 
-				
-				//Composition
-				(表([[],])), 
-				
-				//After composition, finalization
-				q{}
-			)
-			(Id(_M_, _L_), args); 
-			
-			HitInfo hit;  //Todo: hit
-			//Todo: keycombo
-			
-			return hit; 
-		} 
-		
-	}
-	auto Edit_old(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(ref T0 value, T args)
-	{
-		/+
-			Solved 260813:
-			NOTIMPL("Doube precision View2D bug: Clicking at any position seeks only to the beginning os text."); 
-		+/
-		
-		static if(is(T0==Path))
-		return EditPath!(_M_, _L_)(value, args); //Todo: not good! There will be 2 returns!!!
-		static if(is(T0==File))
-		return EditFile!(_M_, _L_)(value, args); //Todo: not good! There will be 2 returns!!!
-		
-		enum IsNum = std.traits.isNumeric!T0; 
-		
-		mixin(prepareId); 
-		static if(IsNum)
-		mixin(range_M); 
-		
-		static struct EditResult
-		{
-			HitInfo hit; 
-			bool changed, focused; 
-			alias changed this; 
-		} 
-		EditResult res; 
-		
-		void value2editor()
-		{ textEditorState.str = value.text; } 
-		
-		bool wasConvertError; //editor2value messaging back with this
-		
-		void editor2value()
-		{
-			try
-			{
-				auto newValue = textEditorState.str.to!T0;  //Todo: range clamp
-				
-				static if(IsNum)
-				{
-					auto clamped = _range.clamp(newValue); 
-					wasConvertError = clamped != newValue; 
-					newValue = clamped; 
-				}
-				
-				res.changed = newValue != value; 
-				value = newValue; 
-			}catch(Exception)
-			{ wasConvertError = true; }
-		} 
-		
-		Row(
-			{
-				actContainer.id = id_; 
-				
-				auto ref hit()
-				{ return res.hit; } 
-				
-				flags.clipSubCells = true; 
-				auto row = cast(.Row)actContainer; 
-				
-				hit = hitTest(enabled); 
-				
-				mixin(hintHandler); 
-				
-				bool focusEnter; 
-				mixin(
-					processGenericArgs(
-						q{
-							static if(N=="focusEnter")
-							focusEnter = a; 
-						}
-					)
-				); 
-				
-				//const focusEnter = getGenericArg!(args, bool, "focusEnter");
-				
-				/+
-					Note: This would be the implementation with a struct: 
-					static foreach(a; args) static if(is(typeof(a) == ManualFocus)) manualFocus = a.value;
-				+/
-				//The downside is that the struct litters the namespace with simple names.
-				/+
-					220820: this is too specific. Use the ManualFocus parameter instead. 
-						static foreach(a; args) static if(is(typeof(a) == KeyCombo)) if(a.pressed) manualFocus = true;
-				+/
-				
-				const focused = focusUpdate
-					(
-					actContainer, id_,
-					enabled,
-					hit.pressed || focusEnter, //enter
-					inputs["Esc"].pressed,  //exit
-					/*onEnter*/ {
-						value2editor; 
-						
-						//must override the previous value from another edit
-						//Todo: this must be rewritten with imStorage bounds.
-						textEditorState.cmdQueue ~= EditCmd(EditCmd.cEnd); 
-						
-						//for keyboard entry: textEditorState.cmdQueue ~= EditCmd(EditCmd.cEnd);
-					},
-					/*onFocus	*/ {/*_EditHandleInput(value, textEditorState.str, chg);*/},
-					/*onExit	*/ {}
-				); 
-				res.focused = focused; 
-				
-				static if(std.traits.isNumeric!T0)
-				flags.hAlign = HAlign.right; 
-				else flags.hAlign = HAlign.left; 
-				
-				applyEditStyle(enabled, focused, hit.hover_smooth); 
-				
-				//text editor functionality
-				if(focused)
-				{
-					editor2value; //Todo: when to write back? always / only when change/exit?
-					
-					textEditorState.row = row; 
-					textEditorState.strModified = false; //ready for next modifications
-					
-					const localMouse = hit.hover ? 
-						vec2(targetView.mousePos) - hit.hitBounds.topLeft - row.topLeftGapSize : vec2(0); 
-					//Todo: this is not when dr and drGUI is used concurrently. currentMouse id for drUI only.
-					
-					((0x5724BEB16D5C4).檢(hit.toJson)); 
-					
-					
-					((0x57285EB16D5C4).檢(localMouse)); 
-					
-					
-					textEditorState.handleKeyboardInput	(mainWindow.inputChars, flags.acceptEditorKeys, localMouse); 
-				}
-				
-				if(focused)
-				flags.dontHideSpaces = true; 
-				
-				
-				//execute the delegate funct parameters
-				static foreach(a; args)
-				static if(__traits(compiles, a()))
-				{ a(); }
-				
-				//put the text out
-				if(focused)
-				{
-					if(wasConvertError) textStyle.fontColor = clRed; 
-					row.appendMarkupLine(textEditorState.str, textStyle, textEditorState.cellStrOfs); 
-				}
-				else { row.appendMarkupLine(value.text         , textStyle); }
-				
-				//get default fontheight for the editor after the (possibly empty) string was displayed
-				const fh = style.fontHeight; 
-				
-				//set editor's defaultFontHeight for the caret when the string is empty
-				if(focused)
-				textEditorState.defaultFontHeight = fh; 
-				
-				//set minimal height for the control
-				if(row.empty && row.innerHeight<=0)
-				{ row.innerHeight = fh; }
-			}
-		); 
-		
-		return res; //a hit testet vissza kene adni im.valtozoban
-	} 
-	auto IncBtn_old(string _M_=__MODULE__, size_t _L_=__LINE__, int sign=1, Value, Args...)
-		(ref Value value, in Args args)
-		if(sign!=0 && isNumeric!Value)
-	{
-		mixin(range_M); 
-		
-		auto capt = symbolStr(`Calculator` ~ ((sign>0)?(`Addition`) :(`Subtract`))); 
-		enum isInt = isIntegral!Value; 
-		
-		auto hit = Btn!(_M_, _L_)(capt, args, ((sign).名!q{id})); 
-		//2 id's can pass because of the static foreach
-		
-		bool chg; 
-		if(hit.repeated)
-		{
-			auto 	oldValue 	= value,
-				step 	= abs(_range.step),
-				newValue 	= _range.clamp(value+step*sign); 
-			
-			if(isInt)
-			value = cast(Value)(round(newValue)); 
-			else value = cast(Value)newValue; 
-			
-			chg = newValue != oldValue; 
-		}
-		
-		return chg; 
-	} 
-	
-	auto DecBtn_old(string _M_=__MODULE__, size_t _L_=__LINE__, Value, Args...)
-		(ref Value value, in Args args)
-	{ return IncBtn!(_M_, _L_, -1)(value, args); } 
-	
-	auto LedBtn_old(string _M_=__MODULE__, size_t _L_=__LINE__, T, Args...)(void delegate() ledFun, T caption, in Args args)
-	{
-		return Btn!(_M_, _L_)(
-			{
-				flags.hAlign = HAlign.left; 
-				ledFun(); 
-				if(actContainer.subCells.length)
-				Spacer(fh*0.25f); 
-				width = 3.5*fh; 
-				static if(isSomeString!T)
-				Text(caption); 
-				else caption(); 
-			}, args
-		); 
-	} 
-	
-	auto LedBtn_old(string _M_=__MODULE__, size_t _L_=__LINE__, T, Args...)(bool ledState, RGB ledColor, T caption, in Args args)
-	{
-		return LedBtn_old!(_M_, _L_)(
-			{
-				if(ledColor!=clBlack)
-				{ flags.hAlign = HAlign.left; Led(ledState, ledColor); }
-			}, caption, args
-		); 
-	} 
-	
-	auto Link(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(T0 text, T args)
-		if(isSomeString!T0 || __traits(compiles, text()) )
-	{
-		mixin(prepareId); 
-		
-		HitInfo hit; 
-		
-		Row(
-			{
-				actContainer.id = id_; 
-				hit = hitTest(imEnabled); 
-				
-				mixin(hintHandler); 
-				
-				bool focused = focusUpdate	(
-					actContainer, id_, imEnabled, 
-					hit.pressed, inputs.Esc.pressed
-				); 
-				
-				//handle the space key when focused
-				if(focused)
-				{
-					with(inputs.Space)
-					{
-						if(down)
-						hit.captured	= true; 
-						if(pressed)
-						hit.clicked	= true; 
-					}
-				}
-				
-				applyLinkStyle(imEnabled, focused, hit.captured, hit.hover_smooth); 
-				
-				static if(isSomeString!T0)
-				Text(text); 
-				else text(); 
-				 //delegate
-				
-				static foreach(a; args)
-				static if(__traits(compiles, a()))
-				a(); 
-			}
-		); 
-		
-		//KeyCombo in click mode.
-		static foreach(a; args)
-		static if(is(typeof(a) == KeyCombo))
-		if(canProcessUserInput && a.pressed)
-		hit.clicked = true; 
-		
-		return hit; 
-	} 
-	
-	auto ChkBox(string _M_=__MODULE__, size_t _L_=__LINE__, string chkBoxStyle="chk", C, T...)(ref bool state, C caption, T args)
-	{
-		mixin(prepareId); 
-		
-		HitInfo hit; 
-		Row(
-			{
-				flags.wordWrap = false; 
-				margin.left = margin.right = 2; 
-				
-				actContainer.id = id_; 
-				hit = hitTest(imEnabled); 
-				mixin(hintHandler); 
-				
-				//update checkbox state
-				if(imEnabled && hit.clicked)
-				state.toggle; 
-				
-				//mixin GetChkBoxColors;
-				RGB hoverColor(RGB baseColor, RGB bkColor)
-				{
-					return !imEnabled 	? clWinBtnDisabledText
-						: mix(baseColor, bkColor, hit.captured ? 0.5f : hit.hover_smooth*0.3f); 
-				} 
-				
-				auto markColor = hoverColor(state ? clAccent : style.fontColor, style.bkColor); 
-				auto textColor = hoverColor(style.fontColor, style.bkColor); 
-				
-				auto bullet = chkBoxStyle=="radio" 	? tag(`symbol RadioBtn`~(state?"On":"Off"))
-					: tag(`symbol Checkbox`~(state?"CompositeReversed":"")); 
-				
-				//Text(format(tag("style fontColor=\"%s\"")~bullet~" "~tag("style fontColor=\"%s\"")~caption, markColor, textColor));
-				
-				static if(__traits(compiles, caption==""))	const captionIsEmpty = caption==""; 
-				else	enum captionIsEmpty = false; 
-				
-				if(captionIsEmpty)	Text(markColor, bullet); 
-				else	Text(markColor, bullet, " ", textColor, caption); 
-				
-				static foreach(a; args) static if(__traits(compiles, a())) a(); 
-			}
-		); 
-		
-		return hit; 
-	} 
-	
-	auto ChkBox(string _M_=__MODULE__, size_t _L_=__LINE__, string chkBoxStyle="chk", T...)(Property prop, string caption, T args)
-	{
-		auto bp = cast(BoolProperty)prop; 
-		enforce(bp !is null); 
-		auto last = bp.act; 
-		auto res = ChkBox!(_M_, _L_)(bp.act, caption.empty ? prop.caption : caption, genericId(prop.name), hint(prop.hint), args); 
-		bp.uiChanged |= last != bp.act; 
-		return res; 
-	} 
-	
-	auto RadioBtn(string _M_=__MODULE__, size_t _L_=__LINE__, C, T...)(ref bool state, C caption, T args)
-	{ return ChkBox!(_M_, _L_, "radio")(state, caption, args); } 
-	
-	version(/+$DIDE_REGION+/none) {
-		auto Slider_old(string _M_=__MODULE__, size_t _L_=__LINE__, V, T...)(ref V value, T args)
-			if(isFloatingPoint!V || isIntegral!V)
-		{
-			mixin(prepareId, selected_M, range_M);  //Todo: selected???
-			
-			//flipped range interval. Needed for vertical scrollbar
-			const flipped = !_range.isOrdered; 
-			if(flipped)
-			swap(_range.min, _range.max); 
-			
-			//string props;
-			static foreach(a; args)
-			{
-				{
-					alias t = Unqual!(typeof(a)); 
-					static if(isSomeString!t)
-					{
-						//props = a; //todo: ennek is
-						static assert(0, "string parameter in Slider is deprecated. Use {} delegate instead!"); 
-					}
-				}
-			}
-			
-			float normValue = _range.normalize(flipped ? _range.max-value : value); 
-			
-			int wrapCnt; 
-			if(_range.isEndless)
-			{
-				wrapCnt = normValue.floor.iround;  //Todo: refactor endless wrapCnt stuff
-				normValue = normValue-normValue.floor; 
-			}
-			
-			bool userModified; 
-			HitInfo hit; 
-			auto sl = new .Slider(
-				id_, imEnabled, normValue, _range, userModified, targetView.mousePos.vec2, 
-				style, hit, getStaticParamDef(SliderOrientation.auto_, args), 
-				getStaticParamDef(SliderType.slider, args), theme.isTool ? 1 : 1.4f
-			); 
-			
-			append(sl); push(sl, id_); scope(exit) pop; 
-			
-			mixin(hintHandler); 
-			static foreach(a; args)
-			static if(__traits(compiles, a()))
-			a(); 
-			
-			//Todo: args hanfling is bad here! only handles delegates. Ignored named parameters!
-			
-			if(userModified && imEnabled)
-			{
-				
-				if(_range.isEndless)
-				normValue += wrapCnt-sl.wrapCnt; 
-				
-				float f = _range.denormalize(normValue); 
-				static if(isIntegral!V)
-				f = round(f); 
-				value = f.to!V; 
-				if(flipped)
-				value = (_range.max-value).to!V; //UNFLIP
-			}
-			
-			return userModified; 
-		} 
-	}
-	
-	version(/+$DIDE_REGION+/none) {
-		this(
-			in im.Id id, bool enabled, ref float nPos_, in ValueRange range_, ref bool userModified, vec2 mousePos, 
-			TextStyle ts, out im.HitInfo hit, Orientation orientation, Type type, float fhScale, float normThumbSize=float.init
-		)
-		{
-			this.id = id; 
-			this.orientation = orientation; 
-			this.type = type; 
-			this.nPos = enabled ? nPos_ : nPos_/+float.init+//+Todo: hideThumb option+/; 
-			this.normThumbSize = normThumbSize; 
-			
-			if(type==Type.scrollBar) padding = "2"; 
-			
-			hit = im.hitTest(this, enabled); 
-			hitBounds = hit.hitBounds; 
-			
-			if(1 || type==Type.slider)
-			focused = im.focusUpdate(
-				this, id, enabled,
-				hit.pressed || hit.hover && inputs.RMB.pressed, //when to enter
-				inputs.Esc.pressed,  //when to exit
-			); 
-			
-			//res.focused = focused;
-			
-			if(focused && im.canProcessUserInput)
-			userModified |= im.sliderState.handleKeyboard(nPos, range_, 8); 
-			
-			bkColor = ts.bkColor; 
-			const hoverOrFocus = enabled ? max(hit.hover_smooth*.5f, focused ? 1.0f : 0) : 0; 
-			
-			final switch(type)
-			{
-				case Type.slider: 
-					clThumb =	mix(mix(clSliderThumb, clSliderThumbHover, hoverOrFocus), clSliderThumbPressed, hit.captured_smooth); 
-					clLine =	mix(mix(clSliderLine , clSliderLineHover , hoverOrFocus), clSliderLinePressed , hit.captured_smooth); 
-					clRuler = clGray/+mix(bkColor, ts.fontColor, 0.5)+/; //disable ruler for now
-					
-					if(focused) { clThumb = clBlack; clLine = clBlack; }//Todo: lame logic
-					
-					rulerSides = 0; 
-				break; 
-				case Type.scrollBar: 
-					clThumb = mix(clScrollThumb, clScrollThumbPressed, hoverOrFocus); 
-					bkColor = mix(clScrollBk, clScrollThumb, min(hoverOrFocus, .5f)); 
-					
-					if(focused) { clThumb = clBlack; }//Todo: lame logic
-					
-					//clThumb = mix(clWinBtn, clWinBtnPressed, max(hit.hover_smooth*.5f, sliderState.pressed_id==id ? 1 : 0));
-					rulerSides = 0; 
-				break; 
-			}
-			
-			if(!enabled)
-			clLine = clThumb = clGray; //Todo: nem clGray ez, hanem clDisabledText vagy ilyesmi
-			
-			baseSize = ts.fontHeight*fhScale*0.8f; 
-			outerSize = vec2(baseSize*6, baseSize); //default size
-			
-			userModified |= im.sliderState.handleMouse(id, hit, nPos, mousePos, range_, wrapCnt); 
-			
-			if(userModified)
-			nPos_ = nPos; 
-		} 
-		
-		this(
-			in im.Id id, bool enabled, ref float nPos_, in ValueRange range_, ref bool userModified, vec2 mousePos, 
-			TextStyle ts, out im.HitInfo hit, Orientation orientation, Type type, float fhScale, float normThumbSize=float.init
-		)
-		{
-			this.id = id; 
-			this.orientation = orientation; 
-			this.type = type; 
-			this.nPos = enabled ? nPos_ : nPos_/+float.init+//+Todo: hideThumb option+/; 
-			this.normThumbSize = normThumbSize; 
-			
-			if(type==Type.scrollBar) padding = "2"; 
-			
-			hit = im.hitTest(this, enabled); 
-			hitBounds = hit.hitBounds; 
-			
-			bool focused; 
-			if(1 || type==Type.slider)
-			focused = im.focusUpdate(
-				this, id, enabled,
-				hit.pressed || hit.hover && inputs.RMB.pressed, //when to enter
-				inputs.Esc.pressed,  //when to exit
-			); 
-			
-			//res.focused = focused;
-			
-			if(focused && im.canProcessUserInput)
-			userModified |= im.sliderState.handleKeyboard(nPos, range_, 8); 
-			
-			bkColor = ts.bkColor; 
-			setupAppearance(enabled, focused, hit.hover_smooth, hit.captured_smooth, ts.fontHeight*fhScale*0.8f); 
-			
-			userModified |= im.sliderState.handleMouse(id, hit, nPos, mousePos, range_, wrapCnt); 
-			
-			if(userModified)
-			nPos_ = nPos; 
-		} 
-	}
-	version(/+$DIDE_REGION+/none) {
-		void createBars(bool doPurge)
-		{
-			assert(orientation.among('H', 'V')); 
-			
-			Id[] toRemove; 
-			foreach(id, ref info; infos)
-			{
-				if(info.lastAccess<application.tick)
-				{
-					if(doPurge) toRemove ~= id; 
-					continue; 
-				}
-				const exists 	= (orientation=='H' && info.container.flags.hasHScrollBar)
-					|| (orientation=='V' && info.container.flags.hasVScrollBar); 
-				if(!exists) continue; 
-				
-				bool enabled; 
-				float normValue; 
-				float normThumbSize; 
-				float activeRange = info.contentSize - info.pageSize; 
-				
-				const flip = orientation=='V'; 
-				void doFlip()
-				{ if(flip) normValue = 1-normValue; } 
-				
-				if(activeRange > 0.001f)
-				{
-					//restrict range
-					info.offset.minimize(activeRange); 
-					info.offset.maximize(0); 
-					
-					enabled = true; 
-					normValue = info.offset/activeRange; 
-					normThumbSize = info.pageSize/info.contentSize; 
-					
-					doFlip; 
-				}else
-				{
-					info.offset = 0; //no active range, so just reset it to 0
-				}
-				
-				bool userModified; 
-				HitInfo hit; 
-				/+
-					Todo: scrollbars only work on GUI surface. This flag shlould be inherited automatically, 
-							just like the upcoming enabled flag.
-				+/
-				auto sl = new .Slider
-					(
-					combine(info.container.id, orientation), enabled, normValue, 
-					linRange(0, 1), userModified, view_gui.mousePos.vec2, tsNormal, hit,
-					orientation=='H' ? SliderOrientation.horz : SliderOrientation.vert, 
-					SliderType.scrollBar, 1, normThumbSize
-				); 
-				/+
-					Code: this(
-						in im.Id id, bool enabled, ref float nPos_, in ValueRange range_, ref bool userModified, vec2 mousePos, 
-						TextStyle ts, out im.HitInfo hit, Orientation orientation, Type type, float fhScale, float normThumbSize=float.init
-					)
-					{
-						this.id = id; 
-						this.orientation = orientation; 
-						this.type = type; 
-						this.nPos = enabled ? nPos_ : nPos_/+float.init+//+Todo: hideThumb option+/; 
-						this.normThumbSize = normThumbSize; 
-						
-						if(type==Type.scrollBar) padding = "2"; 
-						
-						hit = im.hitTest(this, enabled); 
-						hitBounds = hit.hitBounds; 
-						
-						bool focused; 
-						if(1 || type==Type.slider)
-						focused = im.focusUpdate(
-							this, id, enabled,
-							hit.pressed || hit.hover && inputs.RMB.pressed, //when to enter
-							inputs.Esc.pressed,  //when to exit
-						); 
-						
-						//res.focused = focused;
-						
-						if(focused && im.canProcessUserInput)
-						userModified |= im.sliderState.handleKeyboard(nPos, range_, 8); 
-						
-						bkColor = ts.bkColor; 
-						setupAppearance(enabled, focused, hit.hover_smooth, hit.captured_smooth, ts.fontHeight*fhScale*0.8f); 
-						
-						userModified |= im.sliderState.handleMouse(id, hit, nPos, mousePos, range_, wrapCnt); 
-						
-						if(userModified)
-						nPos_ = nPos; 
-					} 
-				+/
-				
-				info.slider = sl; 
-				
-				//set the position of the slider.
-				//Todo: Because it's after hitTest, interaction will be delayed for 1 frame. But it should not.
-				const scrollThickness = DefaultScrollThickness; //Todo: this is duplicated!!!
-				with(info.container)
-				if(orientation=='H')
-				{
-					sl.outerPos = vec2(0, innerHeight-scrollThickness); 
-					sl.outerSize = vec2(innerWidth-((flags.hasVScrollBar) ?(scrollThickness):(0)), scrollThickness); 
-				}
-				else
-				{
-					sl.outerPos = vec2(innerWidth-scrollThickness, 0); 
-					sl.outerSize = vec2(scrollThickness, innerHeight-((flags.hasHScrollBar) ?(scrollThickness):(0))); 
-				}
-				
-				
-				
-				//Todo: the hitInfo is for the last frame. It should be processed a bit later
-				if(userModified && enabled)
-				{
-					doFlip; 
-					info.offset = normValue*activeRange; 
-				}
-			}
-			
-			//purge old ones
-			foreach(id; toRemove) infos.remove(id); 
-		} 
-		/+
-			Code: auto HRuler(string _M_=__MODULE__, size_t _L_=__LINE__, T, Args...)
-				(
-				const T tMin, const T tMax, ref T t0, ref T t1,
-				Args args /+optional: /+Structured: &t0_smooth, &t1_smooth+/+/
-			)
-			{
-				mixin(prepareId); bool userModified; 
-				
-				static if(is(T==DateTime))
-				{
-					{
-						HitInfo hit; 
-						
-						enum isSmooth = Args.length>=2 	&& is(Args[0]==DateTime*) 
-							&& is(Args[1]==DateTime*); 
-						
-						static if(isSmooth)
-						{
-							ref rangeFollower = ImStorage!(RangeFollower!DateTime).access(id_); 
-							rangeFollower.beforeUpdate(false, t0, t1, tMin, tMax); 
-						}
-						
-						auto ruler = new DateTimeRuler(
-							id_, imEnabled, tMin, tMax, t0, t1,
-							style, targetView.mousePos.vec2, userModified, hit
-						); 
-						
-						static if(isSmooth)
-						{
-							rangeFollower.afterUpdate(userModified, t0, t1, calcAnimationT(deltaTime, .7)); 
-							ruler.t0_draw = *(args[0]) = rangeFollower.smooth[0],
-							ruler.t1_draw = *(args[1]) = rangeFollower.smooth[1]; 
-						}
-						else
-						{
-							ruler.t0_draw = t0,
-							ruler.t1_draw = t1; 
-						}
-						
-						append(ruler); push(ruler, id_); scope(exit) pop; 
-						
-						static foreach(a; args) static if(__traits(compiles, a())) a(); 
-					}
-				}
-				else static assert(0, "Unsupported type: "~T.stringof); 
-				
-				return userModified; 
-			} 
-		+/
-		
-		void ScrollBox()
-		{
-			NOTIMPL; 
-			version(/+$DIDE_REGION+/none) {
-				Panel(
-					DockAlignment.bottomClient,
-					{
-						margin = "0"; padding = "0"; //border = "1 normal gray";
-						outerHeight = 200; 
-						auto siz = innerSize; 
-						Container
-						(
-							{
-								outerSize = siz; 
-								with(flags) {
-									clipSubCells = true; 
-									vScrollState = ScrollState.auto_; 
-									hScrollState = ScrollState.auto_; 
-								}
-								
-								if(auto mod = errorModule)
-								{
-									if(auto col = mod.content)
-									{
-										//total size placeholder
-										Container({ outerPos = col.outerSize; outerSize = vec2(0); }); 
-										
-										flags.saveVisibleBounds = true; 
-										if(auto visibleBounds = imstVisibleBounds(actId))
-										{
-											CodeRow[] visibleRows = col.rows.filter!(
-												r => r.outerBounds.overlaps(visibleBounds)
-												&& r.subCells.length
-											).array; 
-											//Opt: binary search
-											
-											actContainer.append(cast(Cell[])visibleRows); 
-											//Note: append is important because it already has the spaceHolder Container.
-										}
-									}
-									else
-									WARN("Invalid errorList"); 
-								}
-							}
-						); 
-					}
-				); 
-			}
-		} 
-	}
-	version(/+$DIDE_REGION+/none) {
-		auto OldListItem(string _M_=__MODULE__, size_t _L_=__LINE__, T0, T...)(T0 text, T args)
-			if(isSomeString!T0 || __traits(compiles, text()) )
-		{
-			mixin(prepareId, enable.M, selected_M); 
-			
-			//Todo: This is only the base of a listitem. Later it must communicate with a container
-			
-			HitInfo hit; 
-			Row(
-				{
-					/+actContainer.id = id_; +/
-					hit = hitTest(enabled); 
-					
-					style = tsNormal; //!!! na ez egy gridbol kell, hogy jojjon!
-					
-					margin = "0"; 
-					auto bcolor = mix(style.fontColor, style.bkColor, .5f); 
-					border	= Border(1, BorderStyle.normal, mix(bcolor, style.fontColor, hit.hover_smooth)); 
-					border.inset	= true; 
-					border.extendBottomRight = true; 
-					padding = Padding(0, 2, 0, 2); 
-					
-					style.bkColor = mix(style.bkColor, clGray, hit.hover_smooth*.16f); 
-					
-					if(!enabled)
-					{
-						style.fontColor = mix(style.fontColor, clGray, 0.5f); 
-						//Todo: rather use an 50% overlay for disabled?
-					}
-					
-					if(_selected)
-					{
-						style.bkColor	= mix(style.bkColor, clAccent, .5f); 
-						border.color	= mix(border.color , clAccent, .5f); 
-					}
-					
-					bkColor = style.bkColor; 
-					//Todo: update the backgroundColor of the container. Should be automatic, but how?...
-					
-					static if(isSomeString!T0)
-					Text(text); 
-					else text(); 
-					 //delegate
-				}
-			); 
-			
-			return hit; 
-		} 
-	}
-	version(/+$DIDE_REGION+/none) {
-		auto ListBoxItem(string _M_=__MODULE__, size_t _L_=__LINE__, C, Args...)
-			(ref bool isSelected, C s, in Args args)
-		{
-			HitInfo hit; 
-			Row!(_M_, _L_)
-			(
-				{
-					hit = hitTest(imEnabled); 
-					
-					if(
-						!isSelected && hit.hover && (
-							inputs.LMB.down || inputs.RMB.down
-							/+mosue down left or right+/
-						)
-					)
-					isSelected = true; 
-					
-					padding = "2 2"; 
-					background = mix(background, clAccent, max(isSelected ? 0.66f:0, hit.hover_smooth*0.33f)); 
-					style.bkColor = background; 
-					
-					static if(__traits(compiles, s()))
-					s(); 
-					else Text(s.text); 
-				}, args
-			); 
-			
-			return hit; 
-		} 
-	}
-	
-	version(/+$DIDE_REGION+/none) {
-		auto ListBox(string _M_=__MODULE__, size_t _L_=__LINE__, A, Args...)
-			(ref A value, A[] items, Args args)
-		{
-			auto idx = cast(int) items.countUntil(value); 
-			//Opt: slow search. iterates items twice: 1. in this, 2. in the main ListBox funct
-			
-			auto res = ListBox!(_M_, _L_)(idx, items, args); 
-			if(res)
-			value = items[idx]; 
-			return res; 
-		} 
-		
-		auto ListBox(string _M_=__MODULE__, size_t _L_=__LINE__, E, Args...)
-			(ref E e, Args args)
-			if(is(E==enum))
-		{
-			auto s = e.text; 
-			auto res = ListBox!(_M_, _L_)(s, getEnumMembers!E, args); 
-			if(res)
-			ignoreExceptions({ e = s.to!E; }); 
-			return res; 
-		} 
-		
-		/+
-			Todo: the parameters of all the ListBox-es, ComboBoxes must be refactored. 
-			It's a lot of copy paste and yet it's far from full accessible functionality.
-		+/
-		static void ScrollListBox(T, U, string _M_=__MODULE__ , size_t _L_=__LINE__)
-			(ref T focusedItem, U items, void delegate(in T) cellFun, int pageSize, ref int topIndex)
-			if(isInputRange!U && is(ElementType!U == T))
-		{
-			auto scrollMax = max(0, items.walkLength.to!int-pageSize); 
-			topIndex = topIndex.clamp(0, scrollMax); 
-			auto view = items.drop(topIndex).take(pageSize).array; 
-			Row!(_M_, _L_)(
-				{
-					ListBox(focusedItem, view, cellFun); 
-					if(1 || scrollMax)
-					{
-						Spacer; 
-						Slider(topIndex, range(scrollMax, 0), { width = 1*fh; }); 
-						flags.yAlign = YAlign.stretch; 
-					}
-				}
-			); 
-		} 
-	}
-	version(/+$DIDE_REGION+/none) {
-		//Parameter structs ///////////////////////////////////
-		//deprecated struct id      { uint val;  /*private*/ enum M = q{ auto id_ = file.xxh(line)^baseId;                          static foreach(a; args) static if(is(Unqual!(typeof(a)) == id      )) id_       = [a.val].xxh(id_); }; }
-		deprecated immutable prepareId = q{auto id_ = combine(imId, srcId!(_M_, _L_)(args)); }; 
-		
-		/*
-			struct enable 
-				{ bool val; 	 enum M = q{auto oldEnabled = enabled; scope(exit) enabled = oldEnabled; 	  static foreach(a; args) static if(is(Unqual!(typeof(a)) == enable  )) enabled = enabled && a.val; 	}; } 
-		*/
-		
-		deprecated immutable selected_M = q{static foreach(a; args) static if(isGenericArg!(typeof(cast()a), "selected")) imSelected	= a.val; 	}; 
-		
-		
-		/+private enum range_M = q{range _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == range)) _range = a; }; +/
-		/+deprecated private enum range_M = q{ValueRange _range;  static foreach(a; args) static if(is(Unqual!(typeof(a)) == ValueRange)) _range = a; }; +/
-	}
-	
-	deprecated private enum hintHandler = 
-	q{
-		{
-			static foreach(a; args)
-			static if(is(Unqual!(typeof(a)) == HintRec))
-			{
-				if(a.markup.length && hit.hover)
-				{
-					auto hr = a; 
-					hr.owner = actContainer; 
-					hr.bounds = hit.hitBounds; 
-					addHint(hr); 
-				}
-			}
-		}
-	}; 
-	
 }
