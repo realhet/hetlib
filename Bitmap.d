@@ -6968,10 +6968,11 @@ version(/+$DIDE_REGION+/all)
 	
 	struct BitmapFontProps
 	{
-		string fontName = "Tahoma"; 
+		string fontName; 
 		int height = 32; 
 		int xScale = 1; 
 		bool clearType = false; 
+		bool noAntiAlias = false; 
 	} 
 	
 	auto decodeFontDeclaration(string s, out string text)
@@ -7000,6 +7001,7 @@ version(/+$DIDE_REGION+/all)
 			}
 			else if(a=="ct") { res.clearType = true; }
 			else if(a=="x3") { res.xScale = 3; }
+			else if(a=="na") { res.noAntiAlias = true; }
 			else if(a=="x2") { res.xScale = 2; }
 			else if(a=="") {
 				//empty is ok. Easier to make conditional declarations that way
@@ -7584,37 +7586,37 @@ version(/+$DIDE_REGION+/all)
 {
 	version(D2D_FONT_RENDERER)
 	{
-		 private: 
-			//Direct2D stuff ////////////////////////////////////////////////////////
+		private: 
+		//Direct2D stuff ////////////////////////////////////////////////////////
 		
-			pragma(lib, "D2d1.lib"); 
-			pragma(lib, "DWrite.lib"); 
+		pragma(lib, "D2d1.lib"); 
+		pragma(lib, "DWrite.lib"); 
 		
-			alias FLOAT = float, UINT32 = uint, UINT64 = ulong, D2D1_TAG = UINT64; 
+		alias FLOAT = float, UINT32 = uint, UINT64 = ulong, D2D1_TAG = UINT64; 
 		
-			struct D2D_RECT_F
+		struct D2D_RECT_F
 		{ float left=0, top=0, right=0, bottom=0; } 
-			alias D2D1_RECT_F = D2D_RECT_F; 
-			struct D2D1_COLOR_F
+		alias D2D1_RECT_F = D2D_RECT_F; 
+		struct D2D1_COLOR_F
 		{ float r=0, g=0, b=0, a=1; } 
-			alias DWRITE_COLOR_F = D2D1_COLOR_F; 
-			struct D2D1_POINT_2F
+		alias DWRITE_COLOR_F = D2D1_COLOR_F; 
+		struct D2D1_POINT_2F
 		{ float x=0, y=0; } 
-			alias D2D1_SIZE_F = D2D1_POINT_2F; 
-			struct D2D1_SIZE_U
+		alias D2D1_SIZE_F = D2D1_POINT_2F; 
+		struct D2D1_SIZE_U
 		{ uint x=0, y=0; } 
-			struct D2D1_MATRIX_3X2_F
+		struct D2D1_MATRIX_3X2_F
 		{ float m11=1, m12=0, m21=0, m22=1, dx=0, dy=0; } 
-			struct DWRITE_TEXT_RANGE
+		struct DWRITE_TEXT_RANGE
 		{ uint start, length; } 
 		
-			struct D2D1_RENDER_TARGET_PROPERTIES
+		struct D2D1_RENDER_TARGET_PROPERTIES
 		{
 			int type, pixelFormat, alphaMode; 
 			float dpiX=0, dpiY=0; 
 			int usage, minLevel; 
 		} 
-			auto DCRenderTargetProps()
+		auto DCRenderTargetProps()
 		{
 			return D2D1_RENDER_TARGET_PROPERTIES(
 				0, 
@@ -7623,8 +7625,8 @@ version(/+$DIDE_REGION+/all)
 			); 
 		} 
 		
-			mixin(uuid!(ID2D1Factory, "06152247-6f50-465a-9245-118bfd3b6007")); 
-			interface ID2D1Factory : IUnknown
+		mixin(uuid!(ID2D1Factory, "06152247-6f50-465a-9245-118bfd3b6007")); 
+		interface ID2D1Factory : IUnknown
 		{
 			HRESULT ReloadSystemMetrics(); 
 			void GetDesktopDpi(/*out*/ FLOAT *dpiX,/*out*/ FLOAT *dpiY); 
@@ -7645,60 +7647,69 @@ version(/+$DIDE_REGION+/all)
 			); 
 		} 
 		
-			enum D2D1_FACTORY_TYPE:uint
+		enum D2D1_FACTORY_TYPE:uint
 		{ SINGLE_THREADED, MULTI_THREADED, FORCE_DWORD = 0xffffffff} 
 		
-			extern(Windows) HRESULT D2D1CreateFactory(
+		extern(Windows) HRESULT D2D1CreateFactory(
 			D2D1_FACTORY_TYPE factoryType, 
 			REFIID riid, void* pFactoryOptions, out ID2D1Factory
 		); 
 		
-			enum D2D1_ANTIALIAS_MODE:uint
+		enum D2D1_ANTIALIAS_MODE:uint
 		{ PER_PRIMITIVE, ALIASED, FORCE_DWORD = 0xffffffff} 
-			enum D2D1_DRAW_TEXT_OPTIONS:uint
+		enum D2D1_DRAW_TEXT_OPTIONS:uint
 		{ NONE=0, NO_SNAP=1, CLIP=2, ENABLE_COLOR_FONT=4, FORCE_DWORD=0xffffffff} 
-			enum D2D1_TEXT_ANTIALIAS_MODE:uint
+		enum D2D1_TEXT_ANTIALIAS_MODE:uint
 		{ DEFAULT, CLEARTYPE, GRAYSCALE, ALIASED, FORCE_DWORD = 0xffffffff} 
 		
-			enum DWRITE_TEXT_ALIGNMENT :int
+		enum DWRITE_TEXT_ALIGNMENT :int
 		{ LEADING, TRAILING, CENTER, JUSTIFIED} 
-			enum DWRITE_PARAGRAPH_ALIGNMENT :int
+		enum DWRITE_PARAGRAPH_ALIGNMENT :int
 		{ NEAR, FAR, CENTER} 
-			enum DWRITE_WORD_WRAPPING :int
+		enum DWRITE_WORD_WRAPPING :int
 		{ WRAP, NO_WRAP, EMERGENCY_BREAK, WHOLE_WORD, CHARACTER} 
-			enum DWRITE_READING_DIRECTION :int
+		enum DWRITE_READING_DIRECTION :int
 		{ LEFT_TO_RIGHT, RIGHT_TO_LEFT, TOP_TO_BOTTOM, BOTTOM_TO_TOP} 
-			enum DWRITE_FLOW_DIRECTION :int
+		enum DWRITE_FLOW_DIRECTION :int
 		{ TOP_TO_BOTTOM, BOTTOM_TO_TOP, LEFT_TO_RIGHT, RIGHT_TO_LEFT} 
-			enum DWRITE_TRIMMING_GRANULARITY :int
+		enum DWRITE_TRIMMING_GRANULARITY :int
 		{ NONE, CHARACTER, WORD} 
-			enum DWRITE_LINE_SPACING_METHOD :int
+		enum DWRITE_LINE_SPACING_METHOD :int
 		{ DEFAULT, UNIFORM} 
-			enum DWRITE_FONT_WEIGHT :int
+		enum DWRITE_FONT_WEIGHT :int
 		{
 			THIN=100, EXTRA_LIGHT=200, ULTRA_LIGHT=200, LIGHT=300, SEMI_LIGHT=350, NORMAL=400, 
 			REGULAR=400, MEDIUM=500, DEMI_BOLD=600, SEMI_BOLD=600, BOLD=700, EXTRA_BOLD=800, 
 			ULTRA_BOLD=800, BLACK=900, HEAVY=900, EXTRA_BLACK=950, ULTRA_BLACK=950
 		} 
-			enum DWRITE_FONT_STRETCH :int
+		enum DWRITE_FONT_STRETCH :int
 		{
 			UNDEFINED=0, ULTRA_CONDENSED=1, EXTRA_CONDENSED=2, CONDENSED=3, SEMI_CONDENSED=4, 
 			NORMAL=5, MEDIUM=5, SEMI_EXPANDED=6, EXPANDED=7, EXTRA_EXPANDED=8, ULTRA_EXPANDED=9
 		} 
-			enum DWRITE_FONT_STYLE :int
+		enum DWRITE_FONT_STYLE :int
 		{ NORMAL, OBLIQUE, ITALIC} 
 		
-			struct DWRITE_TEXT_METRICS
+		struct DWRITE_TEXT_METRICS
 		{
-			float 	left, top,
-				width, widthIncludingTrailingWhitespace,
-				height,
-				layoutWidth, layoutHeight; 
+			float 	left=0, top=0,
+				width=0, widthIncludingTrailingWhitespace=0, height=0,
+				layoutWidth=0, layoutHeight=0; 
 			uint maxBidiReorderingDepth, lineCount; 
 		} 
 		
-			mixin(uuid!(IDWriteTextFormat, "9c906818-31d7-4fd3-a151-7c5e225db55a")); 
-			interface IDWriteTextFormat : IUnknown
+		struct DWRITE_LINE_METRICS
+		{
+			uint length, trailingWhitespaceLength, newlineLength; 
+			float height=0, baseline=0; 
+			BOOL isTrimmed; 
+		} 
+		
+		struct DWRITE_OVERHANG_METRICS
+		{ float left=0, top=0, right=0, bottom=0; } 
+		
+		mixin(uuid!(IDWriteTextFormat, "9c906818-31d7-4fd3-a151-7c5e225db55a")); 
+		interface IDWriteTextFormat : IUnknown
 		{
 			HRESULT SetTextAlignment(DWRITE_TEXT_ALIGNMENT textAlignment); 
 			HRESULT SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT paragraphAlignment); 
@@ -7727,14 +7738,14 @@ version(/+$DIDE_REGION+/all)
 			HRESULT GetLocaleName(/*out*/ WCHAR* localeName, UINT32 nameSize); 
 		} 
 		
-			struct D2D1_BRUSH_PROPERTIES
+		struct D2D1_BRUSH_PROPERTIES
 		{
 			FLOAT opacity = 1; 
 			D2D1_MATRIX_3X2_F transform; 
 		} 
 		
-			mixin(uuid!(ID2D1Brush, "2cd906a8-12e2-11dc-9fed-001143a055f9")); 
-			interface ID2D1Brush : ID2D1Resource
+		mixin(uuid!(ID2D1Brush, "2cd906a8-12e2-11dc-9fed-001143a055f9")); 
+		interface ID2D1Brush : ID2D1Resource
 		{
 			//extern(Windows): 
 			void SetOpacity(FLOAT opacity); 
@@ -7743,22 +7754,22 @@ version(/+$DIDE_REGION+/all)
 			void GetTransform(out D2D1_MATRIX_3X2_F transform) const; 
 		} 
 		
-			mixin(uuid!(ID2D1SolidColorBrush, "2cd906a9-12e2-11dc-9fed-001143a055f9")); 
-			interface ID2D1SolidColorBrush : ID2D1Brush
+		mixin(uuid!(ID2D1SolidColorBrush, "2cd906a9-12e2-11dc-9fed-001143a055f9")); 
+		interface ID2D1SolidColorBrush : ID2D1Brush
 		{
 			//extern(Windows): 
 			void SetColor(const D2D1_COLOR_F color); 
 			ref D2D1_COLOR_F GetColor() const; //Bug: got crash? see ID2D1RenderTarget.GetSize()
 		} 
 		
-			mixin(uuid!(ID2D1Resource, "2cd90691-12e2-11dc-9fed-001143a055f9")); 
-			interface ID2D1Resource : IUnknown
+		mixin(uuid!(ID2D1Resource, "2cd90691-12e2-11dc-9fed-001143a055f9")); 
+		interface ID2D1Resource : IUnknown
 		{
 			//extern(Windows): 
 			void GetFactory(out ID2D1Factory factory) const; 
 		} 
-			
-			/+
+		
+		/+
 			Todo: Do DirectWrite Font Fallback Analysis
 			
 			This tells you which actual font file provides each character:
@@ -7778,8 +7789,8 @@ version(/+$DIDE_REGION+/all)
 			+/
 		+/
 		
-			mixin(uuid!(ID2D1RenderTarget, "2cd90694-12e2-11dc-9fed-001143a055f9")); 
-			interface ID2D1RenderTarget : ID2D1Resource
+		mixin(uuid!(ID2D1RenderTarget, "2cd90694-12e2-11dc-9fed-001143a055f9")); 
+		interface ID2D1RenderTarget : ID2D1Resource
 		{
 			HRESULT CreateBitmap(/**/); 
 			HRESULT CreateBitmapFromWicBitmap(/**/); 
@@ -7812,7 +7823,7 @@ version(/+$DIDE_REGION+/all)
 			
 			void DrawTextLayout(
 				D2D1_POINT_2F origin, IDWriteTextLayout textLayout, ID2D1Brush defaultForegroundBrush,
-							D2D1_DRAW_TEXT_OPTIONS options = D2D1_DRAW_TEXT_OPTIONS.NONE
+				D2D1_DRAW_TEXT_OPTIONS options = D2D1_DRAW_TEXT_OPTIONS.NONE
 			); 
 			
 			void DrawGlyphRun(/**/); 
@@ -7853,13 +7864,13 @@ version(/+$DIDE_REGION+/all)
 			BOOL IsSupported(const(D2D1_RENDER_TARGET_PROPERTIES)* renderTargetProperties) const; 
 		} 
 		
-			//------------------------------------------------------------------------------
-			mixin(uuid!(ID2D1DCRenderTarget, "1c51bc64-de61-46fd-9899-63a5d8f03950")); 
-			interface ID2D1DCRenderTarget : ID2D1RenderTarget
+		//------------------------------------------------------------------------------
+		mixin(uuid!(ID2D1DCRenderTarget, "1c51bc64-de61-46fd-9899-63a5d8f03950")); 
+		interface ID2D1DCRenderTarget : ID2D1RenderTarget
 		{ HRESULT BindDC(const HDC  hDC, const(RECT)* pSubRect); } 
 		
-			mixin(uuid!(IDWriteFactory, "b859ee5a-d838-4b5b-a2e8-1adc7d93db48")); 
-			interface IDWriteFactory : IUnknown
+		mixin(uuid!(IDWriteFactory, "b859ee5a-d838-4b5b-a2e8-1adc7d93db48")); 
+		interface IDWriteFactory : IUnknown
 		{
 			HRESULT GetSystemFontCollection(/**/); 
 			HRESULT CreateCustomFontCollection(/**/); 
@@ -7898,12 +7909,12 @@ version(/+$DIDE_REGION+/all)
 			HRESULT CreateGlyphRunAnalysis(/**/); 
 		} 
 		
-			enum DWRITE_FACTORY_TYPE : int { SHARED, ISOLATED} 
+		enum DWRITE_FACTORY_TYPE : int { SHARED, ISOLATED} 
 		
-			export extern(C) HRESULT DWriteCreateFactory(DWRITE_FACTORY_TYPE factoryType, REFIID iid, out IDWriteFactory factory); 
+		export extern(C) HRESULT DWriteCreateFactory(DWRITE_FACTORY_TYPE factoryType, REFIID iid, out IDWriteFactory factory); 
 		
-			mixin(uuid!(IDWriteTextLayout, "53737037-6d14-410b-9bfe-0b182bb70961")); 
-			interface IDWriteTextLayout : IDWriteTextFormat
+		mixin(uuid!(IDWriteTextLayout, "53737037-6d14-410b-9bfe-0b182bb70961")); 
+		interface IDWriteTextLayout : IDWriteTextFormat
 		{
 			HRESULT SetMaxWidth(FLOAT maxWidth); 
 			HRESULT SetMaxHeight(FLOAT maxHeight); 
@@ -7936,39 +7947,41 @@ version(/+$DIDE_REGION+/all)
 			HRESULT GetLocaleNameLength(UINT32 currentPosition, /*out*/ UINT32* nameLength, /*out*/ DWRITE_TEXT_RANGE* textRange = null); 
 			HRESULT GetLocaleName(UINT32 currentPosition, /*out*/ WCHAR* localeName, UINT32 nameSize, /*out*/ DWRITE_TEXT_RANGE* textRange = null); 
 			HRESULT Draw(/**/); 
-			HRESULT GetLineMetrics(/**/); 
+			HRESULT GetLineMetrics(DWRITE_LINE_METRICS* lineMetrics, UINT32 maxLineCount, out UINT32 actualLineCount); 
 			HRESULT GetMetrics(out DWRITE_TEXT_METRICS textMetrics); 
-			HRESULT GetOverhangMetrics(/**/); 
-			HRESULT GetClusterMetrics(/**/); 
+			HRESULT GetOverhangMetrics(out DWRITE_OVERHANG_METRICS overhangs); 
+			HRESULT GetClusterMetrics(/+DWRITE_CLUSTER_METRICS *clusterMetrics, UINT32 maxClusterCount, out UINT32 actualClusterCount+/); 
 			HRESULT DetermineMinWidth(/*out*/ FLOAT* minWidth); 
 			HRESULT HitTestPoint(/**/); 
 			HRESULT HitTestTextPosition(/**/); 
 			HRESULT HitTestTextRange(/**/); 
-		} 
-		
-		
-			class BitmapFontRenderer
+		} 
+		
+		public class BitmapFontRenderer
 		{
 			private: 
-				BitmapFontProps props; 
-				alias props this; 
-				bool isSegoeAssets, isLucidaConsole; 
+			BitmapFontProps props; 
+			alias props this; 
 			
-				ID2D1Factory d2dFactory; 
-				IDWriteFactory dwFactory; 
+			ID2D1Factory d2dFactory; 
+			IDWriteFactory dwFactory; 
 			
-				ID2D1DCRenderTarget dcrt; 
+			ID2D1DCRenderTarget dcrt; 
 			
-				IDWriteTextFormat textFormat; 
-				ID2D1SolidColorBrush brush; 
+			IDWriteTextFormat textFormat; 
+			ID2D1SolidColorBrush brush; 
 			
-				bool mustRebuild = true; 
+			bool mustRebuild = true; 
+			float invHeight; 
+			bool isSegoeAssets, isLucidaConsole; 
 			
-				const 	white	= D2D1_COLOR_F(1, 1, 1),
-				black	= D2D1_COLOR_F(0, 0, 0),
-				heightScale 	= 0.75f; 
 			
-				void initialize()
+			enum white	= D2D1_COLOR_F(1, 1, 1),
+			black	= D2D1_COLOR_F(0, 0, 0),
+			heightToFontSize 	= 0.75183519f, /+Based on Segoe UI. This is the fontSize / em ratio there.+/
+			desiredBaseline	= 0.75f /+just a coincidence that this is also .75+/; 
+			
+			void initialize()
 			{
 				//Create factories
 				D2D1CreateFactory(
@@ -7976,7 +7989,7 @@ version(/+$DIDE_REGION+/all)
 					&IID_ID2D1Factory, null, d2dFactory
 				).hrChk("D2D1CreateFactory"); 
 				DWriteCreateFactory(
-					DWRITE_FACTORY_TYPE.SHARED, 
+					DWRITE_FACTORY_TYPE.ISOLATED, 
 					&IID_IDWriteFactory, dwFactory
 				).hrChk("DWriteCreateFactory"); 
 				
@@ -7987,12 +8000,13 @@ version(/+$DIDE_REGION+/all)
 				dcrt.CreateSolidColorBrush(black, D2D1_BRUSH_PROPERTIES(1), brush).hrChk("CreateSolidColorBrush"); 
 			} 
 			
-				void rebuild()
+			void rebuild()
 			{
 				if(!chkClear(mustRebuild)) return; 
 				
 				isSegoeAssets = fontName=="Segoe MDL2 Assets"; 
 				isLucidaConsole = fontName=="Lucida Console"; 
+				invHeight = 1.0f / height; 
 				
 				//Create font
 				SafeRelease(textFormat); 
@@ -8002,19 +8016,20 @@ version(/+$DIDE_REGION+/all)
 					DWRITE_FONT_WEIGHT.REGULAR, 
 					DWRITE_FONT_STYLE.NORMAL, 
 					DWRITE_FONT_STRETCH.NORMAL,
-					height*heightScale, 
+					height * heightToFontSize, 
 					"".toPWChar/*locale*/, 
 					textFormat
 				).hrChk("CreateTextFormat"); 
 				
 				dcrt.SetTransform(D2D1_MATRIX_3X2_F(xScale, 0, 0, 1, 0, 0)); 
 				dcrt.SetTextAntialiasMode(
-					clearType 	? D2D1_TEXT_ANTIALIAS_MODE.CLEARTYPE 
+					clearType 	? D2D1_TEXT_ANTIALIAS_MODE.CLEARTYPE :
+					noAntiAlias	? D2D1_TEXT_ANTIALIAS_MODE.ALIASED
 						: D2D1_TEXT_ANTIALIAS_MODE.GRAYSCALE
 				); 
 			} 
 			
-				void finalize()
+			void finalize()
 			{
 				SafeRelease(textFormat); 
 				SafeRelease(brush); 
@@ -8023,47 +8038,37 @@ version(/+$DIDE_REGION+/all)
 				SafeRelease(dwFactory); 
 			} 
 			public: 
-				this()
+			this()
 			{ initialize; } 
 			
-				~this()
+			~this()
 			{ finalize; } 
 			
-				void setProps(in BitmapFontProps props_)
+			void setProps(in BitmapFontProps props_)
 			{
 				if(props==props_) return; 
 				props = props_; 
 				mustRebuild = true; 
 			} 
 			
-				Bitmap render(in BitmapFontProps props_, string text)
+			Bitmap render(in BitmapFontProps props_, string text)
 			{
 				setProps(props_); 
 				return renderText(text); 
 			} 
 			
-				Bitmap renderDecl(string fontDecl)
+			Bitmap renderDecl(string fontDecl)
 			{
 				string text; 
 				setProps(decodeFontDeclaration(fontDecl, text)); 
 				return renderText(text); 
 			} 
 			
-				Bitmap renderText(string text)
+			Bitmap renderText(string text)
 			{
-				enforce(!text.empty, "Nothing to render."); 
+				enforce(!text.empty, "renderText(): Nothing to render."); 
 				
 				if(mustRebuild) rebuild; 
-				
-				//a single space character needs special care
-				const spaceIdx = text.among(" ", /*"\u2000", "\u2001", "\u2004",*/ smallSpace); 
-				//Todo: measure the width of spaces. For example put 2 well known chars around it.
-				
-				const spaceScale =  [1,	1 , /*2	    , 4	      , 0.666f	 ,*/ 0.4f    ][spaceIdx]; 
-								 //1/4em	1/2em	    1em	      1/6em	 1/4em      thin
-				const isSpace = spaceIdx>0; 
-				if(isSpace) text = "j";  //a letter used to emulate the width of a space.
-				//Todo: get space width from DirectWrite
 				
 				//Create text layout
 				IDWriteTextLayout textLayout; 
@@ -8079,33 +8084,45 @@ version(/+$DIDE_REGION+/all)
 				DWRITE_TEXT_METRICS metrics; 
 				textLayout.GetMetrics(metrics).hrChk("GetMetrics"); 
 				
-				auto bmpSize()
-				{ return ivec2((metrics.width*props.xScale*spaceScale).iround, props.height).max(ivec2(1)); } 
+				DWRITE_LINE_METRICS lineMetrics; uint lineMetricsCount; 
+				textLayout.GetLineMetrics(&lineMetrics, 1, lineMetricsCount).hrChk("GetLineMetrics"); 
+				const relativeBaseline = lineMetrics.baseline * invHeight; 
 				
-				if(isSpace) { return new Bitmap(image2D(bmpSize, ubyte(0))); }
+				/+
+					DWRITE_OVERHANG_METRICS overhangMetrics; 
+					textLayout.GetOverhangMetrics(overhangMetrics).hrChk("GetOverhangMetrics"); 
+				+/
+				
+				const bmpSize = ivec2(
+					(iround(
+						metrics.widthIncludingTrailingWhitespace
+						* props.xScale/+*spaceScale+/
+					)), props.height
+				); 
+				
+				enforce(bmpSize.x>0 && bmpSize.y>0, "renderText(): Bitmap has no area."); 
 				
 				Bitmap doRender(bool inverse=false)
 				{
-					auto gBmp = new GdiBitmap(bmpSize); 
-					scope(exit) gBmp.destroy; 
-					
-					//draw
+					auto gBmp = new GdiBitmap(bmpSize); scope(exit) gBmp.destroy; 
 					auto rect = RECT(0, 0, gBmp.size.x, gBmp.size.y); //Todo: this can be null???
 					dcrt.BindDC(gBmp.hdcMem, &rect).hrChk("BindDC"); 
 					
 					dcrt.BeginDraw; 
+					try
+					{
 						dcrt.Clear(inverse ? white : black); 
 						brush.SetColor(inverse ? black : white); 
-					
-						float y = 0; 
-						if(isLucidaConsole) y = props.height*0.16f; else if(!isSegoeAssets)
-					y = props.height*((-1.425f)/18); 
-					
+						const y = props.height * (
+							(desiredBaseline - relativeBaseline) 
+							+ ((isSegoeAssets)?(.125f):(0))
+						); 
 						dcrt.DrawTextLayout(
-						D2D1_POINT_2F(0, y), textLayout, brush, 
-						D2D1_DRAW_TEXT_OPTIONS.ENABLE_COLOR_FONT
-					); 
-					dcrt.EndDraw.hrChk("EndDraw"); 
+							D2D1_POINT_2F(0, y), textLayout, brush, 
+							D2D1_DRAW_TEXT_OPTIONS.ENABLE_COLOR_FONT
+						); 
+					}
+					finally { dcrt.EndDraw.hrChk("EndDraw"); }
 					
 					return gBmp.toBitmap; 
 				} 
@@ -8113,7 +8130,7 @@ version(/+$DIDE_REGION+/all)
 				auto res = doRender; 
 				
 				static bool isGrayscale(in RGBA color)
-				{ return color.rg==color.gb; } 
+				=> color.rg==color.gb; 
 				
 				if(
 					res.access!RGBA.asArray.map!isGrayscale.all && 
@@ -8138,24 +8155,13 @@ version(/+$DIDE_REGION+/all)
 							: RGBA(b.bgr, alpha); 
 					} 
 					res.set(image2D!process(res.access!RGBA, res2.access!RGBA)); 
-					
-				}
-				
-				if(isSegoeAssets)
-				{
-					 //align the assets font vertically with letters
-					int ysh = iround(res.height*0.125f); //scroll down that many pixels
-					
-					auto img = res.access!ubyte; 
-					img = img.extract_nearest(0, -ysh, res.width, res.height); 
-					res.set(img); 
 				}
 				
 				return res; 
 			} 
 		} 
 		
-			alias bitmapFontRenderer = Singleton!BitmapFontRenderer; 
+		public alias bitmapFontRenderer = Singleton!BitmapFontRenderer; 
 	}
 	
 	//Segoe Symbol database ////////////////////////////////

@@ -1643,7 +1643,7 @@ version(/+$DIDE_REGION+/all)
 		} 
 	}
 	
-	TexHandle fontTexture(Args...)(in dchar ch, in TextStyle ts)
+	TexHandle fontTexture(in dchar ch, in TextStyle ts)
 	{
 		TexHandle stIdx; //the result texture index
 		
@@ -8514,7 +8514,7 @@ struct im
 							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
 							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
 						}
-						((0x3B69AEB16D5C4).檢 (ImStorageManager.stats)); 
+						((0x3B691EB16D5C4).檢 (ImStorageManager.stats)); 
 					}
 				}
 				
@@ -10265,7 +10265,7 @@ struct im
 		void Grp(alias Cntr, string _M_=__MODULE__, size_t _L_=__LINE__, T, A...)
 			(T title, void delegate() fun, in A args)
 		{
-			Container!GrpContainer
+			CustomContainer!GrpContainer
 			(
 				{
 					Row({ padding.left+=fh/4; padding.right+=fh/4; }, title); 
@@ -10912,7 +10912,7 @@ struct im
 		auto BtnRow(Cntr = .Row, string _M_=__MODULE__, size_t _L_=__LINE__, Args...)
 			(void delegate() fun, in Args args)
 		{
-			Container!(Cntr, _M_, _L_)
+			CustomContainer!(Cntr, _M_, _L_)
 			(
 				{
 					static if(is(Cntr : .Row)) rowFlags.btnRowLines = true; 
@@ -10952,7 +10952,7 @@ struct im
 					foreach(i0, capt; captions)
 					{
 						const i = cast(int)i0; 
-						if(Btn(capt, genericId(i), ((idx==i).名!q{selected})))
+						if(Btn(capt, ((i).名!q{id}), ((idx==i).名!q{selected})))
 						idx = i; 
 					}
 				}, args
