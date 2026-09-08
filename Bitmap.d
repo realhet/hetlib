@@ -4814,1039 +4814,568 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 		}version(/+$DIDE_REGION WEBP+/all)
 		{
 			pragma(lib, "libwebp.lib"); 
-			version(none)
+			extern (C)
 			{
-				extern (C)
+				
+				
+				enum WEBP_DECODER_ABI_VERSION = 0x0209; 
+				enum WEBP_ENCODER_ABI_VERSION = 0x020f; 
+				
+				/+
+					Note: Extracted with:
+						/+
+						Code: copy types.h + decode.h + encode.h webp_d_header.c
+						ldc2 webp_d_header.c -Hc -o-
+					+/
+					
+					Manual modifications:
+						- remove ImportC header
+						- remove /+Code:  = void+/
+						- fix an union
+						- fix an identifier called /+Code: ref+/
+						- bring all the static functions
+						- bring two initialization functions passing ABI versions
+					
+					250626: it works now. /+Todo: after a longer test period, remove the old headers.+/
+				+/
+				/+
+					alias __uint16_t = ushort; 
+					alias __uint32_t = uint; 
+					alias __uint64_t = ulong; 
+					align alias uintptr_t = ulong; 
+					align alias va_list = char*; 
+					align void __va_start(char**, ...); 
+					alias size_t = ulong; 
+					alias ptrdiff_t = long; 
+					alias intptr_t = long; 
+					alias __vcrt_bool = bool; 
+					alias wchar_t = ushort; 
+					void __security_init_cookie(); 
+					void __security_check_cookie(ulong _StackCookie); 
+					void __report_gsfailure(ulong _StackCookie); 
+					extern __gshared ulong __security_cookie; 
+					alias __crt_bool = bool; 
+					void _invalid_parameter_noinfo(); 
+					void _invalid_parameter_noinfo_noreturn(); 
+					void _invoke_watson(
+						const(ushort)* _Expression, const(ushort)* _FunctionName, 
+						const(ushort)* _FileName, uint _LineNo, ulong _Reserved
+					); 
+					alias errno_t = int; 
+					alias wint_t = ushort; 
+					alias wctype_t = ushort; 
+					alias __time32_t = int; 
+					alias __time64_t = long; 
+					struct __crt_locale_data_public
+					{
+						const(ushort)* _locale_pctype; 
+						int _locale_mb_cur_max; 
+						uint _locale_lc_codepage; 
+					} 
+					struct __crt_locale_pointers
+					{
+						__crt_locale_data* locinfo; 
+						__crt_multibyte_data* mbcinfo; 
+					} 
+					alias _locale_t = __crt_locale_pointers*; 
+					struct _Mbstatet
+					{
+						uint _Wchar; 
+						ushort _Byte; 
+						ushort _State; 
+					} 
+					struct _Mbstatet; 
+					alias mbstate_t = _Mbstatet; 
+					alias time_t = long; 
+					alias rsize_t = ulong; 
+					int* _errno(); 
+					int _set_errno(int _Value); 
+					int _get_errno(int* _Value); 
+					extern uint __threadid(); 
+					extern ulong __threadhandle(); 
+					alias int8_t = byte; 
+					alias uint8_t = ubyte; 
+					alias int16_t = short; 
+					alias uint16_t = ushort; 
+					alias int32_t = int; 
+					alias uint32_t = uint; 
+					alias uint64_t = ulong; 
+					alias int64_t = long; 
+				+/
+				extern void* WebPMalloc(ulong size); 
+				extern void WebPFree(void* ptr); 
+				extern int WebPGetDecoderVersion(); 
+				extern int WebPGetInfo(const(ubyte)* data, ulong data_size, int* width, int* height); 
+				extern ubyte* WebPDecodeRGBA(const(ubyte)* data, ulong data_size, int* width, int* height); 
+				extern ubyte* WebPDecodeARGB(const(ubyte)* data, ulong data_size, int* width, int* height); 
+				extern ubyte* WebPDecodeBGRA(const(ubyte)* data, ulong data_size, int* width, int* height); 
+				extern ubyte* WebPDecodeRGB(const(ubyte)* data, ulong data_size, int* width, int* height); 
+				extern ubyte* WebPDecodeBGR(const(ubyte)* data, ulong data_size, int* width, int* height); 
+				extern ubyte* WebPDecodeYUV(
+					const(ubyte)* data, ulong data_size, int* width, int* height, 
+					ubyte** u, ubyte** v, int* stride, int* uv_stride
+				); 
+				extern ubyte* WebPDecodeRGBAInto(
+					const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
+					ulong output_buffer_size, int output_stride
+				); 
+				extern ubyte* WebPDecodeARGBInto(
+					const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
+					ulong output_buffer_size, int output_stride
+				); 
+				extern ubyte* WebPDecodeBGRAInto(
+					const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
+					ulong output_buffer_size, int output_stride
+				); 
+				extern ubyte* WebPDecodeRGBInto(
+					const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
+					ulong output_buffer_size, int output_stride
+				); 
+				extern ubyte* WebPDecodeBGRInto(
+					const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
+					ulong output_buffer_size, int output_stride
+				); 
+				extern ubyte* WebPDecodeYUVInto(
+					const(ubyte)* data, ulong data_size, ubyte* luma, 
+					ulong luma_size, int luma_stride, ubyte* u, ulong u_size, 
+					int u_stride, ubyte* v, ulong v_size, int v_stride
+				); 
+				enum WEBP_CSP_MODE
 				{
-					//Copyright 2011 Google Inc. All Rights Reserved.
-					//
-					//Use of this source code is governed by a BSD-style license
-					//that can be found in the COPYING file in the root of the source
-					//tree. An additional intellectual property rights grant can be found
-					//in the file PATENTS. All contributing project authors may
-					//be found in the AUTHORS file in the root of the source tree.
-					//-----------------------------------------------------------------------------
-					//
-					//   WebP encoder: main interface
-					//
-					//Author: Skal (pascal.massimino@gmail.com)
-						
-					//public import webp.types;
-					
-					enum WEBP_ENCODER_ABI_VERSION = 0x0202;    //MAJOR(8b) + MINOR(8b)
-					
-					//Return the encoder's version number, packed in hexadecimal using 8bits for
-					//each of major/minor/revision. E.g: v2.5.7 is 0x020507.
-					int WebPGetEncoderVersion(); 
-					
-					//------------------------------------------------------------------------------
-					//One-stop-shop call! No questions asked:
-					
-					//Returns the size of the compressed data (pointed to by *output), or 0 if
-					//an error occurred. The compressed data must be released by the caller
-					//using the call 'free(*output)'.
-					//These functions compress using the lossy format, and the quality_factor
-					//can go from 0 (smaller output, lower quality) to 100 (best quality,
-					//larger output).
-					size_t WebPEncodeRGB(
-						const ubyte*	rgb,
-						int width, int height, int stride,
-						float quality_factor, ubyte** output
-					); 
-					size_t WebPEncodeBGR(
-						const ubyte*	bgr,
-						int width, int height, int stride,
-						float quality_factor, ubyte** output
-					); 
-					size_t WebPEncodeRGBA(
-						const ubyte* rgba,
-						int width, int height, int stride,
-						float quality_factor, ubyte** output
-					); 
-					size_t WebPEncodeBGRA(
-						const ubyte* bgra,
-						int width, int height, int stride,
-						float quality_factor, ubyte** output
-					); 
-					
-					//These functions are the equivalent of the above, but compressing in a
-					//lossless manner. Files are usually larger than lossy format, but will
-					//not suffer any compression loss.
-					size_t WebPEncodeLosslessRGB(
-						const ubyte* rgb,
-						int width, int height, int stride,
-						ubyte** output
-					); 
-					size_t WebPEncodeLosslessBGR(
-						const ubyte* bgr,
-						int width, int height, int stride,
-						ubyte** output
-					); 
-					size_t WebPEncodeLosslessRGBA(
-						const ubyte* rgba,
-						int width, int height, int stride,
-						ubyte** output
-					); 
-					size_t WebPEncodeLosslessBGRA(
-						const ubyte* bgra,
-						int width, int height, int stride,
-						ubyte** output
-					); 
-					
-					//------------------------------------------------------------------------------
-					//Coding parameters
-					
-					//Image characteristics hint for the underlying encoder.
-					enum WebPImageHint
-					{
-						WEBP_HINT_DEFAULT = 0,	 //default preset.
-						WEBP_HINT_PICTURE,	 //digital picture, like portrait, inner shot
-						WEBP_HINT_PHOTO,	 //outdoor photograph, with natural lighting
-						WEBP_HINT_GRAPH,	 //Discrete tone image (graph, map-tile etc).
-						WEBP_HINT_LAST
-					} 
-					
-					//Compression parameters.
-					struct WebPConfig
-					{
-						int lossless; 	         //Lossless encoding (0=lossy(default), 1=lossless).
-						float quality; 	         //between 0 (smallest file) and 100 (biggest)
-						int method; 	         //quality/speed trade-off (0=fast, 6=slower-better)
-						
-						WebPImageHint image_hint;  //Hint for image type (lossless only for now).
-						
-						//Parameters related to lossy compression only:
-						int target_size; 	 //if non-zero, set the desired target size in bytes.
-							//Takes precedence over the 'compression' parameter.
-						float target_PSNR; 	 //if non-zero, specifies the minimal distortion to
-							//try to achieve. Takes precedence over target_size.
-						int segments; 	 //maximum number of segments to use, in [1..4]
-						int sns_strength; 	 //Spatial Noise Shaping. 0=off, 100=maximum.
-						int filter_strength; 	 //range: [0 = off .. 100 = strongest]
-						int filter_sharpness; 	 //range: [0 = off .. 7 = least sharp]
-						int filter_type; 	 //filtering type: 0 = simple, 1 = strong (only used
-							//if filter_strength > 0 or autofilter > 0)
-						int autofilter; 	 //Auto adjust filter's strength [0 = off, 1 = on]
-						int alpha_compression; 	 //Algorithm for encoding the alpha plane (0 = none,
-							//1 = compressed with WebP lossless). Default is 1.
-						int alpha_filtering; 	 //Predictive filtering method for alpha plane.
-							//0: none, 1: fast, 2: best. Default if 1.
-						int alpha_quality; 	 //Between 0 (smallest size) and 100 (lossless).
-							//Default is 100.
-						int pass; 	 //number of entropy-analysis passes (in [1..10]).
-						
-						int show_compressed; 	 //if true, export the compressed picture back.
-							//In-loop filtering is not applied.
-						int preprocessing; 	 //preprocessing filter:
-							//0=none, 1=segment-smooth, 2=pseudo-random dithering
-						int partitions; 	 //log2(number of token partitions) in [0..3]. Default
-							//is set to 0 for easier progressive decoding.
-						int partition_limit; 	 //quality degradation allowed to fit the 512k limit
-							//on prediction modes coding (0: no degradation,
-							//100: maximum possible degradation).
-						int emulate_jpeg_size; 	 //If true, compression parameters will be remapped
-							//to better match the expected output size from
-							//JPEG compression. Generally, the output size will
-							//be similar but the degradation will be lower.
-						int thread_level; 	 //If non-zero, try and use multi-threaded encoding.
-						int low_memory; 	 //If set, reduce memory usage (but increase CPU use).
-						
-						uint[5] pad;            //padding for later use
-					} 
-					
-					//Enumerate some predefined settings for WebPConfig, depending on the type
-					//of source picture. These presets are used when calling WebPConfigPreset().
-					enum WebPPreset
-					{
-						WEBP_PRESET_DEFAULT = 0,	 //default preset.
-						WEBP_PRESET_PICTURE,	 //digital picture, like portrait, inner shot
-						WEBP_PRESET_PHOTO,	 //outdoor photograph, with natural lighting
-						WEBP_PRESET_DRAWING,	 //hand or line drawing, with high-contrast details
-						WEBP_PRESET_ICON,	 //small-sized colorful images
-						WEBP_PRESET_TEXT	 //text-like
-					} 
-					
-					//Internal, version-checked, entry point
-					int WebPConfigInitInternal(WebPConfig*, WebPPreset, float, int); 
-					
-					//Should always be called, to initialize a fresh WebPConfig structure before
-					//modification. Returns false in case of version mismatch. WebPConfigInit()
-					//must have succeeded before using the 'config' object.
-					//Note that the default values are lossless=0 and quality=75.
-					int WebPConfigInit(WebPConfig* config)
-					{
-						return WebPConfigInitInternal(
-							config, WebPPreset.WEBP_PRESET_DEFAULT, 75.0f,
-							WEBP_ENCODER_ABI_VERSION
-						); 
-					} 
-					
-					//This function will initialize the configuration according to a predefined
-					//set of parameters (referred to by 'preset') and a given quality factor.
-					//This function can be called as a replacement to WebPConfigInit(). Will
-					//return false in case of error.
-					int WebPConfigPreset(
-						WebPConfig* config,
-						WebPPreset preset, float quality
-					)
-					{
-						return WebPConfigInitInternal(
-							config, preset, quality,
-							WEBP_ENCODER_ABI_VERSION
-						); 
-					} 
-					
-					//Returns true if 'config' is non-NULL and all configuration parameters are
-					//within their valid ranges.
-					int WebPValidateConfig(const WebPConfig* config); 
-					
-					//------------------------------------------------------------------------------
-					//Input / Output
-					//Structure for storing auxiliary statistics (mostly for lossy encoding).
-					
-					struct WebPAuxStats
-					{
-						int coded_size; 	//final size
-							
-						float[5] PSNR; 	//peak-signal-to-noise ratio for Y/U/V/All/Alpha
-						int[3] block_count; 	//number of intra4/intra16/skipped macroblocks
-						int[2] header_bytes; 	//approximate number of bytes spent for header
-							//and mode-partition #0
-						int[3][4] residual_bytes; 	//approximate number of bytes spent for
-							//DC/AC/uv coefficients for each (0..3) segments.
-						int[4] segment_size; 	//number of macroblocks in each segments
-						int[4] segment_quant; 	//quantizer values for each segments
-						int[4] segment_level; 	//filtering strength for each segments [0..63]
-							
-						int alpha_data_size; 	//size of the transparency data
-						int layer_data_size; 	//size of the enhancement layer data
-						
-						//lossless encoder statistics
-						uint lossless_features; 	//bit0:predictor bit1:cross-color transform
-							//bit2:subtract-green bit3:color indexing
-						int histogram_bits; 	//number of precision bits of histogram
-						int transform_bits; 	//precision bits for transform
-						int cache_bits; 	//number of bits for color cache lookup
-						int palette_size; 	//number of color in palette, if used
-						int lossless_size; 	//final lossless size
-							
-						uint[4] pad; 	//padding for later use
-					} 
-					
-					//Signature for output function. Should return true if writing was successful.
-					//data/data_size is the segment of data to write, and 'picture' is for
-					//reference (and so one can make use of picture->custom_ptr).
-					alias int function(
-						const ubyte* data, size_t data_size,
-						const WebPPicture* picture
-					) WebPWriterFunction; 
-					
-					//WebPMemoryWrite: a special WebPWriterFunction that writes to memory using
-					//the following WebPMemoryWriter object (to be set as a custom_ptr).
-					struct WebPMemoryWriter
-					{
-						ubyte* mem; 	 //final buffer (of size 'max_size', larger than 'size').
-						size_t		 size; 	 //final size
-						size_t		 max_size; 	 //total capacity
-						uint[1] pad;        //padding for later use
-					} 
-					
-					//The following must be called first before any use.
-					void WebPMemoryWriterInit(WebPMemoryWriter* writer); 
-					
-					//The custom writer to be used with WebPMemoryWriter as custom_ptr. Upon
-					//completion, writer.mem and writer.size will hold the coded data.
-					//if (WEBP_ENCODER_ABI_VERSION > 0x0203)
-					//writer.mem must be freed by calling WebPMemoryWriterClear.
-					
-					//} else {
-					//writer.mem must be freed by calling 'free(writer.mem)'.
-					//}
-					int WebPMemoryWrite(
-						const ubyte* data, size_t data_size,
-						const WebPPicture* picture
-					); 
-					
-					//Progress hook, called from time to time to report progress. It can return
-					//false to request an abort of the encoding process, or true otherwise if
-					//everything is OK.
-					alias int function(int percent, const WebPPicture* picture) WebPProgressHook; 
-					
-					//Color spaces.
-					enum WebPEncCSP
-					{
-						//chroma sampling
-						WEBP_YUV420	= 0,	  //4:2:0
-						WEBP_YUV420A	= 4,	  //alpha channel variant
-						WEBP_CSP_UV_MASK = 3,	  //bit-mask to get the UV sampling factors
-						WEBP_CSP_ALPHA_BIT = 4	  //bit that is set if alpha is present
-					} 
-					
-					//Encoding error conditions.
-					enum WebPEncodingError
-					{
-						VP8_ENC_OK = 0,
-						VP8_ENC_ERROR_OUT_OF_MEMORY,	 //memory error allocating objects
-						VP8_ENC_ERROR_BITSTREAM_OUT_OF_MEMORY,	 //memory error while flushing bits
-						VP8_ENC_ERROR_NULL_PARAMETER,	 //a pointer parameter is NULL
-						VP8_ENC_ERROR_INVALID_CONFIGURATION,	 //configuration is invalid
-						VP8_ENC_ERROR_BAD_DIMENSION,	 //picture has invalid width/height
-						VP8_ENC_ERROR_PARTITION0_OVERFLOW,	 //partition is bigger than 512k
-						VP8_ENC_ERROR_PARTITION_OVERFLOW,	 //partition is bigger than 16M
-						VP8_ENC_ERROR_BAD_WRITE,	 //error while flushing bytes
-						VP8_ENC_ERROR_FILE_TOO_BIG,	 //file is bigger than 4G
-						VP8_ENC_ERROR_USER_ABORT,	 //abort request by user
-						VP8_ENC_ERROR_LAST	 //list terminator. always last.
-					} 
-					
-					//maximum width/height allowed (inclusive), in pixels
-					enum WEBP_MAX_DIMENSION = 16383; 
-					
-					//Main exchange structure (input samples, output bytes, statistics)
-					struct WebPPicture
-					{
-						//   INPUT
-						//////////////
-						//Main flag for encoder selecting between ARGB or YUV input.
-						//It is recommended to use ARGB input (*argb, argb_stride) for lossless
-						//compression, and YUV input (*y, *u, *v, etc.) for lossy compression
-						//since these are the respective native colorspace for these formats.
-						int use_argb; 
-						
-						//YUV input (mostly used for input to lossy compression)
-						WebPEncCSP colorspace; 		  //colorspace: should be YUV420 for now (=Y'CbCr).
-						int width, height; 			//dimensions (less or equal to WEBP_MAX_DIMENSION)
-						ubyte* y, u, v; 		//pointers to luma/chroma planes.
-						int y_stride, uv_stride; 	  //luma/chroma strides.
-						ubyte* a; 	  //pointer to the alpha plane
-						int a_stride; 	  //stride of the alpha plane
-						uint[2] pad1;              //padding for later use
-						
-						//ARGB input (mostly used for input to lossless compression)
-						uint* argb; 	          //Pointer to argb (32 bit) plane.
-						int argb_stride; 	          //This is stride in pixels units, not bytes.
-						uint[3] pad2;              //padding for later use
-						
-						//   OUTPUT
-						///////////////
-						//Byte-emission hook, to store compressed bytes as they are ready.
-						WebPWriterFunction writer; 	 //can be NULL
-						void* custom_ptr; 	 //can be used by the writer.
-						
-						//map for extra information (only for lossy compression mode)
-						int extra_info_type; 	   //1: intra type, 2: segment, 3: quant
-								 //4: intra-16 prediction mode,
-								 //5: chroma prediction mode,
-								 //6: bit cost, 7: distortion
-						ubyte* extra_info; 	   //if not NULL, points to an array of size
-								 //((width + 15) / 16) * ((height + 15) / 16) that
-								 //will be filled with a macroblock map, depending
-								 //on extra_info_type.
-						
-						//   STATS AND REPORTS
-						///////////////////////////
-						//Pointer to side statistics (updated only if not NULL)
-						WebPAuxStats* stats; 
-						
-						//Error code for the latest error encountered during encoding
-						WebPEncodingError error_code; 
-						
-						//If not NULL, report progress during encoding.
-						WebPProgressHook progress_hook; 
-						
-						void* user_data; 	       //this field is free to be set to any value and
-						       //used during callbacks (like progress-report e.g.).
-						
-						uint[3] pad3;           //padding for later use
-						
-						//Unused for now: original samples (for non-YUV420 modes)
-						ubyte* pad4, pad5; 
-						uint[8] pad6; 
-						
-						//PRIVATE FIELDS
-						////////////////////
-						void* memory_; 		//row chunk of memory for yuva planes
-						void* memory_argb_; 		    //and for argb too.
-						void*[2] pad7;          //padding for later use
-					} 
-					
-					//Internal, version-checked, entry point
-					int WebPPictureInitInternal(WebPPicture*, int); 
-					
-					//Should always be called, to initialize the structure. Returns false in case
-					//of version mismatch. WebPPictureInit() must have succeeded before using the
-					//'picture' object.
-					//Note that, by default, use_argb is false and colorspace is WEBP_YUV420.
-					int WebPPictureInit(WebPPicture* picture)
-					{ return WebPPictureInitInternal(picture, WEBP_ENCODER_ABI_VERSION); } 
-					
-					//------------------------------------------------------------------------------
-					//WebPPicture utils
-					
-					//Convenience allocation / deallocation based on picture->width/height:
-					//Allocate y/u/v buffers as per colorspace/width/height specification.
-					//Note! This function will free the previous buffer if needed.
-					//Returns false in case of memory error.
-					int WebPPictureAlloc(WebPPicture* picture); 
-					
-					//Release the memory allocated by WebPPictureAlloc() or WebPPictureImport*().
-					//Note that this function does _not_ free the memory used by the 'picture'
-					//object itself.
-					//Besides memory (which is reclaimed) all other fields of 'picture' are
-					//preserved.
-					void WebPPictureFree(WebPPicture* picture); 
-					
-					//Copy the pixels of *src into *dst, using WebPPictureAlloc. Upon return, *dst
-					//will fully own the copied pixels (this is not a view). The 'dst' picture need
-					//not be initialized as its content is overwritten.
-					//Returns false in case of memory allocation error.
-					int WebPPictureCopy(const WebPPicture* src, WebPPicture* dst); 
-					
-					//Compute PSNR, SSIM or LSIM distortion metric between two pictures.
-					//Result is in dB, stores in result[] in the Y/U/V/Alpha/All order.
-					//Returns false in case of error (src and ref don't have same dimension, ...)
-					//Warning : this function is rather CPU-intensive.
-					int WebPPictureDistortion(
-						const WebPPicture* src, const WebPPicture* _ref,
-						int metric_type, //0 = PSNR, 1 = SSIM, 2 = LSIM
-						float* result
-					); //[5]
-					
-					//self-crops a picture to the rectangle defined by top/left/width/height.
-					//Returns false in case of memory allocation error, or if the rectangle is
-					//outside of the source picture.
-					//The rectangle for the view is defined by the top-left corner pixel
-					//coordinates (left, top) as well as its width and height. This rectangle
-					//must be fully be comprised inside the 'src' source picture. If the source
-					//picture uses the YUV420 colorspace, the top and left coordinates will be
-					//snapped to even values.
-					int WebPPictureCrop(
-						WebPPicture* picture,
-						int left, int top, int width, int height
-					); 
-					
-					//Extracts a view from 'src' picture into 'dst'. The rectangle for the view
-					//is defined by the top-left corner pixel coordinates (left, top) as well
-					//as its width and height. This rectangle must be fully be comprised inside
-					//the 'src' source picture. If the source picture uses the YUV420 colorspace,
-					//the top and left coordinates will be snapped to even values.
-					//Picture 'src' must out-live 'dst' picture. Self-extraction of view is allowed
-					//('src' equal to 'dst') as a mean of fast-cropping (but note that doing so,
-					//the original dimension will be lost). Picture 'dst' need not be initialized
-					//with WebPPictureInit() if it is different from 'src', since its content will
-					//be overwritten.
-					//Returns false in case of memory allocation error or invalid parameters.
-					int WebPPictureView(
-						const WebPPicture* src,
-						int left, int top, int width, int height,
-						WebPPicture* dst
-					); 
-					
-					//Returns true if the 'picture' is actually a view and therefore does
-					//not own the memory for pixels.
-					int WebPPictureIsView(const WebPPicture* picture); 
-					
-					//Rescale a picture to new dimension width x height.
-					//If either 'width' or 'height' (but not both) is 0 the corresponding
-					//dimension will be calculated preserving the aspect ratio.
-					//No gamma correction is applied.
-					//Returns false in case of error (invalid parameter or insufficient memory).
-					int WebPPictureRescale(WebPPicture* pic, int width, int height); 
-					
-					//Colorspace conversion function to import RGB samples.
-					//Previous buffer will be free'd, if any.
-					//*rgb buffer should have a size of at least height * rgb_stride.
-					//Returns false in case of memory error.
-					int WebPPictureImportRGB(WebPPicture* picture, const ubyte* rgb, int rgb_stride); 
-					//Same, but for RGBA buffer.
-					int WebPPictureImportRGBA(WebPPicture* picture, const ubyte* rgba, int rgba_stride); 
-					//Same, but for RGBA buffer. Imports the RGB direct from the 32-bit format
-					//input buffer ignoring the alpha channel. Avoids needing to copy the data
-					//to a temporary 24-bit RGB buffer to import the RGB only.
-					
-					int WebPPictureImportRGBX(WebPPicture* picture, const ubyte* rgbx, int rgbx_stride); 
-					
-					//Variants of the above, but taking BGR(A|X) input.
-					int WebPPictureImportBGR(WebPPicture* picture, const ubyte* bgr, int bgr_stride); 
-					int WebPPictureImportBGRA(WebPPicture* picture, const ubyte* bgra, int bgra_stride); 
-					int WebPPictureImportBGRX(WebPPicture* picture, const ubyte* bgrx, int bgrx_stride); 
-					
-					//Converts picture->argb data to the YUV420A format. The 'colorspace'
-					//parameter is deprecated and should be equal to WEBP_YUV420.
-					//Upon return, picture->use_argb is set to false. The presence of real
-					//non-opaque transparent values is detected, and 'colorspace' will be
-					//adjusted accordingly. Note that this method is lossy.
-					//Returns false in case of error.
-					int WebPPictureARGBToYUVA(
-						WebPPicture* picture,
-						WebPEncCSP colorspace
-					); 
-					
-					//Same as WebPPictureARGBToYUVA(), but the conversion is done using
-					//pseudo-random dithering with a strength 'dithering' between
-					//0.0 (no dithering) and 1.0 (maximum dithering). This is useful
-					//for photographic picture.
-					int WebPPictureARGBToYUVADithered(WebPPicture* picture, WebPEncCSP colorspace, float dithering); 
-					
-					//Converts picture->yuv to picture->argb and sets picture->use_argb to true.
-					//The input format must be YUV_420 or YUV_420A.
-					//Note that the use of this method is discouraged if one has access to the
-					//raw ARGB samples, since using YUV420 is comparatively lossy. Also, the
-					//conversion from YUV420 to ARGB incurs a small loss too.
-					//Returns false in case of error.
-					int WebPPictureYUVAToARGB(WebPPicture* picture); 
-					
-					//Helper function: given a width x height plane of RGBA or YUV(A) samples
-					//clean-up the YUV or RGB samples under fully transparent area, to help
-					//compressibility (no guarantee, though).
-					void WebPCleanupTransparentArea(WebPPicture* picture); 
-					
-					//Scan the picture 'picture' for the presence of non fully opaque alpha values.
-					//Returns true in such case. Otherwise returns false (indicating that the
-					//alpha plane can be ignored altogether e.g.).
-					int WebPPictureHasTransparency(const WebPPicture* picture); 
-					
-					//Remove the transparency information (if present) by blending the color with
-					//the background color 'background_rgb' (specified as 24bit RGB triplet).
-					//After this call, all alpha values are reset to 0xff.
-					void WebPBlendAlpha(WebPPicture* pic, uint background_rgb); 
-					
-					//------------------------------------------------------------------------------
-					//Main call
-					
-					//Main encoding call, after config and picture have been initialized.
-					//'picture' must be less than 16384x16384 in dimension (cf WEBP_MAX_DIMENSION),
-					//and the 'config' object must be a valid one.
-					//Returns false in case of error, true otherwise.
-					//In case of error, picture->error_code is updated accordingly.
-					//'picture' can hold the source samples in both YUV(A) or ARGB input, depending
-					//on the value of 'picture->use_argb'. It is highly recommended to use
-					//the former for lossy encoding, and the latter for lossless encoding
-					//(when config.lossless is true). Automatic conversion from one format to
-					//another is provided but they both incur some loss.
-					int WebPEncode(const WebPConfig* config, WebPPicture* picture); 
-					
-					//------------------------------------------------------------------------------
-					
-				} extern (C)
-				{
-					//Copyright 2010 Google Inc. All Rights Reserved.
-					//
-					//Use of this source code is governed by a BSD-style license
-					//that can be found in the COPYING file in the root of the source
-					//tree. An additional intellectual property rights grant can be found
-					//in the file PATENTS. All contributing project authors may
-					//be found in the AUTHORS file in the root of the source tree.
-					//-----------------------------------------------------------------------------
-					//
-					//Main decoding functions for WebP images.
-					//
-					//Author: Skal (pascal.massimino@gmail.com)
-					
-					import std.typecons; 
-					
-					enum WEBP_DECODER_ABI_VERSION = 0x0203;    //MAJOR(8b) + MINOR(8b)
-					
-					
-					alias WebPIDecoder = Typedef!(void*); 
-					
-					
-					//Return the decoder's version number, packed in hexadecimal using 8bits for
-					//each of major/minor/revision. E.g: v2.5.7 is 0x020507.
-					int WebPGetDecoderVersion(); 
-					
-					//Retrieve basic header information: width, height.
-					//This function will also validate the header and return 0 in
-					//case of formatting error.
-					//Pointers 'width' and 'height' can be passed NULL if deemed irrelevant.
-					int WebPGetInfo(const ubyte* data, size_t data_size, int* width, int* height); 
-					
-					//Decodes WebP images pointed to by 'data' and returns RGBA samples, along
-					//with the dimensions in *width and *height. The ordering of samples in
-					//memory is R, G, B, A, R, G, B, A... in scan order (endian-independent).
-					//The returned pointer should be deleted calling free().
-					//Returns NULL in case of error.
-					ubyte* WebPDecodeRGBA(const ubyte* data, size_t data_size, int* width, int* height); 
-					
-					//Same as WebPDecodeRGBA, but returning A, R, G, B, A, R, G, B... ordered data.
-					ubyte* WebPDecodeARGB(const ubyte* data, size_t data_size, int* width, int* height); 
-					
-					//Same as WebPDecodeRGBA, but returning B, G, R, A, B, G, R, A... ordered data.
-					ubyte* WebPDecodeBGRA(const ubyte* data, size_t data_size, int* width, int* height); 
-					
-					//Same as WebPDecodeRGBA, but returning R, G, B, R, G, B... ordered data.
-					//If the bitstream contains transparency, it is ignored.
-					ubyte* WebPDecodeRGB(const ubyte* data, size_t data_size, int* width, int* height); 
-					
-					//Same as WebPDecodeRGB, but returning B, G, R, B, G, R... ordered data.
-					ubyte* WebPDecodeBGR(const ubyte* data, size_t data_size, int* width, int* height); 
-					
-					
-					//Decode WebP images pointed to by 'data' to Y'UV format(*). The pointer
-					//returned is the Y samples buffer. Upon return, *u and *v will point to
-					//the U and V chroma data. These U and V buffers need NOT be free()'d,
-					//unlike the returned Y luma one. The dimension of the U and V planes
-					//are both (*width + 1) / 2 and (*height + 1)/ 2.
-					//Upon return, the Y buffer has a stride returned as '*stride', while U and V
-					//have a common stride returned as '*uv_stride'.
-					//Return NULL in case of error.
-					//(*) Also named Y'CbCr. See: http://en.wikipedia.org/wiki/YCbCr
-					ubyte* WebPDecodeYUV(
-						const ubyte* data, size_t data_size,
-						int* width, int* height,
-						ubyte** u, ubyte** v,
-						int* stride, int* uv_stride
-					); 
-					
-					//These five functions are variants of the above ones, that decode the image
-					//directly into a pre-allocated buffer 'output_buffer'. The maximum storage
-					//available in this buffer is indicated by 'output_buffer_size'. If this
-					//storage is not sufficient (or an error occurred), NULL is returned.
-					//Otherwise, output_buffer is returned, for convenience.
-					//The parameter 'output_stride' specifies the distance (in bytes)
-					//between scanlines. Hence, output_buffer_size is expected to be at least
-					//output_stride x picture-height.
-					ubyte* WebPDecodeRGBAInto(
-						const ubyte* data, size_t data_size,
-						ubyte* output_buffer, size_t output_buffer_size, int output_stride
-					); 
-					ubyte* WebPDecodeARGBInto(
-						const ubyte* data, size_t data_size,
-						ubyte* output_buffer, size_t output_buffer_size, int output_stride
-					); 
-					ubyte* WebPDecodeBGRAInto(
-						const ubyte* data, size_t data_size,
-						ubyte* output_buffer, size_t output_buffer_size, int output_stride
-					); 
-					
-					//RGB and BGR variants. Here too the transparency information, if present,
-					//will be dropped and ignored.
-					ubyte* WebPDecodeRGBInto(
-						const ubyte* data, size_t data_size,
-						ubyte* output_buffer, size_t output_buffer_size, int output_stride
-					); 
-					ubyte* WebPDecodeBGRInto(
-						const ubyte* data, size_t data_size,
-						ubyte* output_buffer, size_t output_buffer_size, int output_stride
-					); 
-					
-					//WebPDecodeYUVInto() is a variant of WebPDecodeYUV() that operates directly
-					//into pre-allocated luma/chroma plane buffers. This function requires the
-					//strides to be passed: one for the luma plane and one for each of the
-					//chroma ones. The size of each plane buffer is passed as 'luma_size',
-					//'u_size' and 'v_size' respectively.
-					//Pointer to the luma plane ('*luma') is returned or NULL if an error occurred
-					//during decoding (or because some buffers were found to be too small).
-					
-					ubyte* WebPDecodeYUVInto(
-						const ubyte* data, size_t data_size,
-						ubyte* luma, size_t luma_size, int luma_stride,
-						ubyte* u, size_t u_size, int u_stride,
-						ubyte* v, size_t v_size, int v_stride
-					); 
-					
-					//------------------------------------------------------------------------------
-					//Output colorspaces and buffer
-					
-					//Colorspaces
-					//Note: the naming describes the byte-ordering of packed samples in memory.
-					//For instance, MODE_BGRA relates to samples ordered as B,G,R,A,B,G,R,A,...
-					//Non-capital names (e.g.:MODE_Argb) relates to pre-multiplied RGB channels.
-					//RGBA-4444 and RGB-565 colorspaces are represented by following byte-order:
-					//RGBA-4444: [r3 r2 r1 r0 g3 g2 g1 g0], [b3 b2 b1 b0 a3 a2 a1 a0], ...
-					//RGB-565: [r4 r3 r2 r1 r0 g5 g4 g3], [g2 g1 g0 b4 b3 b2 b1 b0], ...
-					//In the case WEBP_SWAP_16BITS_CSP is defined, the bytes are swapped for
-					//these two modes:
-					//RGBA-4444: [b3 b2 b1 b0 a3 a2 a1 a0], [r3 r2 r1 r0 g3 g2 g1 g0], ...
-					//RGB-565: [g2 g1 g0 b4 b3 b2 b1 b0], [r4 r3 r2 r1 r0 g5 g4 g3], ...
-					
-					enum WEBP_CSP_MODE
-					{
-						MODE_RGB = 0, MODE_RGBA = 1,
-						MODE_BGR = 2, MODE_BGRA = 3,
-						MODE_ARGB = 4, MODE_RGBA_4444 = 5,
-						MODE_RGB_565 = 6,
-						//RGB-premultiplied transparent modes (alpha value is preserved)
-						MODE_rgbA = 7,
-						MODE_bgrA = 8,
-						MODE_Argb = 9,
-						MODE_rgbA_4444 = 10,
-						//YUV modes must come after RGB ones.
-						MODE_YUV = 11, MODE_YUVA = 12,  //yuv 4:2:0
-						MODE_LAST = 13
-					} 
-					
-					//Some useful macros:
-					static int WebPIsPremultipliedMode(WEBP_CSP_MODE mode)
-					{
-						return (
-							mode == WEBP_CSP_MODE.MODE_rgbA || 
-							mode == WEBP_CSP_MODE.MODE_bgrA || 
-							mode == WEBP_CSP_MODE.MODE_Argb ||
-							mode == WEBP_CSP_MODE.MODE_rgbA_4444
-						); 
-					} 
-					
-					static int WebPIsAlphaMode(WEBP_CSP_MODE mode)
-					{
-						return (
-							mode == WEBP_CSP_MODE.MODE_RGBA || 
-							mode == WEBP_CSP_MODE.MODE_BGRA || 
-							mode == WEBP_CSP_MODE.MODE_ARGB ||
-							mode == WEBP_CSP_MODE.MODE_RGBA_4444 || 
-							mode == WEBP_CSP_MODE.MODE_YUVA ||
-							WebPIsPremultipliedMode(mode)
-						); 
-					} 
-					
-					static int WebPIsRGBMode(WEBP_CSP_MODE mode)
-					{ return (mode < WEBP_CSP_MODE.MODE_YUV); } 
-					
-					//------------------------------------------------------------------------------
-					//WebPDecBuffer: Generic structure for describing the output sample buffer.
-					
-					struct WebPRGBABuffer
-					{
-							//view as RGBA
-						ubyte* rgba;    //pointer to RGBA samples
-						int stride; 	     //stride in bytes from one scanline to the next.
-						size_t size; 	     //total size of the *rgba buffer.
-					}; 
-					
-					struct WebPYUVABuffer
-					{
-												//view as YUVA
-						ubyte* y; 
-						ubyte *u; 
-						ubyte *v; 
-						ubyte *a; 	//pointer to luma, chroma U/V, alpha samples
-						int y_stride; 		    //luma stride
-						int u_stride,	v_stride; 	    //chroma strides
-						int a_stride; 					 //alpha stride
-						size_t y_size; 				 //luma plane size
-						size_t u_size, v_size; 	    //chroma planes size
-						size_t a_size; 	    //alpha-plane size
-					}; 
-					
-					//Output buffer
-					struct WebPDecBuffer
-					{
-						WEBP_CSP_MODE colorspace; 	//Colorspace.
-						int width, height; 	//Dimensions.
-						int is_external_memory; 	//If true, 'internal_memory' pointer is not used.
-						union u
-						{
-							WebPRGBABuffer RGBA; 
-							WebPYUVABuffer YUVA; 
-						} //Nameless union of buffer parameters.
-						uint[4] pad;               //padding for later use
-						
-						ubyte* private_memory; 	//Internally allocated memory (only when
-							//is_external_memory is false). Should not be used
-							//externally, but accessed via the buffer union.
-					}; 
-					
-					//Internal, version-checked, entry point
-					int WebPInitDecBufferInternal(WebPDecBuffer*, int); 
-					
-					//Initialize the structure as empty. Must be called before any other use.
-					//Returns false in case of version mismatch
-					static int WebPInitDecBuffer(WebPDecBuffer* buffer)
-					{ return WebPInitDecBufferInternal(buffer, WEBP_DECODER_ABI_VERSION); } 
-					
-					//Free any memory associated with the buffer. Must always be called last.
-					//Note: doesn't free the 'buffer' structure itself.
-					void WebPFreeDecBuffer(WebPDecBuffer* buffer); 
-					
-					//------------------------------------------------------------------------------
-					//Enumeration of the status codes
-					
-					enum VP8StatusCode
-					{
-						VP8_STATUS_OK = 0,
-						VP8_STATUS_OUT_OF_MEMORY,
-						VP8_STATUS_INVALID_PARAM,
-						VP8_STATUS_BITSTREAM_ERROR,
-						VP8_STATUS_UNSUPPORTED_FEATURE,
-						VP8_STATUS_SUSPENDED,
-						VP8_STATUS_USER_ABORT,
-						VP8_STATUS_NOT_ENOUGH_DATA
-					} 
-					
-					//------------------------------------------------------------------------------
-					//Incremental decoding
-					//
-					//This API allows streamlined decoding of partial data.
-					//Picture can be incrementally decoded as data become available thanks to the
-					//WebPIDecoder object. This object can be left in a SUSPENDED state if the
-					//picture is only partially decoded, pending additional input.
-					//Code example:
-					//
-					//   WebPInitDecBuffer(&buffer);
-					//   buffer.colorspace = mode;
-					//   ...
-					//   WebPIDecoder* idec = WebPINewDecoder(&buffer);
-					//   while (has_more_data) {
-					//// ... (get additional data)
-					//status = WebPIAppend(idec, new_data, new_data_size);
-					//if (status != VP8_STATUS_SUSPENDED ||
-					//   break;
-					//}
-					//
-					//// The above call decodes the current available buffer.
-					//// Part of the image can now be refreshed by calling to
-					//// WebPIDecGetRGB()/WebPIDecGetYUVA() etc.
-					//   }
-					//   WebPIDelete(idec);
-					
-					//Creates a new incremental decoder with the supplied buffer parameter.
-					//This output_buffer can be passed NULL, in which case a default output buffer
-					//is used (with MODE_RGB). Otherwise, an internal reference to 'output_buffer'
-					//is kept, which means that the lifespan of 'output_buffer' must be larger than
-					//that of the returned WebPIDecoder object.
-					//The supplied 'output_buffer' content MUST NOT be changed between calls to
-					//WebPIAppend() or WebPIUpdate() unless 'output_buffer.is_external_memory' is
-					//set to 1. In such a case, it is allowed to modify the pointers, size and
-					//stride of output_buffer.u.RGBA or output_buffer.u.YUVA, provided they remain
-					//within valid bounds.
-					//All other fields of WebPDecBuffer MUST remain constant between calls.
-					//Returns NULL if the allocation failed.
-					WebPIDecoder* WebPINewDecoder(WebPDecBuffer* output_buffer); 
-					
-					//This function allocates and initializes an incremental-decoder object, which
-					//will output the RGB/A samples specified by 'csp' into a preallocated
-					//buffer 'output_buffer'. The size of this buffer is at least
-					//'output_buffer_size' and the stride (distance in bytes between two scanlines)
-					//is specified by 'output_stride'.
-					//Additionally, output_buffer can be passed NULL in which case the output
-					//buffer will be allocated automatically when the decoding starts. The
-					//colorspace 'csp' is taken into account for allocating this buffer. All other
-					//parameters are ignored.
-					//Returns NULL if the allocation failed, or if some parameters are invalid.
-					WebPIDecoder* WebPINewRGB(
-						WEBP_CSP_MODE csp,
-						ubyte* output_buffer, size_t output_buffer_size, 
-						int output_stride
-					); 
-					
-					//This function allocates and initializes an incremental-decoder object, which
-					//will output the raw luma/chroma samples into a preallocated planes if
-					//supplied. The luma plane is specified by its pointer 'luma', its size
-					//'luma_size' and its stride 'luma_stride'. Similarly, the chroma-u plane
-					//is specified by the 'u', 'u_size' and 'u_stride' parameters, and the chroma-v
-					//plane by 'v' and 'v_size'. And same for the alpha-plane. The 'a' pointer
-					//can be pass NULL in case one is not interested in the transparency plane.
-					//Conversely, 'luma' can be passed NULL if no preallocated planes are supplied.
-					//In this case, the output buffer will be automatically allocated (using
-					//MODE_YUVA) when decoding starts. All parameters are then ignored.
-					
-					//Returns NULL if the allocation failed or if a parameter is invalid.
-					WebPIDecoder* WebPINewYUVA(
-						ubyte* luma, size_t luma_size, int luma_stride,
-						ubyte* u, size_t u_size, int u_stride,
-						ubyte* v, size_t v_size, int v_stride,
-						ubyte* a, size_t a_size, int a_stride
-					); 
-					
-					//Deprecated version of the above, without the alpha plane.
-					//Kept for backward compatibility.
-					WebPIDecoder* WebPINewYUV(
-						ubyte* luma, size_t luma_size, int luma_stride,
-						ubyte* u, size_t u_size, int u_stride,
-						ubyte* v, size_t v_size, int v_stride
-					); 
-					
-					//Deletes the WebPIDecoder object and associated memory. Must always be called
-					//if WebPINewDecoder, WebPINewRGB or WebPINewYUV succeeded.
-					void WebPIDelete(WebPIDecoder* idec); 
-					
-					//Copies and decodes the next available data. Returns VP8_STATUS_OK when
-					//the image is successfully decoded. Returns VP8_STATUS_SUSPENDED when more
-					//data is expected. Returns error in other cases.
-					VP8StatusCode WebPIAppend(WebPIDecoder* idec, const ubyte* data, size_t data_size); 
-					
-					//A variant of the above function to be used when data buffer contains
-					//partial data from the beginning. In this case data buffer is not copied
-					//to the internal memory.
-					//Note that the value of the 'data' pointer can change between calls to
-					//WebPIUpdate, for instance when the data buffer is resized to fit larger data.
-					VP8StatusCode WebPIUpdate(WebPIDecoder* idec, const ubyte* data, size_t data_size); 
-					
-					//Returns the RGB/A image decoded so far. Returns NULL if output params
-					//are not initialized yet. The RGB/A output type corresponds to the colorspace
-					//specified during call to WebPINewDecoder() or WebPINewRGB().
-					//*last_y is the index of last decoded row in raster scan order. Some pointers
-					//(*last_y, *width etc.) can be NULL if corresponding information is not
-					//needed.
-					ubyte* WebPIDecGetRGB(
-						const WebPIDecoder* idec, int* last_y,
-						int* width, int* height, int* stride
-					); 
-					
-					//Same as above function to get a YUVA image. Returns pointer to the luma
-					//plane or NULL in case of error. If there is no alpha information
-					//the alpha pointer '*a' will be returned NULL.
-					ubyte* WebPIDecGetYUVA(
-						const WebPIDecoder* idec, int* last_y,
-						ubyte** u, ubyte** v, ubyte** a,
-						int* width, int* height, int* stride, int* uv_stride, int* a_stride
-					); 
-					
-					//Deprecated alpha-less version of WebPIDecGetYUVA(): it will ignore the
-					//alpha information (if present). Kept for backward compatibility.
-					static ubyte* WebPIDecGetYUV(
-						const WebPIDecoder* idec, int* last_y, ubyte** u, ubyte** v,
-						int* width, int* height, int* stride, int* uv_stride
-					)
-					{
-						return WebPIDecGetYUVA(
-							idec, last_y, u, v, null, width, height,
-													 stride, uv_stride, null
-						); 
-					} 
-					
-					//Generic call to retrieve information about the displayable area.
-					//If non NULL, the left/right/width/height pointers are filled with the visible
-					//rectangular area so far.
-					//Returns NULL in case the incremental decoder object is in an invalid state.
-					//Otherwise returns the pointer to the internal representation. This structure
-					//is read-only, tied to WebPIDecoder's lifespan and should not be modified.
-					
-					//Todo: Review. I don't know, is this correct.
-					//WEBP_EXTERN(const WebPDecBuffer*) WebPIDecodedArea(
-					//const WebPIDecoder* idec, int* left, int* top, int* width, int* height);
-					WebPDecBuffer* WebPIDecodedArea(const WebPIDecoder* idec, int* left, int* top, int* width, int* height); 
-					
-					//------------------------------------------------------------------------------
-					//Advanced decoding parametrization
-					//
-					//Code sample for using the advanced decoding API
-					/*
-						 // A) Init a configuration object
-						 WebPDecoderConfig config;
-						 CHECK(WebPInitDecoderConfig(&config));
-						
-						 // B) optional: retrieve the bitstream's features.
-						 CHECK(WebPGetFeatures(data, data_size, &config.input) == VP8_STATUS_OK);
-						
-						 // C) Adjust 'config', if needed
-						 config.no_fancy_upsampling = 1;
-						 config.output.colorspace = MODE_BGRA;
-						 // etc.
-						
-						 // Note that you can also make config.output point to an externally
-						 // supplied memory buffer, provided it's big enough to store the decoded
-						 // picture. Otherwise, config.output will just be used to allocate memory
-						 // and store the decoded picture.
-						
-						 // D) Decode!
-						 CHECK(WebPDecode(data, data_size, &config) == VP8_STATUS_OK);
-						
-						 // E) Decoded image is now in config.output (and config.output.u.RGBA)
-						
-						 // F) Reclaim memory allocated in config's object. It's safe to call
-						 // this function even if the memory is external and wasn't allocated
-						 // by WebPDecode().
-						 WebPFreeDecBuffer(&config.output);
-					*/
-					
-					//Features gathered from the bitstream
-					struct WebPBitstreamFeatures
-					{
-						int width; 	 //Width in pixels, as read from the bitstream.
-						int height; 	 //Height in pixels, as read from the bitstream.
-						int has_alpha; 	 //True if the bitstream contains an alpha channel.
-						int has_animation; 	 //True if the bitstream is an animation.
-						int format; 	 //0 = undefined (/mixed), 1 = lossy, 2 = lossless
-						
-						//Unused for now:
-						int no_incremental_decoding; 	 //if true, using incremental decoding is not
-						 //recommended.
-						int rotate; 	 //TODO(later)
-						int uv_sampling; 	 //should be 0 for now. TODO(later)
-						uint[2] pad;              //padding for later use
-					}; 
-					
-					//Internal, version-checked, entry point
-					VP8StatusCode WebPGetFeaturesInternal(const ubyte*, size_t, WebPBitstreamFeatures*, int); 
-					
-					//Retrieve features from the bitstream. The *features structure is filled
-					//with information gathered from the bitstream.
-					//Returns VP8_STATUS_OK when the features are successfully retrieved. Returns
-					//VP8_STATUS_NOT_ENOUGH_DATA when more data is needed to retrieve the
-					//features from headers. Returns error in other cases.
-					static VP8StatusCode WebPGetFeatures(
-						const ubyte* data, size_t data_size,
-						WebPBitstreamFeatures* features
-					)
-					{
-						return WebPGetFeaturesInternal(
-							data, data_size, features,
-							WEBP_DECODER_ABI_VERSION
-						); 
-					} 
-					
-					//Decoding options
-					struct WebPDecoderOptions
-					{
-						int bypass_filtering; 	   //if true, skip the in-loop filtering
-						int no_fancy_upsampling; 	   //if true, use faster pointwise upsampler
-						int use_cropping; 	   //if true, cropping is applied _first_
-						int crop_left, crop_top; 	   //top-left position for cropping.
-						   //Will be snapped to even values.
-						int crop_width, crop_height; 	   //dimension of the cropping area
-						int use_scaling; 	   //if true, scaling is applied _afterward_
-						int scaled_width, scaled_height; 	   //final resolution
-						int use_threads; 	   //if true, use multi-threaded decoding
-						int dithering_strength; 	   //dithering strength (0=Off, 100=full)
-						
-						//Unused for now:
-						int force_rotation; 																 //forced rotation (to be applied _last_)
-						int no_enhancement; 																 //if true, discard enhancement layer
-						uint[4] pad;                        //padding for later use
-					} 
-					
-					//Main object storing the configuration for advanced decoding.
-					struct WebPDecoderConfig
-					{
-						WebPBitstreamFeatures input; 	 //Immutable bitstream features (optional)
-						WebPDecBuffer output; 	 //Output buffer (can point to external mem)
-						WebPDecoderOptions options; 	 //Decoding options
-					}; 
-					
-					//Internal, version-checked, entry point
-					int WebPInitDecoderConfigInternal(WebPDecoderConfig*, int); 
-					
-					//Initialize the configuration as empty. This function must always be
-					//called first, unless WebPGetFeatures() is to be called.
-					//Returns false in case of mismatched version.
-					static int WebPInitDecoderConfig(WebPDecoderConfig* config)
-					{ return WebPInitDecoderConfigInternal(config, WEBP_DECODER_ABI_VERSION); } 
-					
-					//Instantiate a new incremental decoder object with the requested
-					//configuration. The bitstream can be passed using 'data' and 'data_size'
-					//parameter, in which case the features will be parsed and stored into
-					//config->input. Otherwise, 'data' can be NULL and no parsing will occur.
-					//Note that 'config' can be NULL too, in which case a default configuration
-					//is used.
-					//The return WebPIDecoder object must always be deleted calling WebPIDelete().
-					//Returns NULL in case of error (and config->status will then reflect
-					//the error condition).
-					WebPIDecoder* WebPIDecode(
-						const ubyte* data, size_t data_size,
-						WebPDecoderConfig* config
-					); 
-					
-					//Non-incremental version. This version decodes the full data at once, taking
-					//'config' into account. Returns decoding status (which should be VP8_STATUS_OK
-					//if the decoding was successful).
-					VP8StatusCode WebPDecode(
-						const ubyte* data, size_t data_size,
-						WebPDecoderConfig* config
-					); 
-					
+					MODE_RGB = 0,
+					MODE_RGBA = 1,
+					MODE_BGR = 2,
+					MODE_BGRA = 3,
+					MODE_ARGB = 4,
+					MODE_RGBA_4444 = 5,
+					MODE_RGB_565 = 6,
+					MODE_rgbA = 7,
+					MODE_bgrA = 8,
+					MODE_Argb = 9,
+					MODE_rgbA_4444 = 10,
+					MODE_YUV = 11,
+					MODE_YUVA = 12,
+					MODE_LAST = 13,
 				} 
-			}
+				alias MODE_RGB = WEBP_CSP_MODE.MODE_RGB; 
+				alias MODE_RGBA = WEBP_CSP_MODE.MODE_RGBA; 
+				alias MODE_BGR = WEBP_CSP_MODE.MODE_BGR; 
+				alias MODE_BGRA = WEBP_CSP_MODE.MODE_BGRA; 
+				alias MODE_ARGB = WEBP_CSP_MODE.MODE_ARGB; 
+				alias MODE_RGBA_4444 = WEBP_CSP_MODE.MODE_RGBA_4444; 
+				alias MODE_RGB_565 = WEBP_CSP_MODE.MODE_RGB_565; 
+				alias MODE_rgbA = WEBP_CSP_MODE.MODE_rgbA; 
+				alias MODE_bgrA = WEBP_CSP_MODE.MODE_bgrA; 
+				alias MODE_Argb = WEBP_CSP_MODE.MODE_Argb; 
+				alias MODE_rgbA_4444 = WEBP_CSP_MODE.MODE_rgbA_4444; 
+				alias MODE_YUV = WEBP_CSP_MODE.MODE_YUV; 
+				alias MODE_YUVA = WEBP_CSP_MODE.MODE_YUVA; 
+				alias MODE_LAST = WEBP_CSP_MODE.MODE_LAST; 
+				//Some useful macros:
+				static int WebPIsPremultipliedMode(WEBP_CSP_MODE mode)
+				{
+					return (
+						mode == WEBP_CSP_MODE.MODE_rgbA || 
+						mode == WEBP_CSP_MODE.MODE_bgrA || 
+						mode == WEBP_CSP_MODE.MODE_Argb ||
+						mode == WEBP_CSP_MODE.MODE_rgbA_4444
+					); 
+				} 
+				
+				static int WebPIsAlphaMode(WEBP_CSP_MODE mode)
+				{
+					return (
+						mode == WEBP_CSP_MODE.MODE_RGBA || 
+						mode == WEBP_CSP_MODE.MODE_BGRA || 
+						mode == WEBP_CSP_MODE.MODE_ARGB ||
+						mode == WEBP_CSP_MODE.MODE_RGBA_4444 || 
+						mode == WEBP_CSP_MODE.MODE_YUVA ||
+						WebPIsPremultipliedMode(mode)
+					); 
+				} 
+				
+				static int WebPIsRGBMode(WEBP_CSP_MODE mode)
+				{ return (mode < WEBP_CSP_MODE.MODE_YUV); } 
+				struct WebPRGBABuffer
+				{
+					ubyte* rgba; 
+					int stride; 
+					ulong size; 
+				} 
+				struct WebPYUVABuffer
+				{
+					ubyte* y; 
+					ubyte* u; 
+					ubyte* v; 
+					ubyte* a; 
+					int y_stride; 
+					int u_stride; 
+					int v_stride; 
+					int a_stride; 
+					ulong y_size; 
+					ulong u_size; 
+					ulong v_size; 
+					ulong a_size; 
+				} 
+				struct WebPDecBuffer
+				{
+					WEBP_CSP_MODE colorspace; 
+					int width; 
+					int height; 
+					int is_external_memory; 
+					union 
+					{
+						WebPRGBABuffer RGBA; 
+						WebPYUVABuffer YUVA; 
+					} 
+					uint[4] pad; 
+					ubyte* private_memory; 
+				} 
+				extern int WebPInitDecBufferInternal(const WebPDecBuffer*, int); 
+				static int WebPInitDecBuffer(WebPDecBuffer* buffer)
+				{ return WebPInitDecBufferInternal(buffer, WEBP_DECODER_ABI_VERSION); } 
+				extern void WebPFreeDecBuffer(const WebPDecBuffer* buffer); 
+				enum VP8StatusCode
+				{
+					VP8_STATUS_OK = 0,
+					VP8_STATUS_OUT_OF_MEMORY,
+					VP8_STATUS_INVALID_PARAM,
+					VP8_STATUS_BITSTREAM_ERROR,
+					VP8_STATUS_UNSUPPORTED_FEATURE,
+					VP8_STATUS_SUSPENDED,
+					VP8_STATUS_USER_ABORT,
+					VP8_STATUS_NOT_ENOUGH_DATA,
+				} 
+				alias VP8_STATUS_OK = VP8StatusCode.VP8_STATUS_OK; 
+				alias VP8_STATUS_OUT_OF_MEMORY = VP8StatusCode.VP8_STATUS_OUT_OF_MEMORY; 
+				alias VP8_STATUS_INVALID_PARAM = VP8StatusCode.VP8_STATUS_INVALID_PARAM; 
+				alias VP8_STATUS_BITSTREAM_ERROR = VP8StatusCode.VP8_STATUS_BITSTREAM_ERROR; 
+				alias VP8_STATUS_UNSUPPORTED_FEATURE = VP8StatusCode.VP8_STATUS_UNSUPPORTED_FEATURE; 
+				alias VP8_STATUS_SUSPENDED = VP8StatusCode.VP8_STATUS_SUSPENDED; 
+				alias VP8_STATUS_USER_ABORT = VP8StatusCode.VP8_STATUS_USER_ABORT; 
+				alias VP8_STATUS_NOT_ENOUGH_DATA = VP8StatusCode.VP8_STATUS_NOT_ENOUGH_DATA; 
+				alias WebPIDecoder = Typedef!(void*); 
+				
+				extern WebPIDecoder* WebPINewDecoder(const WebPDecBuffer* output_buffer); 
+				extern WebPIDecoder* WebPINewRGB(
+					WEBP_CSP_MODE csp, ubyte* output_buffer, 
+					ulong output_buffer_size, int output_stride
+				); 
+				extern WebPIDecoder* WebPINewYUVA(
+					ubyte* luma, ulong luma_size, int luma_stride, 
+					ubyte* u, ulong u_size, int u_stride, ubyte* v, 
+					ulong v_size, int v_stride, 
+					ubyte* a, ulong a_size, int a_stride
+				); 
+				extern WebPIDecoder* WebPINewYUV(
+					ubyte* luma, ulong luma_size, int luma_stride, 
+					ubyte* u, ulong u_size, int u_stride, ubyte* v, 
+					ulong v_size, int v_stride
+				); 
+				extern void WebPIDelete(const WebPIDecoder* idec); 
+				extern VP8StatusCode WebPIAppend(const WebPIDecoder* idec, const(ubyte)* data, ulong data_size); 
+				extern VP8StatusCode WebPIUpdate(const WebPIDecoder* idec, const(ubyte)* data, ulong data_size); 
+				extern ubyte* WebPIDecGetRGB(const WebPIDecoder* idec, int* last_y, int* width, int* height, int* stride); 
+				extern ubyte* WebPIDecGetYUVA(
+					const WebPIDecoder* idec, int* last_y, ubyte** u, ubyte** v, 
+					ubyte** a, int* width, int* height, int* stride, int* uv_stride, int* a_stride
+				); 
+				static ubyte* WebPIDecGetYUV(
+					const WebPIDecoder* idec, int* last_y, ubyte** u, ubyte** v, 
+					int* width, int* height, int* stride, int* uv_stride
+				); 
+				extern WebPDecBuffer* WebPIDecodedArea(
+					const WebPIDecoder* idec, int* left, int* top, 
+					int* width, int* height
+				); 
+				struct WebPBitstreamFeatures
+				{
+					int width; 
+					int height; 
+					int has_alpha; 
+					int has_animation; 
+					int format; 
+					uint[5] pad; 
+				} 
+				extern VP8StatusCode WebPGetFeaturesInternal(const(ubyte)*, ulong, WebPBitstreamFeatures*, int); 
+				static VP8StatusCode WebPGetFeatures(
+					const ubyte* data, size_t data_size,
+					WebPBitstreamFeatures* features
+				)
+				=> WebPGetFeaturesInternal(
+					data, data_size, features,
+					WEBP_DECODER_ABI_VERSION
+				); 
+				
+				struct WebPDecoderOptions
+				{
+					int bypass_filtering; 
+					int no_fancy_upsampling; 
+					int use_cropping; 
+					int crop_left; 
+					int crop_top; 
+					int crop_width; 
+					int crop_height; 
+					int use_scaling; 
+					int scaled_width; 
+					int scaled_height; 
+					int use_threads; 
+					int dithering_strength; 
+					int flip; 
+					int alpha_dithering_strength; 
+					uint[5] pad; 
+				} 
+				struct WebPDecoderConfig
+				{
+					WebPBitstreamFeatures input; 
+					const WebPDecBuffer output; 
+					WebPDecoderOptions options; 
+				} 
+				extern int WebPInitDecoderConfigInternal(WebPDecoderConfig*, int); 
+				
+				static int WebPInitDecoderConfig(WebPDecoderConfig* config)
+				=> WebPInitDecoderConfigInternal(config, WEBP_DECODER_ABI_VERSION); 
+				
+				extern WebPIDecoder* WebPIDecode(const(ubyte)* data, ulong data_size, WebPDecoderConfig* config); 
+				extern VP8StatusCode WebPDecode(const(ubyte)* data, ulong data_size, WebPDecoderConfig* config); 
+				extern int WebPGetEncoderVersion(); 
+				extern ulong WebPEncodeRGB(
+					const(ubyte)* rgb, int width, int height, int stride, 
+					float quality_factor, ubyte** output
+				); 
+				extern ulong WebPEncodeBGR(
+					const(ubyte)* bgr, int width, int height, int stride, 
+					float quality_factor, ubyte** output
+				); 
+				extern ulong WebPEncodeRGBA(
+					const(ubyte)* rgba, int width, int height, int stride, 
+					float quality_factor, ubyte** output
+				); 
+				extern ulong WebPEncodeBGRA(
+					const(ubyte)* bgra, int width, int height, int stride, 
+					float quality_factor, ubyte** output
+				); 
+				extern ulong WebPEncodeLosslessRGB(const(ubyte)* rgb, int width, int height, int stride, ubyte** output); 
+				extern ulong WebPEncodeLosslessBGR(const(ubyte)* bgr, int width, int height, int stride, ubyte** output); 
+				extern ulong WebPEncodeLosslessRGBA(const(ubyte)* rgba, int width, int height, int stride, ubyte** output); 
+				extern ulong WebPEncodeLosslessBGRA(const(ubyte)* bgra, int width, int height, int stride, ubyte** output); 
+				enum WebPImageHint
+				{
+					WEBP_HINT_DEFAULT = 0,
+					WEBP_HINT_PICTURE,
+					WEBP_HINT_PHOTO,
+					WEBP_HINT_GRAPH,
+					WEBP_HINT_LAST,
+				} 
+				alias WEBP_HINT_DEFAULT = WebPImageHint.WEBP_HINT_DEFAULT; 
+				alias WEBP_HINT_PICTURE = WebPImageHint.WEBP_HINT_PICTURE; 
+				alias WEBP_HINT_PHOTO = WebPImageHint.WEBP_HINT_PHOTO; 
+				alias WEBP_HINT_GRAPH = WebPImageHint.WEBP_HINT_GRAPH; 
+				alias WEBP_HINT_LAST = WebPImageHint.WEBP_HINT_LAST; 
+				struct WebPConfig
+				{
+					int lossless; 
+					float quality; 
+					int method; 
+					WebPImageHint image_hint; 
+					int target_size; 
+					float target_PSNR; 
+					int segments; 
+					int sns_strength; 
+					int filter_strength; 
+					int filter_sharpness; 
+					int filter_type; 
+					int autofilter; 
+					int alpha_compression; 
+					int alpha_filtering; 
+					int alpha_quality; 
+					int pass; 
+					int show_compressed; 
+					int preprocessing; 
+					int partitions; 
+					int partition_limit; 
+					int emulate_jpeg_size; 
+					int thread_level; 
+					int low_memory; 
+					int near_lossless; 
+					int exact; 
+					int use_delta_palette; 
+					int use_sharp_yuv; 
+					int qmin; 
+					int qmax; 
+				} 
+				enum WebPPreset
+				{
+					WEBP_PRESET_DEFAULT = 0,
+					WEBP_PRESET_PICTURE,
+					WEBP_PRESET_PHOTO,
+					WEBP_PRESET_DRAWING,
+					WEBP_PRESET_ICON,
+					WEBP_PRESET_TEXT,
+				} 
+				alias WEBP_PRESET_DEFAULT = WebPPreset.WEBP_PRESET_DEFAULT; 
+				alias WEBP_PRESET_PICTURE = WebPPreset.WEBP_PRESET_PICTURE; 
+				alias WEBP_PRESET_PHOTO = WebPPreset.WEBP_PRESET_PHOTO; 
+				alias WEBP_PRESET_DRAWING = WebPPreset.WEBP_PRESET_DRAWING; 
+				alias WEBP_PRESET_ICON = WebPPreset.WEBP_PRESET_ICON; 
+				alias WEBP_PRESET_TEXT = WebPPreset.WEBP_PRESET_TEXT; 
+				
+				extern int WebPConfigInitInternal(const WebPConfig*, WebPPreset, float, int); 
+				static int WebPConfigInit(WebPConfig* config)
+				{
+					return WebPConfigInitInternal(
+						config, WebPPreset.WEBP_PRESET_DEFAULT, 75.0f,
+						WEBP_ENCODER_ABI_VERSION
+					); 
+				} 
+				static int WebPConfigPreset(
+					WebPConfig* config,
+					WebPPreset preset, float quality
+				)
+				{
+					return WebPConfigInitInternal(
+						config, preset, quality,
+						WEBP_ENCODER_ABI_VERSION
+					); 
+				} 
+				extern int WebPConfigLosslessPreset(const WebPConfig* config, int level); 
+				extern int WebPValidateConfig(const WebPConfig* config); 
+				struct WebPAuxStats
+				{
+					int coded_size; 
+					float[5] PSNR; 
+					int[3] block_count; 
+					int[2] header_bytes; 
+					int[4][3] residual_bytes; 
+					int[4] segment_size; 
+					int[4] segment_quant; 
+					int[4] segment_level; 
+					int alpha_data_size; 
+					int layer_data_size; 
+					uint lossless_features; 
+					int histogram_bits; 
+					int transform_bits; 
+					int cache_bits; 
+					int palette_size; 
+					int lossless_size; 
+					int lossless_hdr_size; 
+					int lossless_data_size; 
+					uint[2] pad; 
+				} 
+				alias WebPWriterFunction = int function(const(ubyte)* data, ulong data_size, const WebPPicture* picture); 
+				struct WebPMemoryWriter
+				{
+					ubyte* mem; 
+					ulong size; 
+					ulong max_size; 
+					uint[1] pad; 
+				} 
+				extern void WebPMemoryWriterInit(WebPMemoryWriter* writer); 
+				extern void WebPMemoryWriterClear(WebPMemoryWriter* writer); 
+				extern int WebPMemoryWrite(const(ubyte)* data, ulong data_size, const WebPPicture* picture); 
+				alias WebPProgressHook = int function(int percent, const WebPPicture* picture); 
+				enum WebPEncCSP
+				{
+					WEBP_YUV420 = 0,
+					WEBP_YUV420A = 4,
+					WEBP_CSP_UV_MASK = 3,
+					WEBP_CSP_ALPHA_BIT = 4,
+				} 
+				alias WEBP_YUV420 = WebPEncCSP.WEBP_YUV420; 
+				alias WEBP_YUV420A = WebPEncCSP.WEBP_YUV420A; 
+				alias WEBP_CSP_UV_MASK = WebPEncCSP.WEBP_CSP_UV_MASK; 
+				alias WEBP_CSP_ALPHA_BIT = WebPEncCSP.WEBP_CSP_ALPHA_BIT; 
+				enum WebPEncodingError
+				{
+					VP8_ENC_OK = 0,
+					VP8_ENC_ERROR_OUT_OF_MEMORY,
+					VP8_ENC_ERROR_BITSTREAM_OUT_OF_MEMORY,
+					VP8_ENC_ERROR_NULL_PARAMETER,
+					VP8_ENC_ERROR_INVALID_CONFIGURATION,
+					VP8_ENC_ERROR_BAD_DIMENSION,
+					VP8_ENC_ERROR_PARTITION0_OVERFLOW,
+					VP8_ENC_ERROR_PARTITION_OVERFLOW,
+					VP8_ENC_ERROR_BAD_WRITE,
+					VP8_ENC_ERROR_FILE_TOO_BIG,
+					VP8_ENC_ERROR_USER_ABORT,
+					VP8_ENC_ERROR_LAST,
+				} 
+				alias VP8_ENC_OK = WebPEncodingError.VP8_ENC_OK; 
+				alias VP8_ENC_ERROR_OUT_OF_MEMORY = WebPEncodingError.VP8_ENC_ERROR_OUT_OF_MEMORY; 
+				alias VP8_ENC_ERROR_BITSTREAM_OUT_OF_MEMORY = WebPEncodingError.VP8_ENC_ERROR_BITSTREAM_OUT_OF_MEMORY; 
+				alias VP8_ENC_ERROR_NULL_PARAMETER = WebPEncodingError.VP8_ENC_ERROR_NULL_PARAMETER; 
+				alias VP8_ENC_ERROR_INVALID_CONFIGURATION = WebPEncodingError.VP8_ENC_ERROR_INVALID_CONFIGURATION; 
+				alias VP8_ENC_ERROR_BAD_DIMENSION = WebPEncodingError.VP8_ENC_ERROR_BAD_DIMENSION; 
+				alias VP8_ENC_ERROR_PARTITION0_OVERFLOW = WebPEncodingError.VP8_ENC_ERROR_PARTITION0_OVERFLOW; 
+				alias VP8_ENC_ERROR_PARTITION_OVERFLOW = WebPEncodingError.VP8_ENC_ERROR_PARTITION_OVERFLOW; 
+				alias VP8_ENC_ERROR_BAD_WRITE = WebPEncodingError.VP8_ENC_ERROR_BAD_WRITE; 
+				alias VP8_ENC_ERROR_FILE_TOO_BIG = WebPEncodingError.VP8_ENC_ERROR_FILE_TOO_BIG; 
+				alias VP8_ENC_ERROR_USER_ABORT = WebPEncodingError.VP8_ENC_ERROR_USER_ABORT; 
+				alias VP8_ENC_ERROR_LAST = WebPEncodingError.VP8_ENC_ERROR_LAST; 
+				struct WebPPicture
+				{
+					int use_argb; 
+					WebPEncCSP colorspace; 
+					int width; 
+					int height; 
+					ubyte* y; 
+					ubyte* u; 
+					ubyte* v; 
+					int y_stride; 
+					int uv_stride; 
+					ubyte* a; 
+					int a_stride; 
+					uint[2] pad1; 
+					uint* argb; 
+					int argb_stride; 
+					uint[3] pad2; 
+					int function(const(ubyte)* data, ulong data_size, const WebPPicture* picture) writer; 
+					void* custom_ptr; 
+					int extra_info_type; 
+					ubyte* extra_info; 
+					WebPAuxStats* stats; 
+					WebPEncodingError error_code; 
+					int function(int percent, const WebPPicture* picture) progress_hook; 
+					void* user_data; 
+					uint[3] pad3; 
+					ubyte* pad4; 
+					ubyte* pad5; 
+					uint[8] pad6; 
+					void* memory_; 
+					void* memory_argb_; 
+					void*[2] pad7; 
+				} 
+				extern int WebPPictureInitInternal(const WebPPicture*, int); 
+				static int WebPPictureInit(WebPPicture* picture)
+				{ return WebPPictureInitInternal(picture, WEBP_ENCODER_ABI_VERSION); } 
+				extern int WebPPictureAlloc(const WebPPicture* picture); 
+				extern void WebPPictureFree(const WebPPicture* picture); 
+				extern int WebPPictureCopy(const WebPPicture* src, const WebPPicture* dst); 
+				extern int WebPPlaneDistortion(
+					const(ubyte)* src, ulong src_stride, const(ubyte)* ref_, ulong ref_stride, 
+					int width, int height, ulong x_step, int type, float* distortion, float* result
+				); 
+				extern int WebPPictureDistortion(const WebPPicture* src, const WebPPicture* ref_, int metric_type, float[5] result); 
+				extern int WebPPictureCrop(const WebPPicture* picture, int left, int top, int width, int height); 
+				extern int WebPPictureView(const WebPPicture* src, int left, int top, int width, int height, const WebPPicture* dst); 
+				extern int WebPPictureIsView(const WebPPicture* picture); 
+				extern int WebPPictureRescale(const WebPPicture* picture, int width, int height); 
+				extern int WebPPictureImportRGB(const WebPPicture* picture, const(ubyte)* rgb, int rgb_stride); 
+				extern int WebPPictureImportRGBA(const WebPPicture* picture, const(ubyte)* rgba, int rgba_stride); 
+				extern int WebPPictureImportRGBX(const WebPPicture* picture, const(ubyte)* rgbx, int rgbx_stride); 
+				extern int WebPPictureImportBGR(const WebPPicture* picture, const(ubyte)* bgr, int bgr_stride); 
+				extern int WebPPictureImportBGRA(const WebPPicture* picture, const(ubyte)* bgra, int bgra_stride); 
+				extern int WebPPictureImportBGRX(const WebPPicture* picture, const(ubyte)* bgrx, int bgrx_stride); 
+				extern int WebPPictureARGBToYUVA(const WebPPicture* picture, WebPEncCSP); 
+				extern int WebPPictureARGBToYUVADithered(const WebPPicture* picture, WebPEncCSP colorspace, float dithering); 
+				extern int WebPPictureSharpARGBToYUVA(const WebPPicture* picture); 
+				extern int WebPPictureSmartARGBToYUVA(const WebPPicture* picture); 
+				extern int WebPPictureYUVAToARGB(const WebPPicture* picture); 
+				extern void WebPCleanupTransparentArea(const WebPPicture* picture); 
+				extern int WebPPictureHasTransparency(const WebPPicture* picture); 
+				extern void WebPBlendAlpha(const WebPPicture* picture, uint background_rgb); 
+				extern int WebPEncode(const WebPConfig* config, const WebPPicture* picture); 
+			} 
 			
 		}
 	} 
@@ -8099,10 +7628,9 @@ version(/+$DIDE_REGION+/all)
 						* props.xScale/+*spaceScale+/
 					)), props.height
 				); 
-				
 				enforce(bmpSize.x>0 && bmpSize.y>0, "renderText(): Bitmap has no area."); 
 				
-				Bitmap doRender(bool inverse=false)
+				Bitmap doRender()
 				{
 					auto gBmp = new GdiBitmap(bmpSize); scope(exit) gBmp.destroy; 
 					auto rect = RECT(0, 0, gBmp.size.x, gBmp.size.y); //Todo: this can be null???
@@ -8111,8 +7639,8 @@ version(/+$DIDE_REGION+/all)
 					dcrt.BeginDraw; 
 					try
 					{
-						dcrt.Clear(inverse ? white : black); 
-						brush.SetColor(inverse ? black : white); 
+						dcrt.Clear    (D2D1_COLOR_F(1, 0, 1)/+BGR!!!+/); 
+						brush.SetColor(D2D1_COLOR_F(1, 1, 0)/+BGR!!!+/); 
 						const y = props.height * (
 							(desiredBaseline - relativeBaseline) 
 							+ ((isSegoeAssets)?(.125f):(0))
@@ -8128,33 +7656,28 @@ version(/+$DIDE_REGION+/all)
 				} 
 				
 				auto res = doRender; 
+				auto im = res.access!RGBA; 
+				auto grayBuf = uninitializedArray!(ubyte[])(im.area); 
 				
-				static bool isGrayscale(in RGBA color)
-				=> color.rg==color.gb; 
+				static bool isFuchsiaAqua(in RGBA color)
+				=> ((mixin(界3(q{255},q{color.r + color.g},q{256}))) && (color.b==255)); 
 				
-				if(
-					res.access!RGBA.asArray.map!isGrayscale.all && 
-					!text.among("➕", "➖", "➗", "✖", "⚙", "🧾", "📄")
-					/+Opt: faster lookup with more exceptions+/
-					/+Todo: Get the alpha mask with IDWriteGlyphRunAnalysis+/
-				)
+				bool allFuchsiaAqua=true; 
+				foreach(i, const c; im.asArray)
 				{
-					res.set(res.get!ubyte); //convert it to 1 channel
+					if(!isFuchsiaAqua(c)) { allFuchsiaAqua = false; break; }
+					grayBuf[i] = c.g; 
 				}
+				
+				if(allFuchsiaAqua)
+				{ res.set(image2D(res.size, grayBuf)); }
 				else
 				{
-					auto res2 = doRender(true); 
-					
-					//ha ide betuk keverednek, akkor aszoknak zajos lesz a konturjuk ugyanis
-					//nem csak a hatterszin valtozik, hanem az eloteszin is. Az mar duplaannyi, mint kene.
-					
-					static RGBA process(RGBA a, RGBA b)
+					foreach(ref col; res.access!RGBA.asArray)
 					{
-						ubyte alpha = cast(ubyte)(~(b.r - a.r)); 
-						return alpha<0xff 	? RGBA(0,0,0, alpha)
-							: RGBA(b.bgr, alpha); 
-					} 
-					res.set(image2D!process(res.access!RGBA, res2.access!RGBA)); 
+						col.a = ((col.g==0 && col.r==col.b)?((cast(ubyte)(col.b ^ 255))):(255)); 
+						col.rgb = ((col.a<0xff)?(clBlack):(col.bgr)); 
+					}
 				}
 				
 				return res; 
@@ -8165,805 +7688,1304 @@ version(/+$DIDE_REGION+/all)
 	}
 	
 	//Segoe Symbol database ////////////////////////////////
+	enum SegoeSymbol : wchar
+	{
+		Accept 	= 0xE8FB,
+		Accident 	= 0xE81F,
+		AccidentSolid 	= 0xEA8E,
+		Accounts 	= 0xE910,
+		ActionCenter 	= 0xE91C,
+		ActionCenterAsterisk 	= 0xEA21,
+		ActionCenterMirrored 	= 0xED0D,
+		ActionCenterNotification 	= 0xE7E7,
+		ActionCenterNotificationMirrored 	= 0xED0C,
+		ActionCenterQuiet 	= 0xEE79,
+		ActionCenterQuietNotification 	= 0xEE7A,
+		Add 	= 0xE710,
+		AddFriend 	= 0xE8FA,
+		AddRemoteDevice 	= 0xE836,
+		AddSurfaceHub 	= 0xECC4,
+		AddTo 	= 0xECC8,
+		AdjustHologram 	= 0xEBD2,
+		Admin 	= 0xE7EF,
+		Airplane 	= 0xE709,
+		AirplaneSolid 	= 0xEB4C,
+		AlignCenter 	= 0xE8E3,
+		AlignLeft 	= 0xE8E4,
+		AlignRight 	= 0xE8E2,
+		AllApps 	= 0xE71D,
+		AllAppsMirrored 	= 0xEA40,
+		Annotation 	= 0xE924,
+		AppIconDefault 	= 0xECAA,
+		Apps 	= 0xED35,
+		AreaChart 	= 0xE9D2,
+		ArrowDown8 	= 0xF0AE,
+		ArrowLeft8 	= 0xF0B0,
+		ArrowRight8 	= 0xF0AF,
+		ArrowUp8 	= 0xF0AD,
+		AspectRatio 	= 0xE799,
+		Asterisk 	= 0xEA38,
+		AsteriskBadge12 	= 0xEDAD,
+		Attach 	= 0xE723,
+		AttachCamera 	= 0xE8A2,
+		Audio 	= 0xE8D6,
+		Back 	= 0xE72B,
+		BackMirrored 	= 0xF0D2,
+		BackSpaceQWERTY 	= 0xE750,
+		BackSpaceQWERTYLg 	= 0xEB96,
+		BackSpaceQWERTYMd 	= 0xE926,
+		BackSpaceQWERTYSm 	= 0xE925,
+		BackToWindow 	= 0xE73F,
+		BackgroundToggle 	= 0xEF1F,
+		Badge 	= 0xEC1B,
+		BandBattery0 	= 0xECB9,
+		BandBattery1 	= 0xECBA,
+		BandBattery2 	= 0xECBB,
+		BandBattery3 	= 0xECBC,
+		BandBattery4 	= 0xECBD,
+		BandBattery5 	= 0xECBE,
+		BandBattery6 	= 0xECBF,
+		Bank 	= 0xE825,
+		BarcodeScanner 	= 0xEC5A,
+		Battery0 	= 0xE850,
+		Battery1 	= 0xE851,
+		Battery10 	= 0xE83F,
+		Battery2 	= 0xE852,
+		Battery3 	= 0xE853,
+		Battery4 	= 0xE854,
+		Battery5 	= 0xE855,
+		Battery6 	= 0xE856,
+		Battery7 	= 0xE857,
+		Battery8 	= 0xE858,
+		Battery9 	= 0xE859,
+		BatteryCharging0 	= 0xE85A,
+		BatteryCharging1 	= 0xE85B,
+		BatteryCharging10 	= 0xEA93,
+		BatteryCharging2 	= 0xE85C,
+		BatteryCharging3 	= 0xE85D,
+		BatteryCharging4 	= 0xE85E,
+		BatteryCharging5 	= 0xE85F,
+		BatteryCharging6 	= 0xE860,
+		BatteryCharging7 	= 0xE861,
+		BatteryCharging8 	= 0xE862,
+		BatteryCharging9 	= 0xE83E,
+		BatterySaver0 	= 0xE863,
+		BatterySaver1 	= 0xE864,
+		BatterySaver10 	= 0xEA95,
+		BatterySaver2 	= 0xE865,
+		BatterySaver3 	= 0xE866,
+		BatterySaver4 	= 0xE867,
+		BatterySaver5 	= 0xE868,
+		BatterySaver6 	= 0xE869,
+		BatterySaver7 	= 0xE86A,
+		BatterySaver8 	= 0xE86B,
+		BatterySaver9 	= 0xEA94,
+		BatteryUnknown 	= 0xE996,
+		Beta 	= 0xEA24,
+		BidiLtr 	= 0xE9AA,
+		BidiRtl 	= 0xE9AB,
+		BlockContact 	= 0xE8F8,
+		BlueLight 	= 0xF08C,
+		Bluetooth 	= 0xE702,
+		BodyCam 	= 0xEC80,
+		Bold 	= 0xE8DD,
+		Bookmarks 	= 0xE8A4,
+		BookmarksMirrored 	= 0xEA41,
+		Brightness 	= 0xE706,
+		Broom 	= 0xEA99,
+		BrowsePhotos 	= 0xE7C5,
+		BrushSize 	= 0xEDA8,
+		Bug 	= 0xEBE8,
+		BuildingEnergy 	= 0xEC0B,
+		BulletedList 	= 0xE8FD,
+		BulletedListMirrored 	= 0xEA42,
+		Bullseye 	= 0xF272,
+		BumperLeft 	= 0xF10C,
+		BumperRight 	= 0xF10D,
+		Bus 	= 0xE806,
+		BusSolid 	= 0xEB47,
+		ButtonA 	= 0xF093,
+		ButtonB 	= 0xF094,
+		ButtonMenu 	= 0xEDE3,
+		ButtonView2 	= 0xEECA,
+		ButtonX 	= 0xF096,
+		ButtonY 	= 0xF095,
+		
+		CC 	= 0xE7F0,
+		Cafe 	= 0xEC32,
+		Calculator 	= 0xE8EF,
+		CalculatorAddition 	= 0xE948,
+		CalculatorBackspace 	= 0xE94F,
+		CalculatorDivide 	= 0xE94A,
+		CalculatorEqualTo 	= 0xE94E,
+		CalculatorMultiply 	= 0xE947,
+		CalculatorNegate 	= 0xE94D,
+		CalculatorPercentage 	= 0xE94C,
+		CalculatorSquareroot 	= 0xE94B,
+		CalculatorSubtract 	= 0xE949,
+		Calendar 	= 0xE787,
+		CalendarDay 	= 0xE8BF,
+		CalendarMirrored 	= 0xED28,
+		CalendarReply 	= 0xE8F5,
+		CalendarSolid 	= 0xEA89,
+		CalendarWeek 	= 0xE8C0,
+		CallForwardInternational 	= 0xE87A,
+		CallForwardInternationalMirrored 	= 0xEA43,
+		CallForwardRoaming 	= 0xE87B,
+		CallForwardRoamingMirrored 	= 0xEA44,
+		CallForwarding 	= 0xE7F2,
+		CallForwardingMirrored 	= 0xEA97,
+		CalligraphyFill 	= 0xF0C7,
+		CalligraphyPen 	= 0xEDFB,
+		Calories 	= 0xECAD,
+		Camera 	= 0xE722,
+		Cancel 	= 0xE711,
+		Caption 	= 0xE8BA,
+		Car 	= 0xE804,
+		CaretBottomRightSolidCenter8 	= 0xF169,
+		CaretDownSolid8 	= 0xEDDC,
+		CaretLeftSolid8 	= 0xEDD9,
+		CaretRight8 	= 0xEDD6,
+		CaretRightSolid8 	= 0xEDDA,
+		CaretUpSolid8 	= 0xEDDB,
+		CashDrawer 	= 0xEC59,
+		CellPhone 	= 0xE8EA,
+		Certificate 	= 0xEB95,
+		CharacterAppearance 	= 0xF17F,
+		Characters 	= 0xE8C1,
+		ChatBubbles 	= 0xE8F2,
+		CheckList 	= 0xE9D5,
+		CheckMark 	= 0xE73E,
+		Checkbox 	= 0xE739,
+		Checkbox14 	= 0xF16B,
+		CheckboxComposite 	= 0xE73A,
+		CheckboxComposite14 	= 0xF16C,
+		CheckboxCompositeReversed 	= 0xE73D,
+		CheckboxFill 	= 0xE73B,
+		CheckboxIndeterminate 	= 0xE73C,
+		CheckboxIndeterminateCombo 	= 0xF16E,
+		CheckboxIndeterminateCombo14 	= 0xF16D,
+		ChecklistMirrored 	= 0xF0B5,
+		ChevronDown 	= 0xE70D,
+		ChevronDownMed 	= 0xE972,
+		ChevronDownSmall 	= 0xE96E,
+		ChevronLeft 	= 0xE76B,
+		ChevronLeftMed 	= 0xE973,
+		ChevronLeftSmall 	= 0xE96F,
+		ChevronRight 	= 0xE76C,
+		ChevronRightMed 	= 0xE974,
+		ChevronRightSmall 	= 0xE970,
+		ChevronUp 	= 0xE70E,
+		ChevronUpMed 	= 0xE971,
+		ChevronUpSmall 	= 0xE96D,
+		ChineseBoPoMoFo 	= 0xE989,
+		ChineseChangjie 	= 0xE981,
+		ChinesePinyin 	= 0xE98A,
+		ChinesePunctuation 	= 0xF111,
+		ChineseQuick 	= 0xE984,
+		ChipCardCreditCardReader 	= 0xEF40,
+		ChromeAnnotate 	= 0xE931,
+		ChromeAnnotateContrast 	= 0xF0F9,
+		ChromeBack 	= 0xE830,
+		ChromeBackContrast 	= 0xF0D5,
+		ChromeBackContrastMirrored 	= 0xF0D6,
+		ChromeBackMirrored 	= 0xEA47,
+		ChromeBackToWindow 	= 0xE92C,
+		ChromeBackToWindowContrast 	= 0xF0D7,
+		ChromeClose 	= 0xE8BB,
+		ChromeCloseContrast 	= 0xEF2C,
+		ChromeFullScreen 	= 0xE92D,
+		ChromeFullScreenContrast 	= 0xF0D8,
+		ChromeMaximize 	= 0xE922,
+		ChromeMaximizeContrast 	= 0xEF2E,
+		ChromeMinimize 	= 0xE921,
+		ChromeMinimizeContrast 	= 0xEF2D,
+		ChromeRestore 	= 0xE923,
+		ChromeRestoreContrast 	= 0xEF2F,
+		ChromeSwitch 	= 0xF1CB,
+		ChromeSwitchContast 	= 0xF1CC,
+		CircleFill 	= 0xEA3B,
+		CircleFillBadge12 	= 0xEDB0,
+		CircleRing 	= 0xEA3A,
+		CircleRingBadge12 	= 0xEDAF,
+		CityNext 	= 0xEC06,
+		CityNext2 	= 0xEC07,
+		Clear 	= 0xE894,
+		ClearAllInk 	= 0xED62,
+		ClearAllInkMirrored 	= 0xEF19,
+		ClearSelection 	= 0xE8E6,
+		ClearSelectionMirrored 	= 0xEA48,
+		Click 	= 0xE8B0,
+		ClipboardList 	= 0xF0E3,
+		ClipboardListMirrored 	= 0xF0E4,
+		ClippingTool 	= 0xF406,
+		ClosePane 	= 0xE89F,
+		ClosePaneMirrored 	= 0xEA49,
+		Cloud 	= 0xE753,
+		CloudPrinter 	= 0xEDA6,
+		CloudSeach 	= 0xEDE4,
+		Code 	= 0xE943,
+		CollapseContent 	= 0xF165,
+		CollapseContentSingle 	= 0xF166,
+		CollateLandscape 	= 0xF57B,
+		CollateLandscapeSeparated 	= 0xF5AC,
+		CollatePortrait 	= 0xF57C,
+		CollatePortraitSeparated 	= 0xF57D,
+		
+		Color 	= 0xE790,
+		ColorOff 	= 0xF570,
+		CommaKey 	= 0xE9AD,
+		CommandPrompt 	= 0xE756,
+		Comment 	= 0xE90A,
+		Communications 	= 0xE95A,
+		CompanionApp 	= 0xEC64,
+		CompanionDeviceFramework 	= 0xED5D,
+		Completed 	= 0xE930,
+		CompletedSolid 	= 0xEC61,
+		Component 	= 0xE950,
+		Connect 	= 0xE703,
+		ConnectApp 	= 0xED5C,
+		Connected 	= 0xF0B9,
+		Construction 	= 0xE822,
+		ConstructionCone 	= 0xE98F,
+		ConstructionSolid 	= 0xEA8D,
+		Contact 	= 0xE77B,
+		Contact2 	= 0xE8D4,
+		ContactInfo 	= 0xE779,
+		ContactInfoMirrored 	= 0xEA4A,
+		ContactPresence 	= 0xE8CF,
+		ContactSolid 	= 0xEA8C,
+		Copy 	= 0xE8C8,
+		CopyTo 	= 0xF413,
+		Courthouse 	= 0xEC08,
+		Crop 	= 0xE7A8,
+		CtrlSpatialLeft 	= 0xF3E7,
+		CtrlSpatialRight 	= 0xF11B,
+		Cut 	= 0xE8C6,
+		DMC 	= 0xE951,
+		DashKey 	= 0xE9AE,
+		DataSense 	= 0xE791,
+		DataSenseBar 	= 0xE7A5,
+		DateTime 	= 0xEC92,
+		DateTimeMirrored 	= 0xEE93,
+		DefaultAPN 	= 0xF080,
+		DefenderApp 	= 0xE83D,
+		DefenderBadge12 	= 0xF0FB,
+		Delete 	= 0xE74D,
+		Design 	= 0xEB3C,
+		DetachablePC 	= 0xF103,
+		DevUpdate 	= 0xECC5,
+		DeveloperTools 	= 0xEC7A,
+		DeviceDiscovery 	= 0xEBDE,
+		DeviceLaptopNoPic 	= 0xE7F8,
+		DeviceLaptopPic 	= 0xE7F7,
+		DeviceMonitorLeftPic 	= 0xE7FA,
+		DeviceMonitorNoPic 	= 0xE7FB,
+		DeviceMonitorRightPic 	= 0xE7F9,
+		Devices 	= 0xE772,
+		Devices2 	= 0xE975,
+		Devices3 	= 0xEA6C,
+		Devices4 	= 0xEB66,
+		Diagnostic 	= 0xE9D9,
+		Dial1 	= 0xF146,
+		Dial10 	= 0xF14F,
+		Dial11 	= 0xF150,
+		Dial12 	= 0xF151,
+		Dial13 	= 0xF152,
+		Dial14 	= 0xF153,
+		Dial15 	= 0xF154,
+		Dial16 	= 0xF155,
+		Dial2 	= 0xF147,
+		Dial3 	= 0xF148,
+		Dial4 	= 0xF149,
+		Dial5 	= 0xF14A,
+		Dial6 	= 0xF14B,
+		Dial7 	= 0xF14C,
+		Dial8 	= 0xF14D,
+		Dial9 	= 0xF14E,
+		DialShape1 	= 0xF156,
+		DialShape2 	= 0xF157,
+		DialShape3 	= 0xF158,
+		DialShape4 	= 0xF159,
+		DialUp 	= 0xE83C,
+		Dialpad 	= 0xE75F,
+		Dictionary 	= 0xE82D,
+		DictionaryAdd 	= 0xE82E,
+		DictionaryCloud 	= 0xEBC3,
+		DirectAccess 	= 0xE83B,
+		Directions 	= 0xE8F0,
+		DisableUpdates 	= 0xE8D8,
+		DisconnectDisplay 	= 0xEA14,
+		DisconnectDrive 	= 0xE8CD,
+		Dislike 	= 0xE8E0,
+		Dock 	= 0xE952,
+		DockBottom 	= 0xE90E,
+		DockLeft 	= 0xE90C,
+		DockLeftMirrored 	= 0xEA4C,
+		DockRight 	= 0xE90D,
+		DockRightMirrored 	= 0xEA4B,
+		Document 	= 0xE8A5,
+		DoublePinyin 	= 0xF085,
+		Down 	= 0xE74B,
+		DownShiftKey 	= 0xE84A,
+		Download 	= 0xE896,
+		DownloadMap 	= 0xE826,
+		Dpad 	= 0xF10E,
+		Draw 	= 0xEC87,
+		DrawSolid 	= 0xEC88,
+		DrivingMode 	= 0xE7EC,
+		Drop 	= 0xEB42,
+		DullSound 	= 0xE911,
+		DullSoundKey 	= 0xE9AF,
+		DuplexLandscapeOneSided 	= 0xF57E,
+		DuplexLandscapeOneSidedMirrored 	= 0xF57F,
+		DuplexLandscapeTwoSidedLongEdge 	= 0xF580,
+		DuplexLandscapeTwoSidedLongEdgeMirrored 	= 0xF581,
+		DuplexLandscapeTwoSidedShortEdge 	= 0xF582,
+		DuplexLandscapeTwoSidedShortEdgeMirrored 	= 0xF583,
+		DuplexPortraitOneSided 	= 0xF584,
+		DuplexPortraitOneSidedMirrored 	= 0xF585,
+		DuplexPortraitTwoSidedLongEdge 	= 0xF586,
+		DuplexPortraitTwoSidedLongEdgeMirrored 	= 0xF587,
+		DuplexPortraitTwoSidedShortEdge 	= 0xF588,
+		DuplexPortraitTwoSidedShortEdgeMirrored 	= 0xF589,
+		DynamicLock 	= 0xF439,
+		EMI 	= 0xE731,
+		Ear 	= 0xF270,
+		
+		Earbud 	= 0xF4C0,
+		EaseOfAccess 	= 0xE776,
+		Edit 	= 0xE70F,
+		EditMirrored 	= 0xEB7E,
+		Education 	= 0xE7BE,
+		Emoji 	= 0xE899,
+		Emoji2 	= 0xE76E,
+		EmojiSwatch 	= 0xED5B,
+		EmojiTabCelebrationObjects 	= 0xED55,
+		EmojiTabFavorites 	= 0xED5A,
+		EmojiTabFoodPlants 	= 0xED56,
+		EmojiTabPeople 	= 0xED53,
+		EmojiTabSmilesAnimals 	= 0xED54,
+		EmojiTabSymbols 	= 0xED58,
+		EmojiTabTextSmiles 	= 0xED59,
+		EmojiTabTransitPlaces 	= 0xED57,
+		EndPoint 	= 0xE81B,
+		EndPointSolid 	= 0xEB4B,
+		EnglishPunctuation 	= 0xF110,
+		Equalizer 	= 0xE9E9,
+		EraseTool 	= 0xE75C,
+		EraseToolFill 	= 0xE82B,
+		EraseToolFill2 	= 0xE82C,
+		Error 	= 0xE783,
+		ErrorBadge 	= 0xEA39,
+		ErrorBadge12 	= 0xEDAE,
+		Ethernet 	= 0xE839,
+		EthernetError 	= 0xEB55,
+		EthernetWarning 	= 0xEB56,
+		ExpandTile 	= 0xE976,
+		ExpandTileMirrored 	= 0xEA4E,
+		ExploitProtectionSettings 	= 0xF259,
+		ExploreContent 	= 0xECCD,
+		ExploreContentSingle 	= 0xF164,
+		Export 	= 0xEDE1,
+		ExportMirrored 	= 0xEDE2,
+		EyeGaze 	= 0xF19D,
+		Eyedropper 	= 0xEF3C,
+		Family 	= 0xEBDA,
+		FastForward 	= 0xEB9D,
+		Favicon 	= 0xE737,
+		FavoriteList 	= 0xE728,
+		FavoriteStar 	= 0xE734,
+		FavoriteStarFill 	= 0xE735,
+		Feedback 	= 0xED15,
+		FeedbackApp 	= 0xE939,
+		Ferry 	= 0xE7E3,
+		FerrySolid 	= 0xEB48,
+		FileExplorer 	= 0xEC50,
+		FileExplorerApp 	= 0xEC51,
+		Filter 	= 0xE71C,
+		FingerInking 	= 0xED5F,
+		Fingerprint 	= 0xE928,
+		FitPage 	= 0xE9A6,
+		Flag 	= 0xE7C1,
+		Flashlight 	= 0xE754,
+		FlickDown 	= 0xE935,
+		FlickLeft 	= 0xE937,
+		FlickRight 	= 0xE938,
+		FlickUp 	= 0xE936,
+		Folder 	= 0xE8B7,
+		FolderFill 	= 0xE8D5,
+		FolderHorizontal 	= 0xF12B,
+		FolderOpen 	= 0xE838,
+		Font 	= 0xE8D2,
+		FontColor 	= 0xE8D3,
+		FontDecrease 	= 0xE8E7,
+		FontIncrease 	= 0xE8E8,
+		FontSize 	= 0xE8E9,
+		Forward 	= 0xE72A,
+		ForwardMirrored 	= 0xF0D3,
+		ForwardSm 	= 0xE9AC,
+		FourBars 	= 0xE908,
+		FreeFormClipping 	= 0xF408,
+		Frigid 	= 0xE9CA,
+		FullAlpha 	= 0xE97F,
+		FullCircleMask 	= 0xE91F,
+		FullHiragana 	= 0xE986,
+		FullKatakana 	= 0xE987,
+		FullScreen 	= 0xE740,
+		FuzzyReading 	= 0xF5EF,
+		GIF 	= 0xF4A9,
+		Game 	= 0xE7FC,
+		GameConsole 	= 0xE967,
+		GiftboxOpen 	= 0xF133,
+		GlobalNavigationButton 	= 0xE700,
+		Globe 	= 0xE774,
+		Go 	= 0xE8AD,
+		GoMirrored 	= 0xEA4F,
+		GoToStart 	= 0xE8FC,
+		GotoToday 	= 0xE8D1,
+		GridView 	= 0xF0E2,
+		GripperBarHorizontal 	= 0xE76F,
+		GripperBarVertical 	= 0xE784,
+		GripperResize 	= 0xE788,
+		GripperResizeMirrored 	= 0xEA50,
+		GripperTool 	= 0xE75E,
+		Groceries 	= 0xEC09,
+		Group 	= 0xE902,
+		GroupList 	= 0xF168,
+		GuestUser 	= 0xEE57,
+		HMD 	= 0xF119,
+		HWPInsert 	= 0xF461,
+		HWPJoin 	= 0xF460,
+		HWPNewLine 	= 0xF465,
+		HWPOverwrite 	= 0xF466,
+		HWPScratchOut 	= 0xF463,
+		HWPSplit 	= 0xF464,
+		HWPStrikeThrough 	= 0xF462,
+		HalfAlpha 	= 0xE97E,
+		HalfDullSound 	= 0xE9B0,
+		HalfKatakana 	= 0xE988,
+		HalfStarLeft 	= 0xE7C6,
+		HalfStarRight 	= 0xE7C7,
+		Handwriting 	= 0xE929,
+		HangUp 	= 0xE778,
+		HardDrive 	= 0xEDA2,
+		HeadlessDevice 	= 0xF191,
+		Headphone 	= 0xE7F6,
+		Headphone0 	= 0xED30,
+		
+		Headphone1 	= 0xED31,
+		Headphone2 	= 0xED32,
+		Headphone3 	= 0xED33,
+		Headset 	= 0xE95B,
+		Health 	= 0xE95E,
+		Heart 	= 0xEB51,
+		HeartBroken 	= 0xEA92,
+		HeartFill 	= 0xEB52,
+		Help 	= 0xE897,
+		HelpMirrored 	= 0xEA51,
+		HideBcc 	= 0xE8C5,
+		Highlight 	= 0xE7E6,
+		HighlightFill 	= 0xE891,
+		HighlightFill2 	= 0xE82A,
+		History 	= 0xE81C,
+		HolePunchLandscapeBottom 	= 0xF597,
+		HolePunchLandscapeLeft 	= 0xF594,
+		HolePunchLandscapeRight 	= 0xF595,
+		HolePunchLandscapeTop 	= 0xF596,
+		HolePunchOff 	= 0xF58F,
+		HolePunchPortraitBottom 	= 0xF593,
+		HolePunchPortraitLeft 	= 0xF590,
+		HolePunchPortraitRight 	= 0xF591,
+		HolePunchPortraitTop 	= 0xF592,
+		HoloLensSelected 	= 0xF4BF,
+		Home 	= 0xE80F,
+		HomeGroup 	= 0xEC26,
+		HomeSolid 	= 0xEA8A,
+		HorizontalTabKey 	= 0xE7FD,
+		IBeam 	= 0xE933,
+		IBeamOutline 	= 0xE934,
+		IOT 	= 0xF22C,
+		ImageExport 	= 0xEE71,
+		Import 	= 0xE8B5,
+		ImportAll 	= 0xE8B6,
+		ImportAllMirrored 	= 0xEA53,
+		ImportMirrored 	= 0xEA52,
+		Important 	= 0xE8C9,
+		ImportantBadge12 	= 0xEDB1,
+		InPrivate 	= 0xE727,
+		IncidentTriangle 	= 0xE814,
+		Info 	= 0xE946,
+		Info2 	= 0xEA1F,
+		InfoSolid 	= 0xF167,
+		InkingCaret 	= 0xED65,
+		InkingColorFill 	= 0xED67,
+		InkingColorOutline 	= 0xED66,
+		InkingTool 	= 0xE76D,
+		InkingToolFill 	= 0xE88F,
+		InkingToolFill2 	= 0xE829,
+		Input 	= 0xE961,
+		InsiderHubApp 	= 0xEC24,
+		InteractiveDashboard 	= 0xF404,
+		InternetSharing 	= 0xE704,
+		Italic 	= 0xE8DB,
+		Japanese 	= 0xE985,
+		JpnRomanji 	= 0xE87C,
+		JpnRomanjiLock 	= 0xE87D,
+		JpnRomanjiShift 	= 0xE87E,
+		JpnRomanjiShiftLock 	= 0xE87F,
+		Key12On 	= 0xE980,
+		Keyboard12Key 	= 0xF261,
+		KeyboardBrightness 	= 0xED39,
+		KeyboardClassic 	= 0xE765,
+		KeyboardDismiss 	= 0xE92F,
+		KeyboardDock 	= 0xF26B,
+		KeyboardFull 	= 0xEC31,
+		KeyboardLeftAligned 	= 0xF20C,
+		KeyboardLeftDock 	= 0xF26D,
+		KeyboardLeftHanded 	= 0xE763,
+		KeyboardLowerBrightness 	= 0xED3A,
+		KeyboardNarrow 	= 0xF260,
+		KeyboardOneHanded 	= 0xED4C,
+		KeyboardRightAligned 	= 0xF20D,
+		KeyboardRightDock 	= 0xF26E,
+		KeyboardRightHanded 	= 0xE764,
+		KeyboardSettings 	= 0xF210,
+		KeyboardShortcut 	= 0xEDA7,
+		KeyboardSplit 	= 0xE766,
+		KeyboardStandard 	= 0xE92E,
+		KeyboardUndock 	= 0xF26C,
+		KnowledgeArticle 	= 0xF000,
+		Korean 	= 0xE97D,
+		LEDLight 	= 0xE781,
+		Label 	= 0xE932,
+		LandscapeOrientation 	= 0xEF6B,
+		LandscapeOrientationMirrored 	= 0xF56F,
+		LangJPN 	= 0xE7DE,
+		LanguageChs 	= 0xE88D,
+		LanguageCht 	= 0xE88C,
+		LanguageJpn 	= 0xEC45,
+		LanguageKor 	= 0xE88B,
+		LaptopSecure 	= 0xF552,
+		LaptopSelected 	= 0xEC76,
+		LargeErase 	= 0xF12A,
+		Leaf 	= 0xE8BE,
+		LeaveChat 	= 0xE89B,
+		LeaveChatMirrored 	= 0xEA54,
+		LeftArrowKeyTime0 	= 0xEC52,
+		LeftDoubleQuote 	= 0xE9B2,
+		LeftQuote 	= 0xE848,
+		LeftStick 	= 0xF108,
+		Lexicon 	= 0xF180,
+		Library 	= 0xE8F1,
+		Light 	= 0xE793,
+		Lightbulb 	= 0xEA80,
+		LightningBolt 	= 0xE945,
+		Like 	= 0xE8E1,
+		LikeDislike 	= 0xE8DF,
+		LineDisplay 	= 0xEF3D,
+		Link 	= 0xE71B,
+		List 	= 0xEA37,
+		ListMirrored 	= 0xEA55,
+		Location 	= 0xE81D,
+		Lock 	= 0xE72E,
+		LockFeedback 	= 0xEBDB,
+		LockScreenGlance 	= 0xEE65,
+		LockscreenDesktop 	= 0xEE3F,
+		LowerBrightness 	= 0xEC8A,
+		MagStripeReader 	= 0xEC5C,
+		
+		Mail 	= 0xE715,
+		MailBadge12 	= 0xEDB3,
+		MailFill 	= 0xE8A8,
+		MailForward 	= 0xE89C,
+		MailForwardMirrored 	= 0xEA56,
+		MailReply 	= 0xE8CA,
+		MailReplyAll 	= 0xE8C2,
+		MailReplyAllMirrored 	= 0xEA58,
+		MailReplyMirrored 	= 0xEA57,
+		Manage 	= 0xE912,
+		MapCompassBottom 	= 0xE813,
+		MapCompassTop 	= 0xE812,
+		MapDirections 	= 0xE816,
+		MapDrive 	= 0xE8CE,
+		MapLayers 	= 0xE81E,
+		MapPin 	= 0xE707,
+		MapPin2 	= 0xE7B7,
+		Marker 	= 0xED64,
+		Marquee 	= 0xEF20,
+		Media 	= 0xEA69,
+		MediaStorageTower 	= 0xE965,
+		Megaphone 	= 0xE789,
+		Memo 	= 0xE77C,
+		Message 	= 0xE8BD,
+		MicClipping 	= 0xEC72,
+		MicError 	= 0xEC56,
+		MicOff 	= 0xEC54,
+		MicOn 	= 0xEC71,
+		MicSleep 	= 0xEC55,
+		Microphone 	= 0xE720,
+		MicrophoneListening 	= 0xF12E,
+		MiracastLogoLarge 	= 0xEC16,
+		MiracastLogoSmall 	= 0xEC15,
+		MixVolumes 	= 0xF4C3,
+		MobActionCenter 	= 0xEC42,
+		MobAirplane 	= 0xEC40,
+		MobBattery0 	= 0xEBA0,
+		MobBattery1 	= 0xEBA1,
+		MobBattery10 	= 0xEBAA,
+		MobBattery2 	= 0xEBA2,
+		MobBattery3 	= 0xEBA3,
+		MobBattery4 	= 0xEBA4,
+		MobBattery5 	= 0xEBA5,
+		MobBattery6 	= 0xEBA6,
+		MobBattery7 	= 0xEBA7,
+		MobBattery8 	= 0xEBA8,
+		MobBattery9 	= 0xEBA9,
+		MobBatteryCharging0 	= 0xEBAB,
+		MobBatteryCharging1 	= 0xEBAC,
+		MobBatteryCharging10 	= 0xEBB5,
+		MobBatteryCharging2 	= 0xEBAD,
+		MobBatteryCharging3 	= 0xEBAE,
+		MobBatteryCharging4 	= 0xEBAF,
+		MobBatteryCharging5 	= 0xEBB0,
+		MobBatteryCharging6 	= 0xEBB1,
+		MobBatteryCharging7 	= 0xEBB2,
+		MobBatteryCharging8 	= 0xEBB3,
+		MobBatteryCharging9 	= 0xEBB4,
+		MobBatterySaver0 	= 0xEBB6,
+		MobBatterySaver1 	= 0xEBB7,
+		MobBatterySaver10 	= 0xEBC0,
+		MobBatterySaver2 	= 0xEBB8,
+		MobBatterySaver3 	= 0xEBB9,
+		MobBatterySaver4 	= 0xEBBA,
+		MobBatterySaver5 	= 0xEBBB,
+		MobBatterySaver6 	= 0xEBBC,
+		MobBatterySaver7 	= 0xEBBD,
+		MobBatterySaver8 	= 0xEBBE,
+		MobBatterySaver9 	= 0xEBBF,
+		MobBatteryUnknown 	= 0xEC02,
+		MobBluetooth 	= 0xEC41,
+		MobCallForwarding 	= 0xEC7E,
+		MobCallForwardingMirrored 	= 0xEC7F,
+		MobDrivingMode 	= 0xEC47,
+		MobLocation 	= 0xEC43,
+		MobQuietHours 	= 0xEC46,
+		MobSIMError 	= 0xF5AB,
+		MobSIMLock 	= 0xE875,
+		MobSIMMissing 	= 0xE876,
+		MobSignal1 	= 0xEC37,
+		MobSignal2 	= 0xEC38,
+		MobSignal3 	= 0xEC39,
+		MobSignal4 	= 0xEC3A,
+		MobSignal5 	= 0xEC3B,
+		MobWifi1 	= 0xEC3C,
+		MobWifi2 	= 0xEC3D,
+		MobWifi3 	= 0xEC3E,
+		MobWifi4 	= 0xEC3F,
+		MobWifiHotspot 	= 0xEC44,
+		MobWifiWarning1 	= 0xF473,
+		MobWifiWarning2 	= 0xF474,
+		MobWifiWarning3 	= 0xF475,
+		MobWifiWarning4 	= 0xF476,
+		MobeSIM 	= 0xED2A,
+		MobeSIMBusy 	= 0xED2D,
+		MobeSIMLocked 	= 0xED2C,
+		MobeSIMNoProfile 	= 0xED2B,
+		MobileLocked 	= 0xEC20,
+		MobileSelected 	= 0xEC75,
+		MobileTablet 	= 0xE8CC,
+		More 	= 0xE712,
+		Mouse 	= 0xE962,
+		MoveToFolder 	= 0xE8DE,
+		Movies 	= 0xE8B2,
+		MultiSelect 	= 0xE762,
+		MultiSelectMirrored 	= 0xEA98,
+		MultimediaDMP 	= 0xED47,
+		MultimediaDMS 	= 0xE953,
+		MultimediaDVR 	= 0xE954,
+		MultimediaPMP 	= 0xE955,
+		MusicAlbum 	= 0xE93C,
+		MusicInfo 	= 0xE90B,
+		MusicNote 	= 0xEC4F,
+		MusicSharing 	= 0xF623,
+		MusicSharingOff 	= 0xF624,
+		Mute 	= 0xE74F,
+		MyNetwork 	= 0xEC27,
+		NUIFPContinueSlideAction 	= 0xEB85,
+		NUIFPContinueSlideHand 	= 0xEB84,
+		NUIFPPressAction 	= 0xEB8B,
+		
+		NUIFPPressHand 	= 0xEB8A,
+		NUIFPPressRepeatAction 	= 0xEB8D,
+		NUIFPPressRepeatHand 	= 0xEB8C,
+		NUIFPRollLeftAction 	= 0xEB89,
+		NUIFPRollLeftHand 	= 0xEB88,
+		NUIFPRollRightHand 	= 0xEB86,
+		NUIFPRollRightHandAction 	= 0xEB87,
+		NUIFPStartSlideAction 	= 0xEB83,
+		NUIFPStartSlideHand 	= 0xEB82,
+		NUIFace 	= 0xEB68,
+		NUIIris 	= 0xEB67,
+		Narrator 	= 0xED4D,
+		NarratorForward 	= 0xEDA9,
+		NarratorForwardMirrored 	= 0xEDAA,
+		NearbySharing 	= 0xF3E2,
+		Network 	= 0xE968,
+		NetworkAdapter 	= 0xEDA3,
+		NetworkConnected 	= 0xF385,
+		NetworkConnectedCheckmark 	= 0xF386,
+		NetworkOffline 	= 0xF384,
+		NetworkPrinter 	= 0xEDA5,
+		NetworkSharing 	= 0xF193,
+		NetworkTower 	= 0xEC05,
+		NewFolder 	= 0xE8F4,
+		NewWindow 	= 0xE78B,
+		Next 	= 0xE893,
+		NoiseCancelation 	= 0xF61F,
+		NoiseCancelationOff 	= 0xF620,
+		OEM 	= 0xE74C,
+		OneBar 	= 0xE905,
+		OpenFile 	= 0xE8E5,
+		OpenFolderHorizontal 	= 0xED25,
+		OpenInNewWindow 	= 0xE8A7,
+		OpenLocal 	= 0xE8DA,
+		OpenPane 	= 0xE8A0,
+		OpenPaneMirrored 	= 0xEA5B,
+		OpenWith 	= 0xE7AC,
+		OpenWithMirrored 	= 0xEA5C,
+		Orientation 	= 0xE8B4,
+		OtherUser 	= 0xE7EE,
+		OutlineHalfStarLeft 	= 0xF0E7,
+		OutlineHalfStarRight 	= 0xF0E8,
+		OutlineQuarterStarLeft 	= 0xF0E5,
+		OutlineQuarterStarRight 	= 0xF0E6,
+		OutlineStarLeftHalf 	= 0xF0F7,
+		OutlineStarRightHalf 	= 0xF0F8,
+		OutlineThreeQuarterStarLeft 	= 0xF0E9,
+		OutlineThreeQuarterStarRight 	= 0xF0EA,
+		PC1 	= 0xE977,
+		PINPad 	= 0xEF3E,
+		PLAP 	= 0xEC19,
+		PPSFourLandscape 	= 0xF58D,
+		PPSFourPortrait 	= 0xF58E,
+		PPSOneLandscape 	= 0xF58A,
+		PPSOnePortrait 	= 0xF5AD,
+		PPSTwoLandscape 	= 0xF58B,
+		PPSTwoPortrait 	= 0xF58C,
+		Package 	= 0xE7B8,
+		Page 	= 0xE7C3,
+		PageLeft 	= 0xE760,
+		PageMarginLandscapeModerate 	= 0xF579,
+		PageMarginLandscapeNarrow 	= 0xF577,
+		PageMarginLandscapeNormal 	= 0xF578,
+		PageMarginLandscapeWide 	= 0xF57A,
+		PageMarginPortraitModerate 	= 0xF575,
+		PageMarginPortraitNarrow 	= 0xF573,
+		PageMarginPortraitNormal 	= 0xF574,
+		PageMarginPortraitWide 	= 0xF576,
+		PageMirrored 	= 0xF56E,
+		PageRight 	= 0xE761,
+		PageSolid 	= 0xE729,
+		PaginationDotOutline10 	= 0xF126,
+		PaginationDotSolid10 	= 0xF127,
+		PanMode 	= 0xECE9,
+		ParkingLocation 	= 0xE811,
+		ParkingLocationMirrored 	= 0xEA5E,
+		ParkingLocationSolid 	= 0xEA8B,
+		PartyLeader 	= 0xECA7,
+		PassiveAuthentication 	= 0xF32A,
+		PasswordKeyHide 	= 0xE9A9,
+		PasswordKeyShow 	= 0xE9A8,
+		Paste 	= 0xE77F,
+		Pause 	= 0xE769,
+		PauseBadge12 	= 0xEDB4,
+		PaymentCard 	= 0xE8C7,
+		PenPalette 	= 0xEE56,
+		PenPaletteMirrored 	= 0xEF16,
+		PenTips 	= 0xF45E,
+		PenTipsMirrored 	= 0xF45F,
+		PenWorkspace 	= 0xEDC6,
+		PenWorkspaceMirrored 	= 0xEF15,
+		Pencil 	= 0xED63,
+		PencilFill 	= 0xF0C6,
+		People 	= 0xE716,
+		PeriodKey 	= 0xE843,
+		Permissions 	= 0xE8D7,
+		PersonalFolder 	= 0xEC25,
+		Personalize 	= 0xE771,
+		Phone 	= 0xE717,
+		PhoneBook 	= 0xE780,
+		Photo 	= 0xE91B,
+		Photo2 	= 0xEB9F,
+		Picture 	= 0xE8B9,
+		PieSingle 	= 0xEB05,
+		Pin 	= 0xE718,
+		PinFill 	= 0xE841,
+		Pinned 	= 0xE840,
+		PinnedFill 	= 0xE842,
+		PinyinIMELogo 	= 0xEDE5,
+		Play 	= 0xE768,
+		Play36 	= 0xEE4A,
+		PlayBadge12 	= 0xEDB5,
+		PlaySolid 	= 0xF5B0,
+		PlaybackRate1x 	= 0xEC57,
+		PlaybackRateOther 	= 0xEC58,
+		PlayerSettings 	= 0xEF58,
+		PointErase 	= 0xED61,
+		PointEraseMirrored 	= 0xEF18,
+		PointerHand 	= 0xF271,
+		PoliceCar 	= 0xEC81,
+		
+		PostUpdate 	= 0xE8F3,
+		PowerButton 	= 0xE7E8,
+		PresenceChicklet 	= 0xE978,
+		PresenceChickletVideo 	= 0xE979,
+		Preview 	= 0xE8FF,
+		PreviewLink 	= 0xE8A1,
+		Previous 	= 0xE892,
+		Print 	= 0xE749,
+		PrintAllPages 	= 0xF571,
+		PrintCustomRange 	= 0xF572,
+		PrintDefault 	= 0xF56D,
+		Printer3D 	= 0xE914,
+		PrintfaxPrinterFile 	= 0xE956,
+		Priority 	= 0xE8D0,
+		Process 	= 0xE9F3,
+		Processing 	= 0xE9F5,
+		ProgressRingDots 	= 0xF16A,
+		Project 	= 0xEBC6,
+		Projector 	= 0xE95D,
+		ProtectedDocument 	= 0xE8A6,
+		Protractor 	= 0xF0B4,
+		ProvisioningPackage 	= 0xE835,
+		PuncKey 	= 0xE844,
+		PuncKey0 	= 0xE84C,
+		PuncKey1 	= 0xE9B4,
+		PuncKey2 	= 0xE9B5,
+		PuncKey3 	= 0xE9B6,
+		PuncKey4 	= 0xE9B7,
+		PuncKey5 	= 0xE9B8,
+		PuncKey6 	= 0xE9B9,
+		PuncKey7 	= 0xE9BB,
+		PuncKey8 	= 0xE9BC,
+		PuncKey9 	= 0xE9BA,
+		PuncKeyLeftBottom 	= 0xE84D,
+		PuncKeyRightBottom 	= 0xE9B3,
+		Puzzle 	= 0xEA86,
+		QWERTYOff 	= 0xE983,
+		QWERTYOn 	= 0xE982,
+		QuarentinedItems 	= 0xF0B2,
+		QuarentinedItemsMirrored 	= 0xF0B3,
+		QuarterStarLeft 	= 0xF0CA,
+		QuarterStarRight 	= 0xF0CB,
+		QuickNote 	= 0xE70B,
+		QuietHours 	= 0xE708,
+		QuietHoursBadge12 	= 0xF0CE,
+		Radar 	= 0xEB44,
+		RadioBtnOff 	= 0xECCA,
+		RadioBtnOn 	= 0xECCB,
+		RadioBullet 	= 0xE915,
+		RadioBullet2 	= 0xECCC,
+		Read 	= 0xE8C3,
+		ReadingList 	= 0xE7BC,
+		ReceiptPrinter 	= 0xEC5B,
+		Recent 	= 0xE823,
+		Record 	= 0xE7C8,
+		RectangularClipping 	= 0xF407,
+		RedEye 	= 0xE7B3,
+		Redo 	= 0xE7A6,
+		Refresh 	= 0xE72C,
+		Relationship 	= 0xF003,
+		RememberedDevice 	= 0xE70C,
+		Reminder 	= 0xEB50,
+		ReminderFill 	= 0xEB4F,
+		Remote 	= 0xE8AF,
+		Remove 	= 0xE738,
+		RemoveFrom 	= 0xECC9,
+		Rename 	= 0xE8AC,
+		Repair 	= 0xE90F,
+		RepeatAll 	= 0xE8EE,
+		RepeatOne 	= 0xE8ED,
+		Replay 	= 0xEF3B,
+		Reply 	= 0xE97A,
+		ReplyMirrored 	= 0xEE35,
+		ReportDocument 	= 0xE9F9,
+		ReportHacked 	= 0xE730,
+		ResetDevice 	= 0xED10,
+		ResetDrive 	= 0xEBC4,
+		Reshare 	= 0xE8EB,
+		ResizeMouseLarge 	= 0xE747,
+		ResizeMouseMedium 	= 0xE744,
+		ResizeMouseMediumMirrored 	= 0xEA5F,
+		ResizeMouseSmall 	= 0xE743,
+		ResizeMouseSmallMirrored 	= 0xEA60,
+		ResizeMouseTall 	= 0xE746,
+		ResizeMouseTallMirrored 	= 0xEA61,
+		ResizeMouseWide 	= 0xE745,
+		ResizeTouchLarger 	= 0xE741,
+		ResizeTouchNarrower 	= 0xE7EA,
+		ResizeTouchNarrowerMirrored 	= 0xEA62,
+		ResizeTouchShorter 	= 0xE7EB,
+		ResizeTouchSmaller 	= 0xE742,
+		ReturnKey 	= 0xE751,
+		ReturnKeyLg 	= 0xEB97,
+		ReturnKeySm 	= 0xE966,
+		ReturnToWindow 	= 0xE944,
+		RevToggleKey 	= 0xE845,
+		Rewind 	= 0xEB9E,
+		RightArrowKeyTime0 	= 0xEBE7,
+		RightArrowKeyTime1 	= 0xE846,
+		RightArrowKeyTime2 	= 0xE847,
+		RightArrowKeyTime3 	= 0xE84E,
+		RightArrowKeyTime4 	= 0xE84F,
+		RightDoubleQuote 	= 0xE9B1,
+		RightQuote 	= 0xE849,
+		RightStick 	= 0xF109,
+		Ringer 	= 0xEA8F,
+		RingerBadge12 	= 0xEDAC,
+		RingerSilent 	= 0xE7ED,
+		RoamingDomestic 	= 0xE879,
+		RoamingInternational 	= 0xE878,
+		Robot 	= 0xE99A,
+		Rotate 	= 0xE7AD,
+		RotateCamera 	= 0xE89E,
+		RotateMapLeft 	= 0xE80D,
+		RotateMapRight 	= 0xE80C,
+		RotationLock 	= 0xE755,
+		Ruler 	= 0xED5E,
+		SDCard 	= 0xE7F1,
+		SIMError 	= 0xF618,
+		SIMLock 	= 0xF61A,
+		
+		SIMMissing 	= 0xF619,
+		SIPMove 	= 0xE759,
+		SIPRedock 	= 0xE75B,
+		SIPUndock 	= 0xE75A,
+		Safe 	= 0xF540,
+		Save 	= 0xE74E,
+		SaveAs 	= 0xE792,
+		SaveCopy 	= 0xEA35,
+		SaveLocal 	= 0xE78C,
+		Scan 	= 0xE8FE,
+		ScreenTime 	= 0xF182,
+		ScrollMode 	= 0xECE7,
+		ScrollUpDown 	= 0xEC8F,
+		Search 	= 0xE721,
+		SearchAndApps 	= 0xE773,
+		SelectAll 	= 0xE8B3,
+		Send 	= 0xE724,
+		SendFill 	= 0xE725,
+		SendFillMirrored 	= 0xEA64,
+		SendMirrored 	= 0xEA63,
+		Sensor 	= 0xE957,
+		Set 	= 0xF5ED,
+		SetSolid 	= 0xF5EE,
+		SetTile 	= 0xE97B,
+		SetlockScreen 	= 0xE7B5,
+		Settings 	= 0xE713,
+		SettingsBattery 	= 0xEE63,
+		SettingsDisplaySound 	= 0xE7F3,
+		Share 	= 0xE72D,
+		ShareBroadband 	= 0xE83A,
+		Shield 	= 0xEA18,
+		Shop 	= 0xE719,
+		ShoppingCart 	= 0xE7BF,
+		ShowBcc 	= 0xE8C4,
+		ShowResults 	= 0xE8BC,
+		ShowResultsMirrored 	= 0xEA65,
+		Shuffle 	= 0xE8B1,
+		SignalBars1 	= 0xE86C,
+		SignalBars2 	= 0xE86D,
+		SignalBars3 	= 0xE86E,
+		SignalBars4 	= 0xE86F,
+		SignalBars5 	= 0xE870,
+		SignalError 	= 0xED2E,
+		SignalNotConnected 	= 0xE871,
+		SignalRoaming 	= 0xEC1E,
+		SignatureCapture 	= 0xEF3F,
+		SkipBack10 	= 0xED3C,
+		SkipForward30 	= 0xED3D,
+		SliderThumb 	= 0xEC13,
+		Slideshow 	= 0xE786,
+		SlowMotionOn 	= 0xEA79,
+		SmallErase 	= 0xF129,
+		Smartcard 	= 0xE963,
+		SmartcardVirtual 	= 0xE964,
+		Sort 	= 0xE8CB,
+		SpatialVolume0 	= 0xF0EB,
+		SpatialVolume1 	= 0xF0EC,
+		SpatialVolume2 	= 0xF0ED,
+		SpatialVolume3 	= 0xF0EE,
+		Speakers 	= 0xE7F5,
+		Speech 	= 0xEFA9,
+		SpeedHigh 	= 0xEC4A,
+		SpeedMedium 	= 0xEC49,
+		SpeedOff 	= 0xEC48,
+		StaplingLandscapeBookBinding 	= 0xF5A9,
+		StaplingLandscapeBottomLeft 	= 0xF5A3,
+		StaplingLandscapeBottomRight 	= 0xF5A4,
+		StaplingLandscapeTopLeft 	= 0xF5A1,
+		StaplingLandscapeTopRight 	= 0xF5A2,
+		StaplingLandscapeTwoBottom 	= 0xF5A8,
+		StaplingLandscapeTwoLeft 	= 0xF5A5,
+		StaplingLandscapeTwoRight 	= 0xF5A6,
+		StaplingLandscapeTwoTop 	= 0xF5A7,
+		StaplingOff 	= 0xF598,
+		StaplingPortraitBookBinding 	= 0xF5A0,
+		StaplingPortraitBottomLeft 	= 0xF5AE,
+		StaplingPortraitBottomRight 	= 0xF59B,
+		StaplingPortraitTopLeft 	= 0xF599,
+		StaplingPortraitTopRight 	= 0xF59A,
+		StaplingPortraitTwoBottom 	= 0xF59F,
+		StaplingPortraitTwoLeft 	= 0xF59C,
+		StaplingPortraitTwoRight 	= 0xF59D,
+		StaplingPortraitTwoTop 	= 0xF59E,
+		StartPoint 	= 0xE819,
+		StartPointSolid 	= 0xEB49,
+		StatusCheckmark 	= 0xF1D8,
+		StatusCheckmark7 	= 0xF0B7,
+		StatusCheckmarkLeft 	= 0xF1D9,
+		StatusCircle 	= 0xEA81,
+		StatusCircle7 	= 0xF0B6,
+		StatusCircleBlock 	= 0xF140,
+		StatusCircleBlock2 	= 0xF141,
+		StatusCircleCheckmark 	= 0xF13E,
+		StatusCircleErrorX 	= 0xF13D,
+		StatusCircleExclamation 	= 0xF13C,
+		StatusCircleInfo 	= 0xF13F,
+		StatusCircleInner 	= 0xF137,
+		StatusCircleLeft 	= 0xEBFD,
+		StatusCircleOuter 	= 0xF136,
+		StatusCircleQuestionMark 	= 0xF142,
+		StatusCircleRing 	= 0xF138,
+		StatusCircleSync 	= 0xF143,
+		StatusConnecting1 	= 0xEB57,
+		StatusConnecting2 	= 0xEB58,
+		StatusDataTransfer 	= 0xE880,
+		StatusDataTransferVPN 	= 0xE881,
+		StatusDualSIM1 	= 0xE884,
+		StatusDualSIM1VPN 	= 0xE885,
+		StatusDualSIM2 	= 0xE882,
+		StatusDualSIM2VPN 	= 0xE883,
+		StatusError 	= 0xEA83,
+		StatusErrorCircle7 	= 0xF0B8,
+		StatusErrorFull 	= 0xEB90,
+		StatusErrorLeft 	= 0xEBFF,
+		StatusExclamationCircle7 	= 0xF12F,
+		StatusInfo 	= 0xF3CC,
+		StatusInfoLeft 	= 0xF3CD,
+		StatusPause7 	= 0xF175,
+		StatusSGLTE 	= 0xE886,
+		StatusSGLTECell 	= 0xE887,
+		
+		StatusSGLTEDataVPN 	= 0xE888,
+		StatusTriangle 	= 0xEA82,
+		StatusTriangleExclamation 	= 0xF13B,
+		StatusTriangleInner 	= 0xF13A,
+		StatusTriangleLeft 	= 0xEBFE,
+		StatusTriangleOuter 	= 0xF139,
+		StatusUnsecure 	= 0xEB59,
+		StatusVPN 	= 0xE889,
+		StatusWarning 	= 0xEA84,
+		StatusWarningLeft 	= 0xEC00,
+		Sticker2 	= 0xF4AA,
+		StockDown 	= 0xEB0F,
+		StockUp 	= 0xEB11,
+		Stop 	= 0xE71A,
+		StopPoint 	= 0xE81A,
+		StopPointSolid 	= 0xEB4A,
+		Stopwatch 	= 0xE916,
+		StorageNetworkWireless 	= 0xE969,
+		StorageOptical 	= 0xE958,
+		StorageTape 	= 0xE96A,
+		Streaming 	= 0xE93E,
+		StreamingEnterprise 	= 0xED2F,
+		Street 	= 0xE913,
+		StreetsideSplitExpand 	= 0xE803,
+		StreetsideSplitMinimize 	= 0xE802,
+		StrokeErase 	= 0xED60,
+		StrokeErase2 	= 0xF128,
+		StrokeEraseMirrored 	= 0xEF17,
+		Subtitles 	= 0xED1E,
+		SubtitlesAudio 	= 0xED1F,
+		SurfaceHub 	= 0xE8AE,
+		SurfaceHubSelected 	= 0xF4BE,
+		Sustainable 	= 0xEC0A,
+		Swipe 	= 0xE927,
+		SwipeRevealArt 	= 0xEC6D,
+		Switch 	= 0xE8AB,
+		SwitchApps 	= 0xE8F9,
+		SwitchUser 	= 0xE748,
+		Sync 	= 0xE895,
+		SyncBadge12 	= 0xEDAB,
+		SyncError 	= 0xEA6A,
+		SyncFolder 	= 0xE8F7,
+		System 	= 0xE770,
+		TVMonitor 	= 0xE7F4,
+		TVMonitorSelected 	= 0xEC77,
+		Tablet 	= 0xE70A,
+		TabletMode 	= 0xEBFC,
+		TabletSelected 	= 0xEC74,
+		Tag 	= 0xE8EC,
+		TapAndSend 	= 0xE9A1,
+		TaskView 	= 0xE7C4,
+		TaskViewExpanded 	= 0xEB91,
+		TaskViewSettings 	= 0xEE40,
+		TaskbarPhone 	= 0xEE64,
+		ThisPC 	= 0xEC4E,
+		ThoughtBubble 	= 0xEA91,
+		ThreeBars 	= 0xE907,
+		ThreeQuarterStarLeft 	= 0xF0CC,
+		ThreeQuarterStarRight 	= 0xF0CD,
+		Tiles 	= 0xECA5,
+		TiltDown 	= 0xE80A,
+		TiltUp 	= 0xE809,
+		TimeLanguage 	= 0xE775,
+		ToggleBorder 	= 0xEC12,
+		ToggleFilled 	= 0xEC11,
+		ToggleThumb 	= 0xEC14,
+		TollSolid 	= 0xF161,
+		ToolTip 	= 0xE82F,
+		Touch 	= 0xE815,
+		TouchPointer 	= 0xE7C9,
+		Touchpad 	= 0xEFA5,
+		Touchscreen 	= 0xEDA4,
+		Trackers 	= 0xEADF,
+		TrackersMirrored 	= 0xEE92,
+		TrafficCongestionSolid 	= 0xF163,
+		TrafficLight 	= 0xEF31,
+		Train 	= 0xE7C0,
+		TrainSolid 	= 0xEB4D,
+		TreeFolderFolder 	= 0xED41,
+		TreeFolderFolderFill 	= 0xED42,
+		TreeFolderFolderOpen 	= 0xED43,
+		TreeFolderFolderOpenFill 	= 0xED44,
+		TriggerLeft 	= 0xF10A,
+		TriggerRight 	= 0xF10B,
+		Trim 	= 0xE78A,
+		TwoBars 	= 0xE906,
+		TwoPage 	= 0xE89A,
+		Type 	= 0xE97C,
+		USB 	= 0xE88E,
+		USBSafeConnect 	= 0xECF3,
+		Underline 	= 0xE8DC,
+		UnderscoreSpace 	= 0xE75D,
+		Undo 	= 0xE7A7,
+		Unfavorite 	= 0xE8D9,
+		Unit 	= 0xECC6,
+		Unknown 	= 0xE9CE,
+		UnknownMirrored 	= 0xF22E,
+		Unlock 	= 0xE785,
+		Unpin 	= 0xE77A,
+		UnsyncFolder 	= 0xE8F6,
+		Up 	= 0xE74A,
+		UpArrowShiftKey 	= 0xE752,
+		UpShiftKey 	= 0xE84B,
+		UpdateRestore 	= 0xE777,
+		Upload 	= 0xE898,
+		UserAPN 	= 0xF081,
+		VPN 	= 0xE705,
+		VerticalBattery0 	= 0xF5F2,
+		VerticalBattery1 	= 0xF5F3,
+		VerticalBattery10 	= 0xF5FC,
+		VerticalBattery2 	= 0xF5F4,
+		VerticalBattery3 	= 0xF5F5,
+		VerticalBattery4 	= 0xF5F6,
+		VerticalBattery5 	= 0xF5F7,
+		VerticalBattery6 	= 0xF5F8,
+		VerticalBattery7 	= 0xF5F9,
+		VerticalBattery8 	= 0xF5FA,
+		VerticalBattery9 	= 0xF5FB,
+		VerticalBatteryCharging0 	= 0xF5FD,
+		VerticalBatteryCharging1 	= 0xF5FE,
+		
+		VerticalBatteryCharging10 	= 0xF607,
+		VerticalBatteryCharging2 	= 0xF5FF,
+		VerticalBatteryCharging3 	= 0xF600,
+		VerticalBatteryCharging4 	= 0xF601,
+		VerticalBatteryCharging5 	= 0xF602,
+		VerticalBatteryCharging6 	= 0xF603,
+		VerticalBatteryCharging7 	= 0xF604,
+		VerticalBatteryCharging8 	= 0xF605,
+		VerticalBatteryCharging9 	= 0xF606,
+		VerticalBatteryUnknown 	= 0xF608,
+		Vibrate 	= 0xE877,
+		Video 	= 0xE714,
+		Video360 	= 0xF131,
+		VideoChat 	= 0xE8AA,
+		VideoSolid 	= 0xEA0C,
+		View 	= 0xE890,
+		ViewAll 	= 0xE8A9,
+		ViewDashboard 	= 0xF246,
+		Volume 	= 0xE767,
+		Volume0 	= 0xE992,
+		Volume1 	= 0xE993,
+		Volume2 	= 0xE994,
+		Volume3 	= 0xE995,
+		VolumeBars 	= 0xEBC5,
+		Walk 	= 0xE805,
+		WalkSolid 	= 0xE726,
+		Warning 	= 0xE7BA,
+		Webcam 	= 0xE8B8,
+		Webcam2 	= 0xE960,
+		Website 	= 0xEB41,
+		Wheel 	= 0xEE94,
+		Wifi 	= 0xE701,
+		Wifi1 	= 0xE872,
+		Wifi2 	= 0xE873,
+		Wifi3 	= 0xE874,
+		WifiAttentionOverlay 	= 0xE998,
+		WifiCall0 	= 0xEBD5,
+		WifiCall1 	= 0xEBD6,
+		WifiCall2 	= 0xEBD7,
+		WifiCall3 	= 0xEBD8,
+		WifiCall4 	= 0xEBD9,
+		WifiCallBars 	= 0xEBD4,
+		WifiError0 	= 0xEB5A,
+		WifiError1 	= 0xEB5B,
+		WifiError2 	= 0xEB5C,
+		WifiError3 	= 0xEB5D,
+		WifiError4 	= 0xEB5E,
+		WifiEthernet 	= 0xEE77,
+		WifiHotspot 	= 0xE88A,
+		WifiWarning0 	= 0xEB5F,
+		WifiWarning1 	= 0xEB60,
+		WifiWarning2 	= 0xEB61,
+		WifiWarning3 	= 0xEB62,
+		WifiWarning4 	= 0xEB63,
+		WindDirection 	= 0xEBE6,
+		WindowsInsider 	= 0xF1AD,
+		WiredUSB 	= 0xECF0,
+		WirelessUSB 	= 0xECF1,
+		Work 	= 0xE821,
+		WorkSolid 	= 0xEB4E,
+		World 	= 0xE909,
+		XboxOneConsole 	= 0xE990,
+		ZeroBars 	= 0xE904,
+		Zoom 	= 0xE71E,
+		ZoomIn 	= 0xE8A3,
+		ZoomMode 	= 0xECE8,
+		ZoomOut 	= 0xE71F,
+		eSIM 	= 0xF61B,
+		eSIMBusy 	= 0xF61E,
+		eSIMLocked 	= 0xF61D,
+		eSIMNoProfile 	= 0xF61C,
+	} 
 	dchar segoeSymbolByName(string name)
 	{
-		immutable tableData =
-			"Wifi2=59507;UnderscoreSpace=59229;MailReply=59594;IBeam=59699;FolderHorizontal=61739;WifiCallBars=60372;StatusErrorCircle7=61624"~
-			";Dial6=61771;MobWifi1=60476;NarratorForwardMirrored=60842;BumperLeft=61708;Unpin=59258;CalendarReply=59637;Annotation=59684;Setl"~
-			"ockScreen=59317;CollateLandscapeSeparated=62892;AlignLeft=59620;Attach=59171;ReturnKey=59217;ChromeAnnotateContrast=61689;Pinned"~
-			"=59456;EndPoint=59419;DataSense=59281;Read=59587;AlignCenter=59619;PrintDefault=62829;VerticalBatteryCharging1=62974;ReminderFil"~
-			"l=60239;ReturnToWindow=59716;CollapseContent=61797;eSIMNoProfile=63004;SyncError=60010;LanguageJpn=60485;PowerButton=59368;Keybo"~
-			"ardRightAligned=61965;FlickRight=59704;CalligraphyPen=60923;KeyboardLeftDock=62061;Headset=59739;AppIconDefault=60586;SpatialVol"~
-			"ume3=61678;People=59158;RepeatOne=59629;CallForwarding=59378;WifiWarning2=60257;TaskViewSettings=60992;FavoriteStar=59188;Grippe"~
-			"rResizeMirrored=59984;WifiCall4=60377;Location=59421;MapPin=59143;CityNext2=60423;RoamingInternational=59512;Edit=59151;CityNext"~
-			"=60422;GoToStart=59644;EMI=59185;BatterySaver2=59493;StatusDualSIM2=59522;Bluetooth=59138;ResizeMouseTallMirrored=60001;DeviceDi"~
-			"scovery=60382;PieSingle=60165;ChevronLeftSmall=59759;LightningBolt=59717;ToggleFilled=60433;TreeFolderFolderOpenFill=60740;Chrom"~
-			"eBackContrastMirrored=61654;PPSTwoLandscape=62859;AdjustHologram=60370;QuietHoursBadge12=61646;StaplingLandscapeTwoRight=62886;A"~
-			"rrowLeft8=61616;CollapseContentSingle=61798;NUIFPStartSlideAction=60291;FileExplorer=60496;NUIFPContinueSlideHand=60292;SignalBa"~
-			"rs1=59500;StatusCircleCheckmark=61758;Volume1=59795;PreviewLink=59553;Korean=59773;MobBattery6=60326;AddRemoteDevice=59446;Check"~
-			"List=59861;ResizeMouseSmallMirrored=60000;BrushSize=60840;DeviceLaptopPic=59383;TiltDown=59402;DuplexLandscapeTwoSidedShortEdge="~
-			"62850;Battery5=59477;ResizeTouchNarrowerMirrored=60002;PenWorkspaceMirrored=61205;MobileTablet=59596;FuzzyReading=62959;ResizeMo"~
-			"useWide=59205;ProgressRingDots=61802;TaskView=59332;MobBatteryCharging6=60337;Forward=59178;DrivingMode=59372;ThisPC=60494;Direc"~
-			"tAccess=59451;Connected=61625;SmallErase=61737;MicOff=60500;BandBattery2=60603;ExploreContentSingle=61796;ResizeTouchNarrower=59"~
-			"370;InkingColorFill=60775;PaymentCard=59591;Photo=59675;NUIFPPressRepeatAction=60301;ActionCenter=59676;ChevronRightMed=59764;Vo"~
-			"lume=59239;RightArrowKeyTime0=60391;CalculatorSquareroot=59723;Groceries=60425;InternetSharing=59140;ChecklistMirrored=61621;Att"~
-			"achCamera=59554;DoublePinyin=61573;Underline=59612;Keyboard12Key=62049;Dialpad=59231;StrokeEraseMirrored=61207;DefenderBadge12=6"~
-			"1691;BusSolid=60231;History=59420;MobSignal3=60473;AllAppsMirrored=59968;Package=59320;StopPoint=59418;ChromeMinimizeContrast=61"~
-			"229;Share=59181;WifiError2=60252;AirplaneSolid=60236;RingerSilent=59373;Connect=59139;Repair=59663;StatusError=60035;Down=59211;"~
-			"WifiCall3=60376;MusicSharingOff=63012;MusicNote=60495;MobBattery5=60325;MobBatterySaver7=60349;View=59536;EyeGaze=61853;SpeedHig"~
-			"h=60490;GripperBarVertical=59268;PuncKey0=59468;Reply=59770;ExploreContent=60621;ChinesePunctuation=61713;ChromeMinimize=59681;B"~
-			"andBattery5=60606;StatusCircleRing=61752;JpnRomanji=59516;ImportMirrored=59986;TrainSolid=60237;Trim=59274;Zoom=59166;RightQuote"~
-			"=59465;ActionCenterNotification=59367;FileExplorerApp=60497;Lock=59182;Unit=60614;VerticalBattery7=62969;ErrorBadge=59961;DateTi"~
-			"me=60562;Reshare=59627;HolePunchPortraitRight=62865;AddFriend=59642;Broom=60057;Input=59745;MobSIMError=62891;InkingColorOutline"~
-			"=60774;UnsyncFolder=59638;Manage=59666;Stop=59162;CaretBottomRightSolidCenter8=61801;StatusCircleErrorX=61757;StatusTriangleOute"~
-			"r=61753;JpnRomanjiShift=59518;VerticalBattery8=62970;DockLeft=59660;PenPaletteMirrored=61206;TollSolid=61793;PuncKeyLeftBottom=5"~
-			"9469;FontSize=59625;Permissions=59607;MapCompassBottom=59411;Print=59209;OutlineHalfStarRight=61672;Streaming=59710;ToggleBorder"~
-			"=60434;DisableUpdates=59608;Caption=59578;KeyboardNarrow=62048;Lightbulb=60032;Type=59772;Code=59715;BatterySaver5=59496;Landsca"~
-			"peOrientationMirrored=62831;BrowsePhotos=59333;Dial5=61770;TreeFolderFolder=60737;PuncKey1=59828;CalculatorMultiply=59719;HWPScr"~
-			"atchOut=62563;Ethernet=59449;SIPMove=59225;WifiCall1=60374;Globe=59252;Sensor=59735;Tiles=60581;MobBatterySaver5=60347;PoliceCar"~
-			"=60545;DeviceMonitorLeftPic=59386;PageMarginPortraitNarrow=62835;Search=59169;Shop=59161;eSIMBusy=63006;TapAndSend=59809;HolePun"~
-			"chPortraitBottom=62867;MobBatteryCharging10=60341;EmojiTabFavorites=60762;Dial7=61772;BandBattery3=60604;QWERTYOn=59778;MusicAlb"~
-			"um=59708;CheckboxIndeterminateCombo14=61805;Wifi=59137;WifiError0=60250;StatusSGLTECell=59527;Set=62957;VerticalBatteryCharging0"~
-			"=62973;ResizeTouchSmaller=59202;MobSignal1=60471;Like=59617;Battery10=59455;DuplexLandscapeTwoSidedShortEdgeMirrored=62851;Flick"~
-			"Down=59701;MapDirections=59414;DuplexPortraitTwoSidedLongEdge=62854;Tag=59628;CopyTo=62483;TabletSelected=60532;ResizeMouseMediu"~
-			"m=59204;MobWifi2=60477;Devices2=59765;DuplexLandscapeTwoSidedLongEdge=62848;PageLeft=59232;NUIFPStartSlideHand=60290;FullScreen="~
-			"59200;Lexicon=61824;NewWindow=59275;BumperRight=61709;SendMirrored=60003;Speakers=59381;Tablet=59146;MobeSIMBusy=60717;Accident="~
-			"59423;ClippingTool=62470;StatusPause7=61813;StatusDualSIM1VPN=59525;CheckboxComposite=59194;Frigid=59850;DictionaryCloud=60355;L"~
-			"ockScreenGlance=61029;Website=60225;TouchPointer=59337;ChinesePinyin=59786;StrokeErase2=61736;MailReplyAll=59586;TwoPage=59546;M"~
-			"obBatteryCharging9=60340;Characters=59585;CalendarWeek=59584;Click=59568;MyNetwork=60455;ExpandTileMirrored=59982;StatusCheckmar"~
-			"kLeft=61913;VerticalBattery6=62968;MobBatterySaver4=60346;DefenderApp=59453;Dpad=61710;Dictionary=59437;ExportMirrored=60898;Ren"~
-			"ame=59564;TriggerRight=61707;DMC=59729;EraseTool=59228;ChromeRestoreContrast=61231;StatusVPN=59529;CalendarMirrored=60712;Constr"~
-			"uctionCone=59791;eSIMLocked=63005;CallForwardRoamingMirrored=59972;Cafe=60466;Record=59336;ReturnKeySm=59750;Construction=59426;"~
-			"MailForwardMirrored=59990;ParkingLocationSolid=60043;BatteryCharging1=59483;HWPNewLine=62565;QuarentinedItems=61618;AddTo=60616;"~
-			"WifiWarning0=60255;MobSignal2=60472;PenTips=62558;MusicSharing=63011;SpatialVolume2=61677;BatterySaver4=59495;NUIFace=60264;Bull"~
-			"etedList=59645;Favicon=59191;MusicInfo=59659;MobBattery7=60327;SearchAndApps=59251;StatusCheckmark=61912;LangJPN=59358;StatusCir"~
-			"cleBlock2=61761;DrawSolid=60552;QuarterStarLeft=61642;Key12On=59776;PageMarginLandscapeNarrow=62839;Remove=59192;Add=59152;Comma"~
-			"ndPrompt=59222;PenTipsMirrored=62559;Safe=62784;Walk=59397;OutlineStarLeftHalf=61687;Warning=59322;Earbud=62656;PageMirrored=628"~
-			"30;ClearSelectionMirrored=59976;DuplexPortraitOneSided=62852;PenWorkspace=60870;JpnRomanjiLock=59517;ChromeSwitchContast=61900;M"~
-			"obWifi3=60478;InkingTool=59245;MediaStorageTower=59749;Ferry=59363;Switch=59563;SpeedOff=60488;LeaveChat=59547;ContactInfoMirror"~
-			"ed=59978;PPSOneLandscape=62858;Delete=59213;SignatureCapture=61247;DynamicLock=62521;RotateCamera=59550;InkingToolFill=59535;Cer"~
-			"tificate=60309;ArrowDown8=61614;HalfDullSound=59824;Airplane=59145;MobBattery8=60328;StatusCircleOuter=61750;MobBatteryCharging4"~
-			"=60335;CheckboxCompositeReversed=59197;SpatialVolume1=61676;ResizeMouseLarge=59207;StreamingEnterprise=60719;VerticalBattery4=62"~
-			"966;Export=60897;WifiError1=60251;Video=59156;Devices3=60012;CellPhone=59626;MailFill=59560;eSIM=63003;Battery0=59472;BatteryCha"~
-			"rging0=59482;Movies=59570;OpenFolderHorizontal=60709;ZoomIn=59555;HolePunchOff=62863;CalculatorBackspace=59727;LineDisplay=61245"~
-			";HeadlessDevice=61841;StatusErrorFull=60304;CalculatorPercentage=59724;CaretRightSolid8=60890;VerticalBatteryCharging3=62976;Tra"~
-			"fficCongestionSolid=61795;Touchpad=61349;MobSIMLock=59509;SurfaceHub=59566;Microphone=59168;BatterySaver0=59491;ScrollUpDown=605"~
-			"59;MicError=60502;SIPRedock=59227;NetworkTower=60421;SetTile=59771;HWPStrikeThrough=62562;Info2=59935;OutlineQuarterStarLeft=616"~
-			"69;BandBattery4=60605;IBeamOutline=59700;Equalizer=59881;RightArrowKeyTime2=59463;Component=59728;Page=59331;GroupList=61800;Bat"~
-			"teryCharging4=59486;LanguageKor=59531;NewFolder=59636;MicOn=60529;MailReplyMirrored=59991;ZoomOut=59167;NarratorForward=60841;Ri"~
-			"ghtArrowKeyTime1=59462;BarcodeScanner=60506;FlickUp=59702;SurfaceHubSelected=62654;RotationLock=59221;DeviceLaptopNoPic=59384;Ch"~
-			"evronUp=59150;TreeFolderFolderOpen=60739;Relationship=61443;CalculatorDivide=59722;StatusCheckmark7=61623;WindowsInsider=61869;G"~
-			"oMirrored=59983;MobBatteryCharging1=60332;SwitchApps=59641;Battery4=59476;QuietHours=59144;BatterySaver8=59499;Robot=59802;PageM"~
-			"arginLandscapeNormal=62840;StaplingPortraitTwoLeft=62876;NetworkConnected=62341;StatusInfoLeft=62413;GlobalNavigationButton=5913"~
-			"6;ForwardMirrored=61651;SetSolid=62958;PanMode=60649;UpdateRestore=59255;MobActionCenter=60482;Draw=60551;MiracastLogoLarge=6043"~
-			"8;PrintAllPages=62833;WifiCall2=60375;NoiseCancelationOff=63008;TabletMode=60412;FullHiragana=59782;Devices=59250;SIMMissing=630"~
-			"01;VerticalBattery5=62967;SaveAs=59282;AddSurfaceHub=60612;CashDrawer=60505;ShowResults=59580;Heart=60241;Swipe=59687;NetworkPri"~
-			"nter=60837;SendFill=59173;Previous=59538;Design=60220;ResizeMouseMediumMirrored=59999;BatteryCharging3=59485;BackSpaceQWERTYMd=5"~
-			"9686;Street=59667;Bank=59429;Light=59283;RedEye=59315;VerticalBatteryCharging4=62977;Apps=60725;CaretDownSolid8=60892;XboxOneCon"~
-			"sole=59792;NUIFPRollLeftHand=60296;ImportAllMirrored=59987;StatusUnsecure=60249;HardDrive=60834;ThoughtBubble=60049;StatusTriang"~
-			"leLeft=60414;Wifi1=59506;ButtonMenu=60899;DuplexLandscapeTwoSidedLongEdgeMirrored=62849;ChevronUpSmall=59757;BuildingEnergy=6042"~
-			"7;CompletedSolid=60513;ShoppingCart=59327;DevUpdate=60613;Back=59179;PPSTwoPortrait=62860;DetachablePC=61699;Bold=59613;Multimed"~
-			"iaDVR=59732;KeyboardOneHanded=60748;MoveToFolder=59614;GotoToday=59601;Preview=59647;USBSafeConnect=60659;Dock=59730;MobBatteryS"~
-			"aver2=60344;StaplingLandscapeBookBinding=62889;MobWifi4=60479;Copy=59592;ButtonB=61588;SmartcardVirtual=59748;MobBatterySaver9=6"~
-			"0351;Asterisk=59960;VerticalBatteryCharging2=62975;OpenPane=59552;StaplingPortraitBookBinding=62880;ChromeBack=59440;InfoSolid=6"~
-			"1799;Devices4=60262;WifiHotspot=59530;Sustainable=60426;KeyboardBrightness=60729;HolePunchPortraitLeft=62864;HomeGroup=60454;Und"~
-			"o=59303;ContactSolid=60044;OtherUser=59374;StaplingLandscapeTopRight=62882;LockFeedback=60379;ReplyMirrored=60981;Dislike=59616;"~
-			"HomeSolid=60042;BatteryCharging10=60051;LandscapeOrientation=61291;TrafficLight=61233;DullSoundKey=59823;ReadingList=59324;Spati"~
-			"alVolume0=61675;WifiEthernet=61047;ChevronDownMed=59762;Webcam=59576;ResetDrive=60356;DuplexLandscapeOneSided=62846;HolePunchLan"~
-			"dscapeLeft=62868;MapCompassTop=59410;MobBatteryUnknown=60418;NetworkSharing=61843;SwitchUser=59208;ResizeTouchShorter=59371;TVMo"~
-			"nitor=59380;GameConsole=59751;CallForwardRoaming=59515;ShowBcc=59588;StatusTriangleExclamation=61755;PresenceChicklet=59768;Remo"~
-			"te=59567;Dial16=61781;Media=60009;ProtectedDocument=59558;ReceiptPrinter=60507;StatusCircleLeft=60413;Unfavorite=59609;ShowResul"~
-			"tsMirrored=60005;Label=59698;CalendarSolid=60041;BackSpaceQWERTY=59216;Mouse=59746;TaskbarPhone=61028;ChromeFullScreenContrast=6"~
-			"1656;ChromeFullScreen=59693;DialUp=59452;ResizeMouseTall=59206;Pause=59241;Rotate=59309;RepeatAll=59630;Narrator=60749;ParkingLo"~
-			"cationMirrored=59998;StaplingPortraitBottomRight=62875;Health=59742;BatteryCharging2=59484;BatterySaver9=60052;ChromeBackToWindo"~
-			"wContrast=61655;TreeFolderFolderFill=60738;IOT=61996;SyncFolder=59639;HalfKatakana=59784;LaptopSelected=60534;SyncBadge12=60843;"~
-			"FontDecrease=59623;CaretUpSolid8=60891;ChatBubbles=59634;Cancel=59153;Megaphone=59273;PersonalFolder=60453;StreetsideSplitMinimi"~
-			"ze=59394;BatteryCharging5=59487;EmojiTabCelebrationObjects=60757;Badge=60443;KeyboardDock=62059;ClearAllInk=60770;StatusCircle7="~
-			"61622;Photo2=60319;ButtonA=61587;BidiRtl=59819;MobBatteryCharging5=60336;FreeFormClipping=62472;Video360=61745;StockUp=60177;Bid"~
-			"iLtr=59818;DateTimeMirrored=61075;NUIFPPressRepeatHand=60300;Process=59891;MobBatterySaver8=60350;Reminder=60240;DuplexPortraitT"~
-			"woSidedShortEdgeMirrored=62857;QuarentinedItemsMirrored=61619;LeftStick=61704;Dial15=61780;StorageTape=59754;VerticalBattery3=62"~
-			"965;CalculatorEqualTo=59726;BatterySaver3=59494;ViewAll=59561;OneBar=59653;Courthouse=60424;PostUpdate=59635;LEDLight=59265;Coll"~
-			"ateLandscape=62843;GripperBarHorizontal=59247;HalfStarLeft=59334;PointEraseMirrored=61208;StatusDualSIM1=59524;StatusCircleInner"~
-			"=61751;LeftQuote=59464;ArrowRight8=61615;Family=60378;WifiError4=60254;OpenPaneMirrored=59995;ChromeClose=59579;LeftArrowKeyTime"~
-			"0=60498;Drop=60226;Dial11=61776;Car=59396;MicClipping=60530;NUIIris=60263;Webcam2=59744;ChevronLeft=59243;VPN=59141;StartPointSo"~
-			"lid=60233;StatusWarning=60036;SIMError=63000;LaptopSecure=62802;MobBatterySaver10=60352;RadioBtnOff=60618;KnowledgeArticle=61440"~
-			";MobBatterySaver3=60345;Upload=59544;MobBattery10=60330;WifiCall0=60373;EmojiTabFoodPlants=60758;NetworkOffline=62340;Message=59"~
-			"581;StaplingPortraitBottomLeft=62894;ContactInfo=59257;ImportAll=59574;SaveLocal=59276;StaplingPortraitTwoTop=62878;DullSound=59"~
-			"665;PC1=59767;StatusConnecting1=60247;Play36=61002;ArrowUp8=61613;StatusCircleInfo=61759;EditMirrored=60286;OutlineHalfStarLeft="~
-			"61671;HolePunchLandscapeBottom=62871;SliderThumb=60435;MicrophoneListening=61742;VerticalBatteryCharging5=62978;Shuffle=59569;Ba"~
-			"ndBattery6=60607;NearbySharing=62434;Stopwatch=59670;RevToggleKey=59461;Accounts=59664;WifiError3=60253;MobeSIMLocked=60716;Chro"~
-			"meAnnotate=59697;OpenLocal=59610;OpenInNewWindow=59559;LanguageChs=59533;Subtitles=60702;DataSenseBar=59301;PlaybackRateOther=60"~
-			"504;KeyboardRightHanded=59236;InteractiveDashboard=62468;VolumeBars=60357;ActionCenterQuiet=61049;LargeErase=61738;Cloud=59219;B"~
-			"attery9=59481;Comment=59658;Italic=59611;BatteryCharging9=59454;PuncKey4=59831;DockRightMirrored=59979;TwoBars=59654;CalendarDay"~
-			"=59583;PPSFourLandscape=62861;Memo=59260;FontColor=59603;MobBatteryCharging2=60333;TimeLanguage=59253;KeyboardShortcut=60839;TVM"~
-			"onitorSelected=60535;CircleRingBadge12=60847;PaginationDotSolid10=61735;PlayBadge12=60853;HorizontalTabKey=59389;MultimediaPMP=5"~
-			"9733;DuplexPortraitTwoSidedLongEdgeMirrored=62855;DashKey=59822;HWPOverwrite=62566;LikeDislike=59615;BookmarksMirrored=59969;Rot"~
-			"ateMapLeft=59405;PointErase=60769;KeyboardDismiss=59695;Projector=59741;CaretRight8=60886;NetworkConnectedCheckmark=62342;ListMi"~
-			"rrored=59989;PLAP=60441;StockDown=60175;MultimediaDMS=59731;Error=59267;Home=59407;ToggleThumb=60436;Sync=59541;CC=59376;Insider"~
-			"HubApp=60452;Dial2=61767;KeyboardLeftAligned=61964;PresenceChickletVideo=59769;Marker=60772;Network=59752;BatterySaver6=59497;Mo"~
-			"bBattery2=60322;ClipboardListMirrored=61668;StatusSGLTEDataVPN=59528;PuncKey3=59830;ChineseChangjie=59777;HalfAlpha=59774;Batter"~
-			"yCharging8=59490;PencilFill=61638;MobileSelected=60533;ChevronRightSmall=59760;DockLeftMirrored=59980;LockscreenDesktop=60991;Si"~
-			"gnalBars5=59504;MobWifiWarning1=62579;SendFillMirrored=60004;Touchscreen=60836;DictionaryAdd=59438;Priority=59600;PuncKey=59460;"~
-			"Japanese=59781;Cut=59590;WalkSolid=59174;HoloLensSelected=62655;SkipBack10=60732;DownloadMap=59430;HighlightFill2=59434;MobBatte"~
-			"ryCharging3=60334;More=59154;MobileLocked=60448;Protractor=61620;EmojiTabTransitPlaces=60759;GripperResize=59272;Send=59172;Info"~
-			"=59718;ErrorBadge12=60846;CallForwardInternational=59514;PinFill=59457;SettingsDisplaySound=59379;Save=59214;SelectAll=59571;Key"~
-			"boardSplit=59238;MixVolumes=62659;Clear=59540;RightStick=61705;Emoji=59545;OEM=59212;MobCallForwarding=60542;ChromeSwitch=61899;"~
-			"MobWifiWarning4=62582;Volume2=59796;Pin=59160;Calendar=59271;ThreeQuarterStarLeft=61644;Work=59425;SIPUndock=59226;HWPJoin=62560"~
-			";Bullseye=62066;ClipboardList=61667;RoamingDomestic=59513;OutlineThreeQuarterStarLeft=61673;UnknownMirrored=61998;SignalNotConne"~
-			"cted=59505;FeedbackApp=59705;Dial9=61774;OpenWith=59308;BatterySaver1=59492;WifiWarning3=60258;EthernetWarning=60246;Smartcard=5"~
-			"9747;MailForward=59548;StatusDataTransferVPN=59521;USB=59534;SaveCopy=59957;MiracastLogoSmall=60437;ThreeBars=59655;BatterySaver"~
-			"7=59498;Next=59539;KeyboardLowerBrightness=60730;ButtonX=61590;ChineseBoPoMoFo=59785;EraseToolFill=59435;PenPalette=61014;Headph"~
-			"one=59382;BandBattery1=60602;VerticalBattery10=62972;OutlineThreeQuarterStarRight=61674;CtrlSpatialRight=61723;BatteryUnknown=59"~
-			"798;Radar=60228;Group=59650;ResizeTouchLarger=59201;HeartFill=60242;CalculatorNegate=59725;SDCard=59377;HMD=61721;QuickNote=5914"~
-			"7;FerrySolid=60232;Battery3=59475;MobBatterySaver0=60342;AllApps=59165;MobLocation=60483;Battery1=59473;Feedback=60693;Companion"~
-			"App=60516;MobBatteryCharging0=60331;MobBattery1=60321;Wheel=61076;Redo=59302;Checkbox=59193;CircleFill=59963;BackgroundToggle=61"~
-			"215;StatusInfo=62412;StatusErrorLeft=60415;ParkingLocation=59409;StatusCircleQuestionMark=61762;Admin=59375;EmojiSwatch=60763;Do"~
-			"wnload=59542;HolePunchLandscapeRight=62869;DownShiftKey=59466;HolePunchPortraitTop=62866;RightArrowKeyTime3=59470;BulletedListMi"~
-			"rrored=59970;Import=59573;StopPointSolid=60234;NUIFPRollLeftAction=60297;VideoSolid=59916;MobBattery9=60329;CalculatorAddition=5"~
-			"9720;MagStripeReader=60508;PuncKey5=59832;VerticalBatteryUnknown=62984;Processing=59893;MailBadge12=60851;EaseOfAccess=59254;Dev"~
-			"iceMonitorRightPic=59385;NUIFPRollRightHandAction=60295;Camera=59170;DeveloperTools=60538;NUIFPPressHand=60298;Brightness=59142;"~
-			"ChevronRight=59244;PinnedFill=59458;Filter=59164;System=59248;ImageExport=61041;Contact=59259;StatusTriangle=60034;MobBatteryCha"~
-			"rging8=60339;RightArrowKeyTime4=59471;FingerInking=60767;MobeSIM=60714;OpenFile=59621;KeyboardLeftHanded=59235;StaplingLandscape"~
-			"TwoBottom=62888;StreetsideSplitExpand=59395;DuplexLandscapeOneSidedMirrored=62847;PeriodKey=59459;ConnectApp=60764;Beta=59940;Fo"~
-			"lder=59575;LeaveChatMirrored=59988;ChromeBackMirrored=59975;LanguageCht=59532;Replay=61243;DuplexPortraitTwoSidedShortEdge=62856"~
-			";OutlineStarRightHalf=61688;Communications=59738;VerticalBatteryCharging6=62979;CheckboxIndeterminateCombo=61806;ButtonY=61589;A"~
-			"lignRight=59618;ChromeRestore=59683;StorageNetworkWireless=59753;Color=59280;MobBatterySaver1=60343;Help=59543;PPSFourPortrait=6"~
-			"2862;FontIncrease=59624;CallForwardingMirrored=60055;StaplingPortraitTopLeft=62873;EmojiTabTextSmiles=60761;Battery2=59474;Trigg"~
-			"erLeft=61706;StaplingOff=62872;Calculator=59631;Trackers=60127;ChevronUpMed=59761;Rewind=60318;SignalRoaming=60446;PINPad=61246;"~
-			"BandBattery0=60601;Dial12=61777;PointerHand=62065;Highlight=59366;PasswordKeyShow=59816;StaplingLandscapeTopLeft=62881;Diagnosti"~
-			"c=59865;Wifi3=59508;ClearAllInkMirrored=61209;Checkbox14=61803;PinyinIMELogo=60901;MobWifiWarning3=62581;StatusCircleExclamation"~
-			"=61756;Eyedropper=61244;PageMarginLandscapeWide=62842;RectangularClipping=62471;SettingsBattery=61027;Dial13=61778;Leaf=59582;Fi"~
-			"tPage=59814;ColorOff=62832;RememberedDevice=59148;CaretLeftSolid8=60889;SubtitlesAudio=60703;PlaybackRate1x=60503;Printer3D=5966"~
-			"8;FullCircleMask=59679;TaskViewExpanded=60305;CheckboxFill=59195;MobBattery0=60320;Dial4=61769;AreaChart=59858;BatterySaver10=60"~
-			"053;Unlock=59269;ZoomMode=60648;PuncKeyRightBottom=59827;Headphone2=60722;VerticalBattery9=62971;Touch=59413;Volume3=59797;Audio"~
-			"=59606;StatusTriangleInner=61754;Dial8=61773;PageMarginLandscapeModerate=62841;OutlineQuarterStarRight=61670;GuestUser=61015;Cal"~
-			"culatorSubtract=59721;BatteryCharging7=59489;ClearSelection=59622;Personalize=59249;World=59657;PassiveAuthentication=62250;Sign"~
-			"alBars4=59503;EthernetError=60245;PaginationDotOutline10=61734;HighlightFill=59537;ChromeBackContrast=61653;ActionCenterAsterisk"~
-			"=59937;Puzzle=60038;MobBattery4=60324;PuncKey2=59829;Play=59240;Settings=59155;StatusExclamationCircle7=61743;HolePunchLandscape"~
-			"Top=62870;Completed=59696;MobeSIMNoProfile=60715;Dial3=61768;ActionCenterMirrored=60685;KeyboardFull=60465;WifiWarning4=60259;So"~
-			"rt=59595;StatusCircle=60033;ScrollMode=60647;WorkSolid=60238;SIMLock=63002;AccidentSolid=60046;Library=59633;PageMarginPortraitM"~
-			"oderate=62837;Emoji2=59246;PartyLeader=60583;CompanionDeviceFramework=60765;CommaKey=59821;PhoneBook=59264;HeartBroken=60050;Sta"~
-			"plingLandscapeTwoTop=62887;MobBatterySaver6=60348;MobSignal4=60474;HalfStarRight=59335;KeyboardSettings=61968;BlueLight=61580;Si"~
-			"gnalBars3=59502;ProvisioningPackage=59445;PuncKey9=59834;Bug=60392;NoiseCancelation=63007;StaplingPortraitTopRight=62874;UserAPN"~
-			"=61569;RingerBadge12=60844;HideBcc=59589;FastForward=60317;CircleRing=59962;BackSpaceQWERTYSm=59685;IncidentTriangle=59412;Direc"~
-			"tions=59632;Mute=59215;Accept=59643;UpArrowShiftKey=59218;NUIFPPressAction=60299;UpShiftKey=59467;StaplingLandscapeBottomRight=6"~
-			"2884;PageMarginPortraitWide=62838;SlowMotionOn=60025;FlickLeft=59703;InkingCaret=60773;CollatePortraitSeparated=62845;PageMargin"~
-			"PortraitNormal=62836;ReportDocument=59897;SkipForward30=60733;Slideshow=59270;CloudSeach=60900;BodyCam=60544;Orientation=59572;R"~
-			"esizeMouseSmall=59203;ChevronDown=59149;WindDirection=60390;StatusDataTransfer=59520;ThreeQuarterStarRight=61645;Battery8=59480;"~
-			"DisconnectDisplay=59924;LowerBrightness=60554;MobSIMMissing=59510;Project=60358;PlayerSettings=61272;Flag=59329;MapPin2=59319;Pa"~
-			"geRight=59233;EmojiTabSymbols=60760;FolderFill=59605;DialShape3=61784;StaplingPortraitTwoRight=62877;MapDrive=59598;RightDoubleQ"~
-			"uote=59825;BackToWindow=59199;Sticker2=62634;RotateMapRight=59404;FullKatakana=59783;VerticalBatteryCharging7=62980;ZeroBars=596"~
-			"52;PrintfaxPrinterFile=59734;NUIFPContinueSlideAction=60293;ImportantBadge12=60849;Education=59326;ActionCenterNotificationMirro"~
-			"red=60684;ButtonView2=61130;NUIFPRollRightHand=60294;CheckboxComposite14=61804;Scan=59646;VerticalBattery0=62962;CheckMark=59198"~
-			";Calories=60589;Volume0=59794;SpeedMedium=60489;ExploitProtectionSettings=62041;MobWifiHotspot=60484;Bookmarks=59556;HelpMirrore"~
-			"d=59985;GIF=62633;ChipCardCreditCardReader=61248;MapLayers=59422;FourBars=59656;Handwriting=59689;ClosePane=59551;Go=59565;PageS"~
-			"olid=59177;PuncKey6=59833;BackMirrored=61650;Dial14=61779;PrintCustomRange=62834;CollatePortrait=62844;FolderOpen=59448;Ruler=60"~
-			"766;Picture=59577;Ear=62064;ResetDevice=60688;VerticalBatteryCharging10=62983;GiftboxOpen=61747;MicSleep=60501;Refresh=59180;Wir"~
-			"edUSB=60656;StatusConnecting2=60248;CloudPrinter=60838;ChromeMaximize=59682;MultiSelect=59234;ChevronDownSmall=59758;LeftDoubleQ"~
-			"uote=59826;CtrlSpatialLeft=62439;MobSignal5=60475;Headphone0=60720;BatteryCharging6=59488;RadioBullet=59669;WirelessUSB=60657;Pa"~
-			"ste=59263;Game=59388;KeyboardUndock=62060;Headphone3=60723;KeyboardRightDock=62062;AsteriskBadge12=60845;GridView=61666;Speech=6"~
-			"1353;InkingToolFill2=59433;StatusSGLTE=59526;PasswordKeyHide=59817;MailReplyAllMirrored=59992;OpenWithMirrored=59996;StaplingLan"~
-			"dscapeTwoLeft=62885;Font=59602;KeyboardStandard=59694;StatusCircleBlock=61760;ExpandTile=59766;CheckboxIndeterminate=59196;MobBa"~
-			"ttery3=60323;NetworkAdapter=60835;ChromeCloseContrast=61228;TiltUp=59401;DefaultAPN=61568;DialShape4=61785;Vibrate=59511;ChromeB"~
-			"ackToWindow=59692;ChineseQuick=59780;StatusWarningLeft=60416;TrackersMirrored=61074;MobDrivingMode=60487;VerticalBatteryCharging"~
-			"8=62981;ReturnKeyLg=60311;ReportHacked=59184;RemoveFrom=60617;Train=59328;DialShape2=61783;GripperTool=59230;Recent=59427;PlaySo"~
-			"lid=62896;List=59959;VerticalBattery1=62963;Bus=59398;FavoriteStarFill=59189;MobBatteryCharging7=60338;Link=59163;HWPInsert=6256"~
-			"1;Marquee=61216;StaplingLandscapeBottomLeft=62883;Mail=59157;StorageOptical=59736;QuarterStarRight=61643;PuncKey8=59836;MobQuiet"~
-			"Hours=60486;Important=59593;HangUp=59256;Battery6=59478;Battery7=59479;Document=59557;StatusCircleSync=61763;SwipeRevealArt=6052"~
-			"5;ConstructionSolid=60045;CalligraphyFill=61639;PauseBadge12=60852;VerticalBattery2=62964;PPSOnePortrait=62893;CharacterAppearan"~
-			"ce=61823;SignalBars2=59501;PuncKey7=59835;StaplingPortraitTwoBottom=62879;ToolTip=59439;QWERTYOff=59779;DisconnectDrive=59597;Fl"~
-			"ashlight=59220;Crop=59304;WifiAttentionOverlay=59800;MobAirplane=60480;StatusDualSIM2VPN=59523;DockRight=59661;ChromeMaximizeCon"~
-			"trast=61230;Dial10=61775;EnglishPunctuation=61712;ActionCenterQuietNotification=61050;RadioBullet2=60620;JpnRomanjiShiftLock=595"~
-			"19;MobWifiWarning2=62580;Fingerprint=59688;EmojiTabSmilesAnimals=60756;Up=59210;ScreenTime=61826;ShareBroadband=59450;BlockConta"~
-			"ct=59640;CircleFillBadge12=60848;EmojiTabPeople=60755;ViewDashboard=62022;MultiSelectMirrored=60056;ChevronLeftMed=59763;StrokeE"~
-			"rase=60768;MultimediaDMP=60743;KeyboardClassic=59237;EraseToolFill2=59436;ClosePaneMirrored=59977;VideoChat=59562;DockBottom=596"~
-			"62;Unknown=59854;DuplexPortraitOneSidedMirrored=62853;AspectRatio=59289;CallForwardInternationalMirrored=59971;Shield=59928;MobC"~
-			"allForwardingMirrored=60543;MobBluetooth=60481;EndPointSolid=60235;DeviceMonitorNoPic=59387;Dial1=61766;SignalError=60718;Forwar"~
-			"dSm=59820;ContactPresence=59599;BackSpaceQWERTYLg=60310;FavoriteList=59176;Ringer=60047;VerticalBatteryCharging9=62982;RadioBtnO"~
-			"n=60619;Pencil=60771;HWPSplit=62564;Contact2=59604;FullAlpha=59775;DialShape1=61782;InPrivate=59175;StartPoint=59417;Headphone1="~
-			"60721;Phone=59159;WifiWarning1=60256"; 
+		__gshared wchar[string] table; 
 		
-		shared static dchar[string] table; 
-		if(table is null) {
-			foreach(s; tableData.split(';')) {
-				auto p = s.split('='); 
-				table[p[0]] = (p[1].to!int).to!dchar; 
-			}
-			table.rehash; 
-		}
+		if(table is null) { auto t = EnumAssocArray!SegoeSymbol; t.rehash; table = (cast(wchar[string])(t)); }
 		
-		//get by dec or hex code
-		if(name.length && name[0].inRange('0', '9')) return name.toInt.to!dchar; 
-		
-		auto a = name in table; 
-		return a ? *a : '\uFFFD'; 
+		if(auto a = name in table) return *a; 
+		else if(name.length && name[0].inRange('0', '9')) return name.toInt.to!dchar; 
+		return '\uFFFD'; 
 	} 
-	
-	/*
-		void importSegoeSymbols(){
-			wchar[string] segoeSymbols;
-		
-			foreach(s; File(`c:\dl\segoe_assets.txt`).readLines){
-				auto p = s.split('\t');
-				if(p.length>=2){
-					segoeSymbols[p[0].strip] = p[1].to!int(16).to!wchar;
-				}
-			}
-		
-			segoeSymbols.rehash;
-		
-			segoeSymbols.byKeyValue.map!(kv => "%s=%s".format(kv.key, kv.value.to!int)).join(';').chunks(128).map!(s=>`"`~s.text~`"~`).join("\r\n").saveTo(File(`c:\dl\a.txt`));
-		
-			readln;
-			application.exit;
-		}
-	*/
-	
+	
 	shared static this()
 	{
 		bitmapLoaders.registerMarkedFunctions!(mixin(__MODULE__)); 
 		bitmapEffects.registerMarkedFunctions!(mixin(__MODULE__)); 
 	} 
-}version(all)
-extern (C)
-{
-	
-	
-	enum WEBP_DECODER_ABI_VERSION = 0x0209; 
-	enum WEBP_ENCODER_ABI_VERSION = 0x020f; 
-	
-	/+
-		Note: Extracted with:
-			/+
-			Code: copy types.h + decode.h + encode.h webp_d_header.c
-			ldc2 webp_d_header.c -Hc -o-
-		+/
-		
-		Manual modifications:
-			- remove ImportC header
-			- remove /+Code:  = void+/
-			- fix an union
-			- fix an identifier called /+Code: ref+/
-			- bring all the static functions
-			- bring two initialization functions passing ABI versions
-		
-		250626: it works now. /+Todo: after a longer test period, remove the old headers.+/
-	+/
-	/+
-		alias __uint16_t = ushort; 
-		alias __uint32_t = uint; 
-		alias __uint64_t = ulong; 
-		align alias uintptr_t = ulong; 
-		align alias va_list = char*; 
-		align void __va_start(char**, ...); 
-		alias size_t = ulong; 
-		alias ptrdiff_t = long; 
-		alias intptr_t = long; 
-		alias __vcrt_bool = bool; 
-		alias wchar_t = ushort; 
-		void __security_init_cookie(); 
-		void __security_check_cookie(ulong _StackCookie); 
-		void __report_gsfailure(ulong _StackCookie); 
-		extern __gshared ulong __security_cookie; 
-		alias __crt_bool = bool; 
-		void _invalid_parameter_noinfo(); 
-		void _invalid_parameter_noinfo_noreturn(); 
-		void _invoke_watson(
-			const(ushort)* _Expression, const(ushort)* _FunctionName, 
-			const(ushort)* _FileName, uint _LineNo, ulong _Reserved
-		); 
-		alias errno_t = int; 
-		alias wint_t = ushort; 
-		alias wctype_t = ushort; 
-		alias __time32_t = int; 
-		alias __time64_t = long; 
-		struct __crt_locale_data_public
-		{
-			const(ushort)* _locale_pctype; 
-			int _locale_mb_cur_max; 
-			uint _locale_lc_codepage; 
-		} 
-		struct __crt_locale_pointers
-		{
-			__crt_locale_data* locinfo; 
-			__crt_multibyte_data* mbcinfo; 
-		} 
-		alias _locale_t = __crt_locale_pointers*; 
-		struct _Mbstatet
-		{
-			uint _Wchar; 
-			ushort _Byte; 
-			ushort _State; 
-		} 
-		struct _Mbstatet; 
-		alias mbstate_t = _Mbstatet; 
-		alias time_t = long; 
-		alias rsize_t = ulong; 
-		int* _errno(); 
-		int _set_errno(int _Value); 
-		int _get_errno(int* _Value); 
-		extern uint __threadid(); 
-		extern ulong __threadhandle(); 
-		alias int8_t = byte; 
-		alias uint8_t = ubyte; 
-		alias int16_t = short; 
-		alias uint16_t = ushort; 
-		alias int32_t = int; 
-		alias uint32_t = uint; 
-		alias uint64_t = ulong; 
-		alias int64_t = long; 
-	+/
-	extern void* WebPMalloc(ulong size); 
-	extern void WebPFree(void* ptr); 
-	extern int WebPGetDecoderVersion(); 
-	extern int WebPGetInfo(const(ubyte)* data, ulong data_size, int* width, int* height); 
-	extern ubyte* WebPDecodeRGBA(const(ubyte)* data, ulong data_size, int* width, int* height); 
-	extern ubyte* WebPDecodeARGB(const(ubyte)* data, ulong data_size, int* width, int* height); 
-	extern ubyte* WebPDecodeBGRA(const(ubyte)* data, ulong data_size, int* width, int* height); 
-	extern ubyte* WebPDecodeRGB(const(ubyte)* data, ulong data_size, int* width, int* height); 
-	extern ubyte* WebPDecodeBGR(const(ubyte)* data, ulong data_size, int* width, int* height); 
-	extern ubyte* WebPDecodeYUV(
-		const(ubyte)* data, ulong data_size, int* width, int* height, 
-		ubyte** u, ubyte** v, int* stride, int* uv_stride
-	); 
-	extern ubyte* WebPDecodeRGBAInto(
-		const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
-		ulong output_buffer_size, int output_stride
-	); 
-	extern ubyte* WebPDecodeARGBInto(
-		const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
-		ulong output_buffer_size, int output_stride
-	); 
-	extern ubyte* WebPDecodeBGRAInto(
-		const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
-		ulong output_buffer_size, int output_stride
-	); 
-	extern ubyte* WebPDecodeRGBInto(
-		const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
-		ulong output_buffer_size, int output_stride
-	); 
-	extern ubyte* WebPDecodeBGRInto(
-		const(ubyte)* data, ulong data_size, ubyte* output_buffer, 
-		ulong output_buffer_size, int output_stride
-	); 
-	extern ubyte* WebPDecodeYUVInto(
-		const(ubyte)* data, ulong data_size, ubyte* luma, 
-		ulong luma_size, int luma_stride, ubyte* u, ulong u_size, 
-		int u_stride, ubyte* v, ulong v_size, int v_stride
-	); 
-	enum WEBP_CSP_MODE
-	{
-		MODE_RGB = 0,
-		MODE_RGBA = 1,
-		MODE_BGR = 2,
-		MODE_BGRA = 3,
-		MODE_ARGB = 4,
-		MODE_RGBA_4444 = 5,
-		MODE_RGB_565 = 6,
-		MODE_rgbA = 7,
-		MODE_bgrA = 8,
-		MODE_Argb = 9,
-		MODE_rgbA_4444 = 10,
-		MODE_YUV = 11,
-		MODE_YUVA = 12,
-		MODE_LAST = 13,
-	} 
-	alias MODE_RGB = WEBP_CSP_MODE.MODE_RGB; 
-	alias MODE_RGBA = WEBP_CSP_MODE.MODE_RGBA; 
-	alias MODE_BGR = WEBP_CSP_MODE.MODE_BGR; 
-	alias MODE_BGRA = WEBP_CSP_MODE.MODE_BGRA; 
-	alias MODE_ARGB = WEBP_CSP_MODE.MODE_ARGB; 
-	alias MODE_RGBA_4444 = WEBP_CSP_MODE.MODE_RGBA_4444; 
-	alias MODE_RGB_565 = WEBP_CSP_MODE.MODE_RGB_565; 
-	alias MODE_rgbA = WEBP_CSP_MODE.MODE_rgbA; 
-	alias MODE_bgrA = WEBP_CSP_MODE.MODE_bgrA; 
-	alias MODE_Argb = WEBP_CSP_MODE.MODE_Argb; 
-	alias MODE_rgbA_4444 = WEBP_CSP_MODE.MODE_rgbA_4444; 
-	alias MODE_YUV = WEBP_CSP_MODE.MODE_YUV; 
-	alias MODE_YUVA = WEBP_CSP_MODE.MODE_YUVA; 
-	alias MODE_LAST = WEBP_CSP_MODE.MODE_LAST; 
-	//Some useful macros:
-	static int WebPIsPremultipliedMode(WEBP_CSP_MODE mode)
-	{
-		return (
-			mode == WEBP_CSP_MODE.MODE_rgbA || 
-			mode == WEBP_CSP_MODE.MODE_bgrA || 
-			mode == WEBP_CSP_MODE.MODE_Argb ||
-			mode == WEBP_CSP_MODE.MODE_rgbA_4444
-		); 
-	} 
-	
-	static int WebPIsAlphaMode(WEBP_CSP_MODE mode)
-	{
-		return (
-			mode == WEBP_CSP_MODE.MODE_RGBA || 
-			mode == WEBP_CSP_MODE.MODE_BGRA || 
-			mode == WEBP_CSP_MODE.MODE_ARGB ||
-			mode == WEBP_CSP_MODE.MODE_RGBA_4444 || 
-			mode == WEBP_CSP_MODE.MODE_YUVA ||
-			WebPIsPremultipliedMode(mode)
-		); 
-	} 
-	
-	static int WebPIsRGBMode(WEBP_CSP_MODE mode)
-	{ return (mode < WEBP_CSP_MODE.MODE_YUV); } 
-	struct WebPRGBABuffer
-	{
-		ubyte* rgba; 
-		int stride; 
-		ulong size; 
-	} 
-	struct WebPYUVABuffer
-	{
-		ubyte* y; 
-		ubyte* u; 
-		ubyte* v; 
-		ubyte* a; 
-		int y_stride; 
-		int u_stride; 
-		int v_stride; 
-		int a_stride; 
-		ulong y_size; 
-		ulong u_size; 
-		ulong v_size; 
-		ulong a_size; 
-	} 
-	struct WebPDecBuffer
-	{
-		WEBP_CSP_MODE colorspace; 
-		int width; 
-		int height; 
-		int is_external_memory; 
-		union 
-		{
-			WebPRGBABuffer RGBA; 
-			WebPYUVABuffer YUVA; 
-		} 
-		uint[4] pad; 
-		ubyte* private_memory; 
-	} 
-	extern int WebPInitDecBufferInternal(const WebPDecBuffer*, int); 
-	static int WebPInitDecBuffer(WebPDecBuffer* buffer)
-	{ return WebPInitDecBufferInternal(buffer, WEBP_DECODER_ABI_VERSION); } 
-	extern void WebPFreeDecBuffer(const WebPDecBuffer* buffer); 
-	enum VP8StatusCode
-	{
-		VP8_STATUS_OK = 0,
-		VP8_STATUS_OUT_OF_MEMORY,
-		VP8_STATUS_INVALID_PARAM,
-		VP8_STATUS_BITSTREAM_ERROR,
-		VP8_STATUS_UNSUPPORTED_FEATURE,
-		VP8_STATUS_SUSPENDED,
-		VP8_STATUS_USER_ABORT,
-		VP8_STATUS_NOT_ENOUGH_DATA,
-	} 
-	alias VP8_STATUS_OK = VP8StatusCode.VP8_STATUS_OK; 
-	alias VP8_STATUS_OUT_OF_MEMORY = VP8StatusCode.VP8_STATUS_OUT_OF_MEMORY; 
-	alias VP8_STATUS_INVALID_PARAM = VP8StatusCode.VP8_STATUS_INVALID_PARAM; 
-	alias VP8_STATUS_BITSTREAM_ERROR = VP8StatusCode.VP8_STATUS_BITSTREAM_ERROR; 
-	alias VP8_STATUS_UNSUPPORTED_FEATURE = VP8StatusCode.VP8_STATUS_UNSUPPORTED_FEATURE; 
-	alias VP8_STATUS_SUSPENDED = VP8StatusCode.VP8_STATUS_SUSPENDED; 
-	alias VP8_STATUS_USER_ABORT = VP8StatusCode.VP8_STATUS_USER_ABORT; 
-	alias VP8_STATUS_NOT_ENOUGH_DATA = VP8StatusCode.VP8_STATUS_NOT_ENOUGH_DATA; 
-	alias WebPIDecoder = Typedef!(void*); 
-	
-	extern WebPIDecoder* WebPINewDecoder(const WebPDecBuffer* output_buffer); 
-	extern WebPIDecoder* WebPINewRGB(
-		WEBP_CSP_MODE csp, ubyte* output_buffer, 
-		ulong output_buffer_size, int output_stride
-	); 
-	extern WebPIDecoder* WebPINewYUVA(
-		ubyte* luma, ulong luma_size, int luma_stride, 
-		ubyte* u, ulong u_size, int u_stride, ubyte* v, 
-		ulong v_size, int v_stride, 
-		ubyte* a, ulong a_size, int a_stride
-	); 
-	extern WebPIDecoder* WebPINewYUV(
-		ubyte* luma, ulong luma_size, int luma_stride, 
-		ubyte* u, ulong u_size, int u_stride, ubyte* v, 
-		ulong v_size, int v_stride
-	); 
-	extern void WebPIDelete(const WebPIDecoder* idec); 
-	extern VP8StatusCode WebPIAppend(const WebPIDecoder* idec, const(ubyte)* data, ulong data_size); 
-	extern VP8StatusCode WebPIUpdate(const WebPIDecoder* idec, const(ubyte)* data, ulong data_size); 
-	extern ubyte* WebPIDecGetRGB(const WebPIDecoder* idec, int* last_y, int* width, int* height, int* stride); 
-	extern ubyte* WebPIDecGetYUVA(
-		const WebPIDecoder* idec, int* last_y, ubyte** u, ubyte** v, 
-		ubyte** a, int* width, int* height, int* stride, int* uv_stride, int* a_stride
-	); 
-	static ubyte* WebPIDecGetYUV(
-		const WebPIDecoder* idec, int* last_y, ubyte** u, ubyte** v, 
-		int* width, int* height, int* stride, int* uv_stride
-	); 
-	extern WebPDecBuffer* WebPIDecodedArea(
-		const WebPIDecoder* idec, int* left, int* top, 
-		int* width, int* height
-	); 
-	struct WebPBitstreamFeatures
-	{
-		int width; 
-		int height; 
-		int has_alpha; 
-		int has_animation; 
-		int format; 
-		uint[5] pad; 
-	} 
-	extern VP8StatusCode WebPGetFeaturesInternal(const(ubyte)*, ulong, WebPBitstreamFeatures*, int); 
-	static VP8StatusCode WebPGetFeatures(
-		const ubyte* data, size_t data_size,
-		WebPBitstreamFeatures* features
-	)
-	=> WebPGetFeaturesInternal(
-		data, data_size, features,
-		WEBP_DECODER_ABI_VERSION
-	); 
-	
-	struct WebPDecoderOptions
-	{
-		int bypass_filtering; 
-		int no_fancy_upsampling; 
-		int use_cropping; 
-		int crop_left; 
-		int crop_top; 
-		int crop_width; 
-		int crop_height; 
-		int use_scaling; 
-		int scaled_width; 
-		int scaled_height; 
-		int use_threads; 
-		int dithering_strength; 
-		int flip; 
-		int alpha_dithering_strength; 
-		uint[5] pad; 
-	} 
-	struct WebPDecoderConfig
-	{
-		WebPBitstreamFeatures input; 
-		const WebPDecBuffer output; 
-		WebPDecoderOptions options; 
-	} 
-	extern int WebPInitDecoderConfigInternal(WebPDecoderConfig*, int); 
-	
-	static int WebPInitDecoderConfig(WebPDecoderConfig* config)
-	=> WebPInitDecoderConfigInternal(config, WEBP_DECODER_ABI_VERSION); 
-	
-	extern WebPIDecoder* WebPIDecode(const(ubyte)* data, ulong data_size, WebPDecoderConfig* config); 
-	extern VP8StatusCode WebPDecode(const(ubyte)* data, ulong data_size, WebPDecoderConfig* config); 
-	extern int WebPGetEncoderVersion(); 
-	extern ulong WebPEncodeRGB(
-		const(ubyte)* rgb, int width, int height, int stride, 
-		float quality_factor, ubyte** output
-	); 
-	extern ulong WebPEncodeBGR(
-		const(ubyte)* bgr, int width, int height, int stride, 
-		float quality_factor, ubyte** output
-	); 
-	extern ulong WebPEncodeRGBA(
-		const(ubyte)* rgba, int width, int height, int stride, 
-		float quality_factor, ubyte** output
-	); 
-	extern ulong WebPEncodeBGRA(
-		const(ubyte)* bgra, int width, int height, int stride, 
-		float quality_factor, ubyte** output
-	); 
-	extern ulong WebPEncodeLosslessRGB(const(ubyte)* rgb, int width, int height, int stride, ubyte** output); 
-	extern ulong WebPEncodeLosslessBGR(const(ubyte)* bgr, int width, int height, int stride, ubyte** output); 
-	extern ulong WebPEncodeLosslessRGBA(const(ubyte)* rgba, int width, int height, int stride, ubyte** output); 
-	extern ulong WebPEncodeLosslessBGRA(const(ubyte)* bgra, int width, int height, int stride, ubyte** output); 
-	enum WebPImageHint
-	{
-		WEBP_HINT_DEFAULT = 0,
-		WEBP_HINT_PICTURE,
-		WEBP_HINT_PHOTO,
-		WEBP_HINT_GRAPH,
-		WEBP_HINT_LAST,
-	} 
-	alias WEBP_HINT_DEFAULT = WebPImageHint.WEBP_HINT_DEFAULT; 
-	alias WEBP_HINT_PICTURE = WebPImageHint.WEBP_HINT_PICTURE; 
-	alias WEBP_HINT_PHOTO = WebPImageHint.WEBP_HINT_PHOTO; 
-	alias WEBP_HINT_GRAPH = WebPImageHint.WEBP_HINT_GRAPH; 
-	alias WEBP_HINT_LAST = WebPImageHint.WEBP_HINT_LAST; 
-	struct WebPConfig
-	{
-		int lossless; 
-		float quality; 
-		int method; 
-		WebPImageHint image_hint; 
-		int target_size; 
-		float target_PSNR; 
-		int segments; 
-		int sns_strength; 
-		int filter_strength; 
-		int filter_sharpness; 
-		int filter_type; 
-		int autofilter; 
-		int alpha_compression; 
-		int alpha_filtering; 
-		int alpha_quality; 
-		int pass; 
-		int show_compressed; 
-		int preprocessing; 
-		int partitions; 
-		int partition_limit; 
-		int emulate_jpeg_size; 
-		int thread_level; 
-		int low_memory; 
-		int near_lossless; 
-		int exact; 
-		int use_delta_palette; 
-		int use_sharp_yuv; 
-		int qmin; 
-		int qmax; 
-	} 
-	enum WebPPreset
-	{
-		WEBP_PRESET_DEFAULT = 0,
-		WEBP_PRESET_PICTURE,
-		WEBP_PRESET_PHOTO,
-		WEBP_PRESET_DRAWING,
-		WEBP_PRESET_ICON,
-		WEBP_PRESET_TEXT,
-	} 
-	alias WEBP_PRESET_DEFAULT = WebPPreset.WEBP_PRESET_DEFAULT; 
-	alias WEBP_PRESET_PICTURE = WebPPreset.WEBP_PRESET_PICTURE; 
-	alias WEBP_PRESET_PHOTO = WebPPreset.WEBP_PRESET_PHOTO; 
-	alias WEBP_PRESET_DRAWING = WebPPreset.WEBP_PRESET_DRAWING; 
-	alias WEBP_PRESET_ICON = WebPPreset.WEBP_PRESET_ICON; 
-	alias WEBP_PRESET_TEXT = WebPPreset.WEBP_PRESET_TEXT; 
-	
-	extern int WebPConfigInitInternal(const WebPConfig*, WebPPreset, float, int); 
-	static int WebPConfigInit(WebPConfig* config)
-	{
-		return WebPConfigInitInternal(
-			config, WebPPreset.WEBP_PRESET_DEFAULT, 75.0f,
-			WEBP_ENCODER_ABI_VERSION
-		); 
-	} 
-	static int WebPConfigPreset(
-		WebPConfig* config,
-		WebPPreset preset, float quality
-	)
-	{
-		return WebPConfigInitInternal(
-			config, preset, quality,
-			WEBP_ENCODER_ABI_VERSION
-		); 
-	} 
-	extern int WebPConfigLosslessPreset(const WebPConfig* config, int level); 
-	extern int WebPValidateConfig(const WebPConfig* config); 
-	struct WebPAuxStats
-	{
-		int coded_size; 
-		float[5] PSNR; 
-		int[3] block_count; 
-		int[2] header_bytes; 
-		int[4][3] residual_bytes; 
-		int[4] segment_size; 
-		int[4] segment_quant; 
-		int[4] segment_level; 
-		int alpha_data_size; 
-		int layer_data_size; 
-		uint lossless_features; 
-		int histogram_bits; 
-		int transform_bits; 
-		int cache_bits; 
-		int palette_size; 
-		int lossless_size; 
-		int lossless_hdr_size; 
-		int lossless_data_size; 
-		uint[2] pad; 
-	} 
-	alias WebPWriterFunction = int function(const(ubyte)* data, ulong data_size, const WebPPicture* picture); 
-	struct WebPMemoryWriter
-	{
-		ubyte* mem; 
-		ulong size; 
-		ulong max_size; 
-		uint[1] pad; 
-	} 
-	extern void WebPMemoryWriterInit(WebPMemoryWriter* writer); 
-	extern void WebPMemoryWriterClear(WebPMemoryWriter* writer); 
-	extern int WebPMemoryWrite(const(ubyte)* data, ulong data_size, const WebPPicture* picture); 
-	alias WebPProgressHook = int function(int percent, const WebPPicture* picture); 
-	enum WebPEncCSP
-	{
-		WEBP_YUV420 = 0,
-		WEBP_YUV420A = 4,
-		WEBP_CSP_UV_MASK = 3,
-		WEBP_CSP_ALPHA_BIT = 4,
-	} 
-	alias WEBP_YUV420 = WebPEncCSP.WEBP_YUV420; 
-	alias WEBP_YUV420A = WebPEncCSP.WEBP_YUV420A; 
-	alias WEBP_CSP_UV_MASK = WebPEncCSP.WEBP_CSP_UV_MASK; 
-	alias WEBP_CSP_ALPHA_BIT = WebPEncCSP.WEBP_CSP_ALPHA_BIT; 
-	enum WebPEncodingError
-	{
-		VP8_ENC_OK = 0,
-		VP8_ENC_ERROR_OUT_OF_MEMORY,
-		VP8_ENC_ERROR_BITSTREAM_OUT_OF_MEMORY,
-		VP8_ENC_ERROR_NULL_PARAMETER,
-		VP8_ENC_ERROR_INVALID_CONFIGURATION,
-		VP8_ENC_ERROR_BAD_DIMENSION,
-		VP8_ENC_ERROR_PARTITION0_OVERFLOW,
-		VP8_ENC_ERROR_PARTITION_OVERFLOW,
-		VP8_ENC_ERROR_BAD_WRITE,
-		VP8_ENC_ERROR_FILE_TOO_BIG,
-		VP8_ENC_ERROR_USER_ABORT,
-		VP8_ENC_ERROR_LAST,
-	} 
-	alias VP8_ENC_OK = WebPEncodingError.VP8_ENC_OK; 
-	alias VP8_ENC_ERROR_OUT_OF_MEMORY = WebPEncodingError.VP8_ENC_ERROR_OUT_OF_MEMORY; 
-	alias VP8_ENC_ERROR_BITSTREAM_OUT_OF_MEMORY = WebPEncodingError.VP8_ENC_ERROR_BITSTREAM_OUT_OF_MEMORY; 
-	alias VP8_ENC_ERROR_NULL_PARAMETER = WebPEncodingError.VP8_ENC_ERROR_NULL_PARAMETER; 
-	alias VP8_ENC_ERROR_INVALID_CONFIGURATION = WebPEncodingError.VP8_ENC_ERROR_INVALID_CONFIGURATION; 
-	alias VP8_ENC_ERROR_BAD_DIMENSION = WebPEncodingError.VP8_ENC_ERROR_BAD_DIMENSION; 
-	alias VP8_ENC_ERROR_PARTITION0_OVERFLOW = WebPEncodingError.VP8_ENC_ERROR_PARTITION0_OVERFLOW; 
-	alias VP8_ENC_ERROR_PARTITION_OVERFLOW = WebPEncodingError.VP8_ENC_ERROR_PARTITION_OVERFLOW; 
-	alias VP8_ENC_ERROR_BAD_WRITE = WebPEncodingError.VP8_ENC_ERROR_BAD_WRITE; 
-	alias VP8_ENC_ERROR_FILE_TOO_BIG = WebPEncodingError.VP8_ENC_ERROR_FILE_TOO_BIG; 
-	alias VP8_ENC_ERROR_USER_ABORT = WebPEncodingError.VP8_ENC_ERROR_USER_ABORT; 
-	alias VP8_ENC_ERROR_LAST = WebPEncodingError.VP8_ENC_ERROR_LAST; 
-	struct WebPPicture
-	{
-		int use_argb; 
-		WebPEncCSP colorspace; 
-		int width; 
-		int height; 
-		ubyte* y; 
-		ubyte* u; 
-		ubyte* v; 
-		int y_stride; 
-		int uv_stride; 
-		ubyte* a; 
-		int a_stride; 
-		uint[2] pad1; 
-		uint* argb; 
-		int argb_stride; 
-		uint[3] pad2; 
-		int function(const(ubyte)* data, ulong data_size, const WebPPicture* picture) writer; 
-		void* custom_ptr; 
-		int extra_info_type; 
-		ubyte* extra_info; 
-		WebPAuxStats* stats; 
-		WebPEncodingError error_code; 
-		int function(int percent, const WebPPicture* picture) progress_hook; 
-		void* user_data; 
-		uint[3] pad3; 
-		ubyte* pad4; 
-		ubyte* pad5; 
-		uint[8] pad6; 
-		void* memory_; 
-		void* memory_argb_; 
-		void*[2] pad7; 
-	} 
-	extern int WebPPictureInitInternal(const WebPPicture*, int); 
-	static int WebPPictureInit(WebPPicture* picture)
-	{ return WebPPictureInitInternal(picture, WEBP_ENCODER_ABI_VERSION); } 
-	extern int WebPPictureAlloc(const WebPPicture* picture); 
-	extern void WebPPictureFree(const WebPPicture* picture); 
-	extern int WebPPictureCopy(const WebPPicture* src, const WebPPicture* dst); 
-	extern int WebPPlaneDistortion(
-		const(ubyte)* src, ulong src_stride, const(ubyte)* ref_, ulong ref_stride, 
-		int width, int height, ulong x_step, int type, float* distortion, float* result
-	); 
-	extern int WebPPictureDistortion(const WebPPicture* src, const WebPPicture* ref_, int metric_type, float[5] result); 
-	extern int WebPPictureCrop(const WebPPicture* picture, int left, int top, int width, int height); 
-	extern int WebPPictureView(const WebPPicture* src, int left, int top, int width, int height, const WebPPicture* dst); 
-	extern int WebPPictureIsView(const WebPPicture* picture); 
-	extern int WebPPictureRescale(const WebPPicture* picture, int width, int height); 
-	extern int WebPPictureImportRGB(const WebPPicture* picture, const(ubyte)* rgb, int rgb_stride); 
-	extern int WebPPictureImportRGBA(const WebPPicture* picture, const(ubyte)* rgba, int rgba_stride); 
-	extern int WebPPictureImportRGBX(const WebPPicture* picture, const(ubyte)* rgbx, int rgbx_stride); 
-	extern int WebPPictureImportBGR(const WebPPicture* picture, const(ubyte)* bgr, int bgr_stride); 
-	extern int WebPPictureImportBGRA(const WebPPicture* picture, const(ubyte)* bgra, int bgra_stride); 
-	extern int WebPPictureImportBGRX(const WebPPicture* picture, const(ubyte)* bgrx, int bgrx_stride); 
-	extern int WebPPictureARGBToYUVA(const WebPPicture* picture, WebPEncCSP); 
-	extern int WebPPictureARGBToYUVADithered(const WebPPicture* picture, WebPEncCSP colorspace, float dithering); 
-	extern int WebPPictureSharpARGBToYUVA(const WebPPicture* picture); 
-	extern int WebPPictureSmartARGBToYUVA(const WebPPicture* picture); 
-	extern int WebPPictureYUVAToARGB(const WebPPicture* picture); 
-	extern void WebPCleanupTransparentArea(const WebPPicture* picture); 
-	extern int WebPPictureHasTransparency(const WebPPicture* picture); 
-	extern void WebPBlendAlpha(const WebPPicture* picture, uint background_rgb); 
-	extern int WebPEncode(const WebPConfig* config, const WebPPicture* picture); 
-} 
+}

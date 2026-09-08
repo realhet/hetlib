@@ -2058,7 +2058,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	enum EnumMemberNames(T) = is(T==enum) ? [__traits(allMembers, T)] : []; 
 	enum EnumBits(T) = float(T.max+1).log2.iceil; 
 	enum EnumAssocArray(alias T) = /+keys = enumMember.text, values = enumMember+/
-	((){ T[string] o; static foreach(t; EnumMemberNames!T) o[t]=mixin("T."~t); return o; })(); 
+	((){ T[string] o; foreach(i, name; EnumMemberNames!T) o[name] = [EnumMembers!T][i]; return o; })(); 
 	
 	size_t hashOfEnum(T)()
 	{ size_t h=2347890201238928092; foreach(e; [EnumMembers!T]) h = mix64(e.text.hashOf, h+(cast(size_t)(e))); return h; } 
@@ -3455,15 +3455,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B4C959F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B4D259F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B59159F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B59A59F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B63B59F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B6B059F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B64459F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B6B959F156A1})); 
 						+/
 					+/
 				+/
@@ -8481,20 +8481,118 @@ version(/+$DIDE_REGION Containers+/all)
 		*/
 		
 	}version(/+$DIDE_REGION+/all) {
-			
-		//unicodeStandardLetter: these can be stylized by fonts, such as Arial/Consolas/Times. Other characters are usually the same, eg.: Chineese chars.
-		//containt ranges of latin, greek, cyril, armenian chars. These can have different representations across each fonts
-		bool isUnicodeStandardLetter(dchar ch)
+		auto findInSortedIntervals_linear(string[] scripts = ["a[0]", "a[1]", "true", "false"], R, T)(R intervals, T val)
+		if(isInputRange!R)
 		{
-			immutable unicodeStandardLetterRanges = [
+			foreach(a; intervals)
+			{
+				if(val<mixin(scripts[0])) break; 
+				if(val>mixin(scripts[1])) continue; 
+				return mixin(scripts[2]); 
+			}
+			return mixin(scripts[3]); 
+		} 
+		
+		
+		
+		/+
+			unicodeStandardLetter: these can be stylized by fonts, such as Arial/Consolas/Times. 
+			Other characters are usually the same, eg.: Chineese chars.
+			contains ranges of latin, greek, cyril, armenian chars. These can have different representations across each fonts
+		+/
+		static immutable wchar[2][] unicodeStandardLetterRanges = 
+		[
+			[0x0020, 0x024F], [0x0370, 0x058F], [0x1C80, 0x1C8F], [0x1E00, 0x1FFF], [0x2C60, 0x2C7F], 
+			[0x2DE0, 0x2DFF], [0xA640, 0xA69F], [0xA720, 0xA7FF], [0xAB30, 0xAB6F] 
+		]; 
+		
+		bool isUnicodeStandardLetter(dchar ch)
+		=> findInSortedIntervals_linear!(["a[0]", "a[1]", "true", "false"])(unicodeStandardLetterRanges, ch); 
+		
+		bool isUnicodeStandardLetter_binary(dchar c)
+		{
+			static immutable wchar[2][] ALPHA_TABLE = 
+				[
 				[0x0020, 0x024F], [0x0370, 0x058F], [0x1C80, 0x1C8F], [0x1E00, 0x1FFF],
 				[0x2C60, 0x2C7F], [0x2DE0, 0x2DFF], [0xA640, 0xA69F], [0xA720, 0xA7FF],
 				[0xAB30, 0xAB6F] 
 			]; 
-			foreach(const r; unicodeStandardLetterRanges)
-			if(ch.inRange(r[0], r[1])>=r[0] && ch<=r[1]) return true; 
+			
+			size_t high = ALPHA_TABLE.length - 1; 
+			//Shortcut search if c is out of range
+			size_t low = (c < ALPHA_TABLE[0][0] || ALPHA_TABLE[high][1] < c) ? high + 1 : 0; 
+			//Binary search
+			while(low <= high)
+			{
+				size_t mid = (low + high) >> 1; 
+				if(c < ALPHA_TABLE[mid][0])
+				high = mid - 1; 
+				else if(ALPHA_TABLE[mid][1] < c)
+				low = mid + 1; 
+				else
+				{
+					assert(ALPHA_TABLE[mid][0] <= c && c <= ALPHA_TABLE[mid][1]); 
+					return true; 
+				}
+			}
 			return false; 
 		} 
+		
+		bool isUnicodeStandardLetter_fast(dchar ch)
+		{
+			static immutable unicodeStandardLetterRanges = 
+				[
+				[0x0020, 0x024F], [0x0370, 0x058F], [0x1C80, 0x1C8F], [0x1E00, 0x1FFF],
+				[0x2C60, 0x2C7F], [0x2DE0, 0x2DFF], [0xA640, 0xA69F], [0xA720, 0xA7FF],
+				[0xAB30, 0xAB6F] 
+			]; 
+			
+			
+			static immutable bitMask = 
+				((){
+				ulong[] res; 
+				foreach(const r; unicodeStandardLetterRanges)
+				{
+					foreach(b; r[0]>>4 .. (r[1]>>4)+1UL)
+					{
+						enforce((r[0] & 15)==0); enforce((r[1] & 15)==15); 
+						const i = b / 64; const reqLen = i+1; 
+						if(res.length < reqLen) res.length = reqLen; 
+						res[i] = res[i].setBit(b % 64); 
+					}
+				}
+				return res; 
+			}()); 
+			
+			const b = (cast(uint)(ch))>>4, i = b / 64; 
+			bool res = i<bitMask.length && bitMask[i].getBit(b % 64); 
+			return res; 
+		} 
+		
+		
+		/+
+			Todo: make benchmarks and a generator for this lookup operation.  Also a way of testing, verification of correctness.
+			/+
+				Code: auto _間=init間; 
+				foreach(i; 0..65536) (cast(dchar)(i)).isUnicodeStandardLetter; ((0x4040359F156A1).檢((update間(_間)))); 
+				foreach(i; 0..65536) (cast(dchar)(i)).isUnicodeStandardLetter_fast; ((0x4047959F156A1).檢((update間(_間)))); 
+				foreach(i; 0..65536) (cast(dchar)(i)).isUnicodeStandardLetter_binary; ((0x404F159F156A1).檢((update間(_間)))); 
+				auto img = image2D(
+					ivec2(256, 256), 
+					iota(2^^16).map!((i)=>((((cast(dchar)(i)).isUnicodeStandardLetter_binary)?(clWhite):(clBlack))))
+				); 
+				((0x405C459F156A1).檢((update間(_間)))); 
+				img.saveTo(`c:\dl\isUnicodeStandardLetter_binary.bmp`); 
+				
+				/+
+					benchmarks:
+					isUnicodeStandardLetter: 	0.49 ms
+					isUnicodeStandardLetter_fast: 	0.12 ms
+					isUnicodeStandardLetter_binary: 	0.29 ms
+				+/
+			+/
+		+/
+		
 		
 		enum UnicodePrivateUserAreaBase = 0xF0000; 
 		
@@ -8514,7 +8612,6 @@ version(/+$DIDE_REGION Containers+/all)
 		{
 			static immutable wchar[2][] ALPHA_TABLE =
 			[
-				//Todo: discover these chars. Decide if they are useful or not.
 				[0x00AA, 0x00AA],[0x00B5, 0x00B5],[0x00B7, 0x00B7],[0x00BA, 0x00BA],[0x00C0, 0x00D6],[0x00D8, 0x00F6],[0x00F8, 0x01F5],[0x01FA, 0x0217],
 				[0x0250, 0x02A8],[0x02B0, 0x02B8],[0x02BB, 0x02BB],[0x02BD, 0x02C1],[0x02D0, 0x02D1],[0x02E0, 0x02E4],[0x037A, 0x037A],[0x0386, 0x0386],
 				[0x0388, 0x038A],[0x038C, 0x038C],[0x038E, 0x03A1],[0x03A3, 0x03CE],[0x03D0, 0x03D6],[0x03DA, 0x03DA],[0x03DC, 0x03DC],[0x03DE, 0x03DE],
@@ -8547,7 +8644,7 @@ version(/+$DIDE_REGION Containers+/all)
 				[0x2128, 0x2128],[0x212A, 0x2131],[0x2133, 0x2138],[0x2160, 0x2182],[0x3005, 0x3007],[0x3021, 0x3029],[0x3041, 0x3093],[0x309B, 0x309C],
 				[0x30A1, 0x30F6],[0x30FB, 0x30FC],[0x3105, 0x312C],[0x4E00, 0x9FA5],[0xAC00, 0xD7A3],
 			]; 
-					
+			
 			size_t high = ALPHA_TABLE.length - 1; 
 			//Shortcut search if c is out of range
 			size_t low = (c < ALPHA_TABLE[0][0] || ALPHA_TABLE[high][1] < c) ? high + 1 : 0; 
@@ -8582,7 +8679,7 @@ version(/+$DIDE_REGION Containers+/all)
 					return cast(TextEncoding)(i); 
 				}
 			}
-					
+			
 			//default encoding
 			if(withoutEnc) *withoutEnc = s; 
 			return def; 
