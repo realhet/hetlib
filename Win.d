@@ -1477,6 +1477,10 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 		void fillTriangle(in vec2 a, in vec2 b, in vec2 c); //not important
 		
 		void* getGfxBuilder(); 
+		
+		bounds2[] getClipBoundsStack(); 
+		size_t getClipBoundsDepth(); 
+		void setClipBoundsDepth(size_t d); 
 	} 
 	struct RectAlign
 	{
@@ -1629,12 +1633,12 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 			/+ Use origin point for translation +/ 
 			V worldOrigin = V(0, 0); 
 			V screenOrigin = viewMain.worldToScreen(worldOrigin, animated); 
-			V guiWorldOrigin = viewGui.screenToWorld(screenOrigin, animated); 
+			V guiWorldOrigin = viewGui.fromScreenToView(screenOrigin, animated); 
 			
 			/+ Use unit point for scale calculation +/
 			V worldUnit = V(1, 0); 
 			V screenUnit = viewMain.worldToScreen(worldUnit); 
-			V guiWorldUnit = viewGui.screenToWorld(screenUnit); 
+			V guiWorldUnit = viewGui.fromScreenToView(screenUnit); 
 			
 			float scale = guiWorldUnit.x - guiWorldOrigin.x; 
 			V origin = guiWorldOrigin; 
@@ -1743,8 +1747,8 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 		
 		bounds2 visibleArea(bool animated = true)
 		{
-			V	mi = screenToWorld(V(0), animated),
-				ma = screenToWorld(clientSize, animated); 
+			V	mi = fromScreenToView(V(0), animated),
+				ma = fromScreenToView(clientSize, animated); 
 			return bounds2(mi, ma).sorted; 
 		} 
 		
@@ -1772,7 +1776,7 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 		{ return ((world-getOrigin(animated))*getScale(animated)+clientSizeHalf); } 
 		//Opt: fucking slow, need to be cached
 		
-		T screenToWorld(T)(in T screen, bool animated=true)
+		T fromScreenToView(T)(in T screen, bool animated=true)
 		{ return T((screen-clientSizeHalf)/getScale(animated) + getOrigin(animated)); } 
 		
 		//Scroll/Zoom User controls
@@ -2025,8 +2029,8 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 			vec2 screenPos = view.trans(worldPos, false); // skip animation
 			
 			// Screen → World  
-			vec2 worldPos = view.screenToWorld(screenPos); 
-			vec2 worldPos = view.screenToWorld(screenPos, false); // skip animation
+			vec2 worldPos = view.fromScreenToView(screenPos); 
+			vec2 worldPos = view.fromScreenToView(screenPos, false); // skip animation
 		+/
 		
 		/+H2: Navigation Controls+/

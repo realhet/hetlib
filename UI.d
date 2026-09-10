@@ -1653,8 +1653,15 @@ version(/+$DIDE_REGION+/all)
 		//ch -> subTexIdx lookup. Cached with a map.   10 FPS -> 13..14 FPS
 		void lookupSubTexIdx()
 		{
+			dchar sanitizedCh()
+			{
+				if(ch==0) return '␀'; 
+				return ch; 
+			} 
+			
+			
 			const fontName = accessFontFace(fontId).name; 
-			const glyphSpec = `font:\`~fontName~`\72\x3\?`~ch.only.toUTF8; 
+			const glyphSpec = `font:\`~fontName~`\72\x3\?`~sanitizedCh.only.toUTF8; 
 			stIdx = textures_getNow(File(glyphSpec)); //fonts are loaded immediatelly
 		} 
 		
@@ -5804,7 +5811,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			with(im)
 			{
-				Container!(.Container, _M_, _L_)
+				CustomContainer!(.Container, _M_, _L_)
 				(
 					((this).名!q{id}), Theme.tool,
 					{
@@ -8219,6 +8226,7 @@ struct im
 				_canProcessUserInput = mainWindow.canProcessUserInput; 
 				
 				setTargetSurfaces(viewWorld, viewGUI); 
+				
 				selectTargetSurface(TargetSurface.gui); //default is the GUI surface
 				
 				//inject stuff into het.uibase. So no import het.ui is needed there.
@@ -8456,15 +8464,19 @@ struct im
 				Drawing[2] dr = [drWorld, drGUI]; 
 				
 				//init clipbounds
+				size_t[2] savedGlobalClipBoundsDepth; 
 				foreach(i, ref d; dr)
 				{
 					auto view = targetSurfaceViews[i].enforce; 
+					savedGlobalClipBoundsDepth[i] = d.getClipBoundsDepth; 
 					d.pushClipBounds(view.screenBounds_anim.bounds2); 
 				}
+				scope(exit) {
+					foreach(i, d; dr)
+					{ d.setClipBoundsDepth(savedGlobalClipBoundsDepth[i]); }
+				}
 				
-				foreach(i; 0..2)
-				surfaceBounds[i] = bounds2.init; 
-				
+				foreach(i; 0..2) surfaceBounds[i] = bounds2.init; 
 				
 				if(funBefore) funBefore(); 
 				
@@ -8473,13 +8485,15 @@ struct im
 					const s = a.flags.targetSurface; 
 					surfaceBounds[s] |= a.outerBounds; 
 					_targetSurfaceBeingDrawn = s; 
-					a.draw(dr[s]); //draw in zOrder
+					
+					const savedLocalClipBoundsDepth = dr[s].getClipBoundsDepth; 
+					scope(exit) dr[s].setClipBoundsDepth(savedLocalClipBoundsDepth); 
+					
+					try { a.draw(dr[s]); }
+					catch(Exception e) { beep; ERR(e.text); }
 				}
 				
 				if(funAfter) funAfter(); 
-				
-				foreach(i, d; dr)
-				{ d.popClipBounds; }
 				
 				//set mouse cursor icon once per frame
 				mainWindow.mouseCursor = mouseCursor; 
@@ -8514,7 +8528,7 @@ struct im
 							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
 							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
 						}
-						((0x3B691EB16D5C4).檢 (ImStorageManager.stats)); 
+						((0x3B85CEB16D5C4).檢 (ImStorageManager.stats)); 
 					}
 				}
 				

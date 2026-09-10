@@ -3658,6 +3658,19 @@ Use SvgParser to prepare absolute SVG command stream!"
 					clipBounds = clipBoundsStack[$-1]; 
 					clipBoundsStack = clipBoundsStack[0..$-1]; 
 				} 
+				
+				bounds2[] getClipBoundsStack()
+				=> clipBoundsStack; 
+				
+				size_t getClipBoundsDepth() 
+				=> clipBoundsStack.length; 
+				
+				void setClipBoundsDepth(size_t d)
+				{
+					if(clipBoundsStack.length<d)
+					ERR("HIGHER DEPTH REQUESTED. Fucking nonsense!"); 
+					else { while(clipBoundsStack.length>d) popClipBounds; }
+				} 
 			}
 			
 			version(/+$DIDE_REGION DrawState+/all)
@@ -3983,7 +3996,7 @@ class VulkanWindow: Window, IGfxContentDestination
 					alt	= k("Alt"	); 
 					ctrl	= k("Ctrl"	); 
 					screen	= screenToClient(inputs.mouseAct).iround; 
-					world	= viewWorld.screenToWorld(vec2(screen)); 
+					world	= viewWorld.fromScreenToView(vec2(screen)); 
 					wheel	= inputs["MW"].delta.iround; 
 				}
 				mouse._updateInternal(a); 
@@ -3991,8 +4004,8 @@ class VulkanWindow: Window, IGfxContentDestination
 				mouse.screenRect = ibounds2(ivec2(0), swapchainClientSize); 
 				mouse.worldRect = bounds2
 					(
-					viewWorld.screenToWorld(vec2(mouse.screenRect.topLeft)),
-					viewWorld.screenToWorld(vec2(mouse.screenRect.bottomRight))
+					viewWorld.fromScreenToView(vec2(mouse.screenRect.topLeft)),
+					viewWorld.fromScreenToView(vec2(mouse.screenRect.bottomRight))
 				); 
 				
 				//Todo: bad names: worldRect is "screenBounds in world coords"
@@ -4021,9 +4034,9 @@ class VulkanWindow: Window, IGfxContentDestination
 					{
 						v.clientSize = bnd.size.vec2; 
 						mouseLast = mousePos; 
-						mousePos = screenToWorld(mp); 
-						screenBounds_anim = screenToWorld(bnd, true); 
-						screenBounds_dest = screenToWorld(bnd, false); 
+						mousePos = fromScreenToView(mp); 
+						screenBounds_anim = fromScreenToView(bnd, true); 
+						screenBounds_dest = fromScreenToView(bnd, false); 
 						workArea_accum = View2D.B.init; 
 					}
 				}
@@ -5570,18 +5583,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2AED682886ADB).檢(
+					((0x2B04B82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2AF4882886ADB))))
+				if((互!((bool),(0),(0x2B0BD82886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2AFDC82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2AFF382886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2B15182886ADB).檢((互!((float/+w=12+/),(1.000),(0x2B16882886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5594,8 +5607,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2B1C882886ADB).檢 (imVG)),
-					((0x2B1EE82886ADB).檢 (imFPS)); 
+					((0x2B33D82886ADB).檢 (imVG)),
+					((0x2B36382886ADB).檢 (imFPS)); 
 				}
 			}
 			

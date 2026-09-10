@@ -7628,7 +7628,7 @@ version(/+$DIDE_REGION+/all)
 						* props.xScale/+*spaceScale+/
 					)), props.height
 				); 
-				enforce(bmpSize.x>0 && bmpSize.y>0, "renderText(): Bitmap has no area."); 
+				enforce(bmpSize.x>0 && bmpSize.y>0, "renderText(): Bitmap has no area. "~text.quoted); 
 				
 				Bitmap doRender()
 				{

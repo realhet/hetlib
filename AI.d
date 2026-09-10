@@ -193,7 +193,6 @@ class AiChat
 					+/
 				),
 					scale 	= ((isPeak)?(2.0):(1.0)); 
-				LOG("Beijing time, GMT+8: hours=", hour); 
 				//Todo: model dependent prices.  this is chat only
 				return i"Usage(prompt_hit: $(cached_prompt_tokens), ".text~
 				i"prompt_miss: $(prompt_tokens), ".text~
@@ -225,12 +224,21 @@ class AiChat
 					completion_tokens	*0.28*scale
 					before 260816
 				+/
-				(
+				/+
 					/+deepseek-v4-flash+/
 					(
 						cached_prompt_tokens	*0.007*scale+ /+2.5x+/
 						(prompt_tokens-cached_prompt_tokens)	*0.22*scale+  /+1.57x+/
 						completion_tokens	*0.66*scale   /+2.36x+/
+					)
+					before 260910
+				+/
+				(
+					/+deepseek-v4-flash+/
+					(
+						cached_prompt_tokens	*0.003*scale+
+						(prompt_tokens-cached_prompt_tokens)	*0.15*scale+
+						completion_tokens	*0.6*scale
 					)
 					/ 1e6/+1M tokens+/ * 316/+1 USD to HUF+/ 
 					/+Todo: more accurate usd to huf+/
