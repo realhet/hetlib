@@ -260,6 +260,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			AnsiEncoding.initialize; 
 			testEstimateTotalSize; //260828
 			
+			test_bits; //260914
+			
 			//startup ---------------------------------------------------------------------
 			
 			CoInitializeEx(null, 0); //fixes problem with "file explorer wont refrest when different filetype selected.". No need for COINIT_APARTMENTTHREADED, just a 0 is enough.
@@ -3455,15 +3457,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B4D259F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B4EF59F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B59A59F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B5B759F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B64459F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B6B959F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B66159F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B6D659F156A1})); 
 						+/
 					+/
 				+/
@@ -4008,14 +4010,203 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 	}version(/+$DIDE_REGION Bitwise+/all)
 	{
-		//Bitwise //////////////////////////////////////////////
-		
 		public import core.bitop : rol, ror,
 		bitCount = popcnt	,
 		//	bitSwap	= bitswap	,
 		byteSwap	= bswap	,
 		bitScan	= bsf	,
 		bitScan_reverse	= bsr	; 
+		
+		bool getBit(T)(T a, size_t idx)
+		=> a.BITS[idx]; 
+		
+		T setBit(T)(T a, size_t idx, bool v=true)
+		{ a.BITS[idx] = v; return a; }  T clearBit(T)(T a, size_t idx)
+		=> setBit(a, idx, false); 
+		
+		T getBits(T)(T a, size_t idx, size_t cnt)
+		=> a.BITS[idx .. idx+cnt].as!T; 
+		
+		T setBits(T)(T a, size_t idx, size_t cnt, T v)
+		{ a.BITS[idx .. idx+cnt] = v; return a; }  T clearBits(T)(T a, size_t idx, size_t cnt)
+		=> setBits(a, idx, cnt, 0); 
+		
+		struct BitsRefSlice(D)
+		{
+			private { D* pdata; size_t st, en; } 
+			
+			size_t opDollar(size_t pos)()
+			=> D.sizeof*8 - st; 
+			
+			bool opIndex()(size_t i)
+			=> BitsRefIndex!D(pdata, this.st+i).get; 
+			bool opIndexAssign()(bool v, size_t i)
+			=> BitsRefIndex!D(pdata, this.st+i).set(v); 
+			
+			auto opSlice(size_t st, size_t en)
+			=> BitsRefSlice!D(pdata, this.st+st, this.st+en); auto opSlice()
+			=> this[0..$]; 
+			
+			auto as(T)()
+			=> BitsValSlice!D(*pdata, st, en).as!T; 
+			auto as(T)(in T val)
+			{
+				const 	msk0 	= ((1UL<<(en-st))-1),
+					msk 	= msk0<<st; 
+				(*pdata) = (cast(D)((*pdata)&~msk | ((val&msk0)<<st))); 
+				return val; 
+			} 
+			
+			auto get() => BitsValSlice!D(*pdata, st, en).get; 
+			
+			auto access() => get; 
+			auto access(T)(in T val) => as = val; 
+			alias this = access; 
+		} struct BitsValSlice(D)
+		{
+			private { D data; size_t st, en; } 
+			
+			size_t opDollar(size_t pos)()
+			=> D.sizeof*8 - st; 
+			
+			bool opIndex()(size_t i)
+			=> BitsValIndex!D(data, this.st+i).get; 
+			
+			auto opSlice(size_t st, size_t en)
+			=> BitsValSlice!D(data, this.st+st, this.st+en); auto opSlice()
+			=> this[0..$]; 
+			
+			auto as(T)()
+			{
+				auto res = (cast(T)((data>>st) & ((1UL<<(en-st))-1))); 
+				static if(isIntegral!T && isSigned!T)
+				{
+					const sh = T.sizeof*8 - (en-st); 
+					res = (cast(T)((cast(T)(res<<sh))>>sh)); /+sign extend+/
+				}
+				return res; 
+			} 
+			
+			static if(D.sizeof<=4)	{ alias DefaultType = uint; }
+			else	{ alias DefaultType = ulong; }
+			auto get() => as!DefaultType; 
+			alias this = get; 
+		} 
+		
+		struct BitsRefIndex(D)
+		{
+			private { D* pdata; size_t idx; } 
+			
+			bool get() => BitsValIndex!D(*pdata, idx).get; 
+			bool set(bool v)
+			{
+				*pdata = (cast(D)((*pdata)&~(1UL<<idx)|((cast(D)(v))<<idx))); 
+				return v; 
+			} 
+			
+			bool access() => get; 
+			bool access(bool v) => set(v); 
+			alias this = access; 
+		} struct BitsValIndex(D)
+		{
+			private { D data; size_t idx; } 
+			
+			bool get() => !!((data>>idx)&1); 
+			alias this = get; 
+		} 
+		
+		auto BITS(D)(ref D data)
+		{
+			static if(__traits(compiles, data = data))	return BitsRefSlice!D(&data, 0, D.sizeof*8); 
+			else	return BitsValSlice!D(data, 0, D.sizeof*8); 
+		} 
+		auto BITS(D)(D data)
+		=> BitsValSlice!D(data, 0, D.sizeof*8); 
+		
+		bool test_bits()
+		{
+			{
+				ubyte b = 0x55; 	enforce(b.BITS[4..8]==5); 
+				b.BITS[4..8] = -1; 	enforce(b.BITS[]==0xF5); 
+				enforce(b.BITS[].as!int==-11); 
+				enforce((0x696).BITS[4..$].as!ubyte==0x69); 
+			}
+			
+			static foreach(T; AliasSeq!(byte, ubyte, short, ushort, int, uint, long, ulong))
+			{
+				{
+					enum nbits = T.sizeof*8; 
+					alias U = Unsigned!T; 
+					
+					/+ --- readonly (rvalue) mode --- +/
+					{
+						auto rd = (cast(T)0xAA).BITS; 
+						enforce(rd[0] == false); 
+						enforce(rd[1] == true); 
+						enforce(rd[nbits-1] == (nbits==8)); 
+						enforce(rd[].as!U == cast(U)0xAA); 
+						enforce(rd[0..4].as!U == cast(U)0xA); 
+						enforce(rd[4..8].as!U == cast(U)0xA); 
+						enforce((cast(T)0xAA).BITS[].as!U == cast(U)0xAA); 
+					}
+					
+					/+ --- readwrite (ref) mode --- +/
+					{
+						T w; 
+						w.BITS[0] = true; 
+						enforce(w.BITS[0] == true); 
+						enforce(w.BITS[1] == false); 
+						enforce(w == 1); 
+						w.BITS[0] = false; 
+						enforce(w == 0); 
+						
+						w.BITS[nbits-1] = true; 
+						enforce(w.BITS[nbits-1] == true); 
+						enforce(w.BITS[].as!U == (cast(U)1 << (nbits-1))); 
+						w.BITS[nbits-1] = false; 
+						enforce(w == 0); 
+						
+						w.BITS[0..4] = cast(T)0xF; 
+						enforce(w.BITS[0..4].as!U == cast(U)0xF); 
+						enforce(w.BITS[].as!U == cast(U)0xF); 
+						w.BITS[0..4] = cast(T)0; 
+						enforce(w == 0); 
+						
+						w.BITS[] = cast(T)0xA5; 
+						enforce(w.BITS[].as!U == cast(U)0xA5); 
+					}
+				}
+			}
+			
+			{
+				byte b = cast(byte)0xF0; 
+				enforce(b.BITS[4..8].as!byte == -1); 
+				enforce(b.BITS[4..8].as!int == -1); 
+				enforce(b.BITS[4..8].as!long == -1); 
+				enforce(b.BITS[4..8].as!ubyte == 0xF); 
+				
+				short s = short.min; 
+				enforce(s.BITS[15] == true); 
+				enforce(s.BITS[].as!short == short.min); 
+				enforce(s.BITS[].as!int == short.min); 
+				enforce(s.BITS[].as!ushort == 0x8000); 
+				
+				int i = int.min; 
+				enforce(i.BITS[31] == true); 
+				enforce(i.BITS[].as!int == int.min); 
+				enforce(i.BITS[].as!uint == 0x8000_0000); 
+				
+				long l = long.min; 
+				enforce(l.BITS[63] == true); 
+				enforce(l.BITS[].as!long == long.min); 
+				enforce(l.BITS[].as!ulong == 0x8000_0000_0000_0000); 
+			}
+			
+			
+			return true; 
+		} 
+		
+		
 		
 		T swapBits(T)(in T a) if(isIntegral!T || isSomeChar!T)
 		{
@@ -4045,21 +4236,6 @@ version(/+$DIDE_REGION Numeric+/all)
 		{ return cast(wstring)((cast(ushort[])s).map!(c => cast(wchar)(c.byteSwap)).array); } 
 		dstring byteSwap(dstring s)
 		{ return cast(dstring)((cast(uint  [])s).map!(c => cast(dchar)(c.byteSwap)).array); } 
-		
-		bool getBit(T)(T a, size_t idx)
-		{ return ((a>>idx)&1)!=0; } 
-		T setBit(T)(T a, size_t idx, bool v=true)
-		{ return cast(T)(a&~(cast(T)1<<idx)|(cast(T)v<<idx)); } 
-		T clearBit(T)(T a, size_t idx)
-		{ return setBit(a, idx, false); } 
-		
-		T getBits(T)(T a, size_t idx, size_t cnt)
-		{ return (a>>idx)&((cast(T)1<<cnt)-1); } 
-		T setBits(T)(T a, size_t idx, size_t cnt, T v) {
-			auto 	msk0 	= (cast(T)1<<cnt)-1,
-				msk 	= msk0<<idx; 
-			return cast(T)(a&~msk|((v&msk0)<<idx)); 
-		} 
 		
 		T maskLowBits(T)(T a)
 		{
@@ -8574,14 +8750,14 @@ version(/+$DIDE_REGION Containers+/all)
 			Todo: make benchmarks and a generator for this lookup operation.  Also a way of testing, verification of correctness.
 			/+
 				Code: auto _間=init間; 
-				foreach(i; 0..65536) (cast(dchar)(i)).isUnicodeStandardLetter; ((0x4040359F156A1).檢((update間(_間)))); 
-				foreach(i; 0..65536) (cast(dchar)(i)).isUnicodeStandardLetter_fast; ((0x4047959F156A1).檢((update間(_間)))); 
-				foreach(i; 0..65536) (cast(dchar)(i)).isUnicodeStandardLetter_binary; ((0x404F159F156A1).檢((update間(_間)))); 
+				foreach(i; 0..65536) (cast(dchar)(i)).isUnicodeStandardLetter; ((0x4163159F156A1).檢((update間(_間)))); 
+				foreach(i; 0..65536) (cast(dchar)(i)).isUnicodeStandardLetter_fast; ((0x416A759F156A1).檢((update間(_間)))); 
+				foreach(i; 0..65536) (cast(dchar)(i)).isUnicodeStandardLetter_binary; ((0x4171F59F156A1).檢((update間(_間)))); 
 				auto img = image2D(
 					ivec2(256, 256), 
 					iota(2^^16).map!((i)=>((((cast(dchar)(i)).isUnicodeStandardLetter_binary)?(clWhite):(clBlack))))
 				); 
-				((0x405C459F156A1).檢((update間(_間)))); 
+				((0x417F259F156A1).檢((update間(_間)))); 
 				img.saveTo(`c:\dl\isUnicodeStandardLetter_binary.bmp`); 
 				
 				/+
