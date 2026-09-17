@@ -260,7 +260,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			AnsiEncoding.initialize; 
 			testEstimateTotalSize; //260828
 			
-			test_bits; //260914
+			test_fillBits; test_bits; test_bitsArray; test_findInSortedIntervals; //260914
+			
 			
 			//startup ---------------------------------------------------------------------
 			
@@ -1639,7 +1640,6 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			{ return e && sameText(PIDModuleFile(pid).fullName, e.fullName); } 
 		}
 	}version(/+$DIDE_REGION+/all) {
-			
 		void installExceptionFilter()
 		{
 			__gshared static installed = false; 
@@ -1749,7 +1749,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			//LOG("Exception filter installed: ", res);
 					
 					
-		} version(/+$DIDE_REGION+/all) {
+		} 
+		version(/+$DIDE_REGION+/all) {
 			version(/+$DIDE_REGION Windows errors+/all)
 			{
 				//Windows error handling //////////////////////////////
@@ -3457,15 +3458,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B4EF59F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B52E59F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B5B759F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B5F659F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B66159F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B6D659F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B6A059F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B71559F156A1})); 
 						+/
 					+/
 				+/
@@ -3569,6 +3570,189 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+Note: The decoder is here: /+$DIDE_LOC DIDE\didebuilder.d+/ / struct ExternalCodeIES+/
 		} 
 	}
+	
+}version(/+$DIDE_REGION+/all) {
+	version(/+$DIDE_REGION Multithread+/all)
+	{
+		auto futureFetch(alias fun, RT = ReturnType!fun)(RT* data = null)
+		{
+			__gshared RT[] queue; 
+			
+			RT[] res; 
+			synchronized
+			{
+				if(data)
+				{ queue ~= *data; }
+				else
+				{
+					res = queue; 
+					queue = []; 
+				}
+			} 	
+			return res; 
+		} 
+		
+		void future(alias fun, Args...)(Args args)
+		{
+			static void futureWrapper(alias fun, Args...)(Args args)
+			{
+				auto res = fun(args); 
+				futureFetch!fun(&res); 
+			} 
+			
+			taskPool.put(task!(futureWrapper!(fun, Args))(args)); 
+		} 
+		
+		class MainThreadJob
+		{
+			/+
+				Note: This can be used to implement the following:
+				In a worker thread there are image processung stuff that 
+				can only be done in the main thread inside the onPaint event.
+				Implementation details for this example:
+				   /+
+					Code: onPaintJob = new MainThreadJob; 
+					...
+					onPaint()
+					{
+						...
+						onPaintJob.update; 
+						...
+					} 
+				+/   /+
+					Code: worker()
+					{
+						...
+						onPaintJob({ process; }); 
+						...
+					} 
+				+/   
+			+/
+			
+			private void delegate()[] queue; 
+			
+			//queue work and wait for it to finish.
+			void opCall(void delegate() f)
+			{
+				synchronized(this) queue ~= f; 
+				while(1)
+				{
+					sleep(3); 
+					bool found; 
+					synchronized(this) found = queue.canFind(f); 
+					if(!found) break; 
+				}
+			} 
+			
+			//must call this periodically from the main thread
+			void update()
+			{
+				synchronized(this)
+				{
+					void delegate() job; 
+					if(queue.length)
+					{
+						job = queue.front; 
+						job(); /+
+							other requests will wait, but not a problem 
+							because there is only one thread serving the queue
+						+/
+						queue.popFront; //it's also the signal to the caller
+					}
+				} 
+			} 
+		} 
+		
+		struct PROBE
+		{
+			string name; 
+			bool logZeroOnExit; 
+			
+			static struct Event {
+				DateTime when; 
+				float value; 
+				ubyte coreIdx; 
+				this(float value)
+				{
+					when = now; 
+					this.value = value; 
+					coreIdx = cast(ubyte) GetCurrentProcessorNumber; 
+				} 
+			} 
+			
+			__gshared Event[][string] events, recordedEvents; 
+			__gshared bool enabled; 
+			
+			static start()
+			{
+				synchronized(typeid(typeof(this)))
+				{
+					recordedEvents = null; 
+					events = null; 
+					enabled = true; 
+				} 
+			} 
+			
+			static stop()
+			{
+				synchronized(typeid(typeof(this)))
+				{
+					enabled = false; 
+					recordedEvents = events; 
+					events = null; 
+					LOG(recordedEvents.length); 
+				} 
+			} 
+			
+			static void log(string name, float value)
+			{
+				if(!enabled) return; 
+				synchronized(typeid(typeof(this)))
+				{ events[name] ~= Event(value); } 
+			} 
+			
+			/+
+				+ Register an event which have a duration.
+					It will log '1' immediatelly.
+					Later when the scope exits, it will log '0'.
+			+/
+			static if(0)
+			{
+				this(string name)
+				{
+					this.name = name; 
+					logZeroOnExit = true; 
+					log(name, 1); 
+				} 
+				
+				/// Register a current value for of name
+				this(string name, float value)
+				{ log(name, value); } 
+			}
+			else
+			{
+				static auto opCall(string name)
+				{
+					PROBE p; 
+					p.name = name; 
+					p.logZeroOnExit = true; 
+					log(name, 1); 
+					return p; 
+				} 
+				
+				static void opCall(string name, float value)
+				{ log(name, value); } 
+			}
+			~this()
+			{
+				if(logZeroOnExit)
+				log(name, 0); 
+			} 
+			
+			
+		} 
+	}
+	
 	
 }
 version(/+$DIDE_REGION Numeric+/all)
@@ -4008,301 +4192,583 @@ version(/+$DIDE_REGION Numeric+/all)
 		{ Uint24 res; res.set_safe(x); return res; } 
 		
 		
-	}version(/+$DIDE_REGION Bitwise+/all)
-	{
-		public import core.bitop : rol, ror,
-		bitCount = popcnt	,
-		//	bitSwap	= bitswap	,
-		byteSwap	= bswap	,
-		bitScan	= bsf	,
-		bitScan_reverse	= bsr	; 
-		
-		bool getBit(T)(T a, size_t idx)
-		=> a.BITS[idx]; 
-		
-		T setBit(T)(T a, size_t idx, bool v=true)
-		{ a.BITS[idx] = v; return a; }  T clearBit(T)(T a, size_t idx)
-		=> setBit(a, idx, false); 
-		
-		T getBits(T)(T a, size_t idx, size_t cnt)
-		=> a.BITS[idx .. idx+cnt].as!T; 
-		
-		T setBits(T)(T a, size_t idx, size_t cnt, T v)
-		{ a.BITS[idx .. idx+cnt] = v; return a; }  T clearBits(T)(T a, size_t idx, size_t cnt)
-		=> setBits(a, idx, cnt, 0); 
-		
-		struct BitsRefSlice(D)
-		{
-			private { D* pdata; size_t st, en; } 
-			
-			size_t opDollar(size_t pos)()
-			=> D.sizeof*8 - st; 
-			
-			bool opIndex()(size_t i)
-			=> BitsRefIndex!D(pdata, this.st+i).get; 
-			bool opIndexAssign()(bool v, size_t i)
-			=> BitsRefIndex!D(pdata, this.st+i).set(v); 
-			
-			auto opSlice(size_t st, size_t en)
-			=> BitsRefSlice!D(pdata, this.st+st, this.st+en); auto opSlice()
-			=> this[0..$]; 
-			
-			auto as(T)()
-			=> BitsValSlice!D(*pdata, st, en).as!T; 
-			auto as(T)(in T val)
-			{
-				const 	msk0 	= ((1UL<<(en-st))-1),
-					msk 	= msk0<<st; 
-				(*pdata) = (cast(D)((*pdata)&~msk | ((val&msk0)<<st))); 
-				return val; 
-			} 
-			
-			auto get() => BitsValSlice!D(*pdata, st, en).get; 
-			
-			auto access() => get; 
-			auto access(T)(in T val) => as = val; 
-			alias this = access; 
-		} struct BitsValSlice(D)
-		{
-			private { D data; size_t st, en; } 
-			
-			size_t opDollar(size_t pos)()
-			=> D.sizeof*8 - st; 
-			
-			bool opIndex()(size_t i)
-			=> BitsValIndex!D(data, this.st+i).get; 
-			
-			auto opSlice(size_t st, size_t en)
-			=> BitsValSlice!D(data, this.st+st, this.st+en); auto opSlice()
-			=> this[0..$]; 
-			
-			auto as(T)()
-			{
-				auto res = (cast(T)((data>>st) & ((1UL<<(en-st))-1))); 
-				static if(isIntegral!T && isSigned!T)
-				{
-					const sh = T.sizeof*8 - (en-st); 
-					res = (cast(T)((cast(T)(res<<sh))>>sh)); /+sign extend+/
-				}
-				return res; 
-			} 
-			
-			static if(D.sizeof<=4)	{ alias DefaultType = uint; }
-			else	{ alias DefaultType = ulong; }
-			auto get() => as!DefaultType; 
-			alias this = get; 
-		} 
-		
-		struct BitsRefIndex(D)
-		{
-			private { D* pdata; size_t idx; } 
-			
-			bool get() => BitsValIndex!D(*pdata, idx).get; 
-			bool set(bool v)
-			{
-				*pdata = (cast(D)((*pdata)&~(1UL<<idx)|((cast(D)(v))<<idx))); 
-				return v; 
-			} 
-			
-			bool access() => get; 
-			bool access(bool v) => set(v); 
-			alias this = access; 
-		} struct BitsValIndex(D)
-		{
-			private { D data; size_t idx; } 
-			
-			bool get() => !!((data>>idx)&1); 
-			alias this = get; 
-		} 
-		
-		auto BITS(D)(ref D data)
-		{
-			static if(__traits(compiles, data = data))	return BitsRefSlice!D(&data, 0, D.sizeof*8); 
-			else	return BitsValSlice!D(data, 0, D.sizeof*8); 
-		} 
-		auto BITS(D)(D data)
-		=> BitsValSlice!D(data, 0, D.sizeof*8); 
-		
-		bool test_bits()
-		{
-			{
-				ubyte b = 0x55; 	enforce(b.BITS[4..8]==5); 
-				b.BITS[4..8] = -1; 	enforce(b.BITS[]==0xF5); 
-				enforce(b.BITS[].as!int==-11); 
-				enforce((0x696).BITS[4..$].as!ubyte==0x69); 
-			}
-			
-			static foreach(T; AliasSeq!(byte, ubyte, short, ushort, int, uint, long, ulong))
-			{
-				{
-					enum nbits = T.sizeof*8; 
-					alias U = Unsigned!T; 
-					
-					/+ --- readonly (rvalue) mode --- +/
-					{
-						auto rd = (cast(T)0xAA).BITS; 
-						enforce(rd[0] == false); 
-						enforce(rd[1] == true); 
-						enforce(rd[nbits-1] == (nbits==8)); 
-						enforce(rd[].as!U == cast(U)0xAA); 
-						enforce(rd[0..4].as!U == cast(U)0xA); 
-						enforce(rd[4..8].as!U == cast(U)0xA); 
-						enforce((cast(T)0xAA).BITS[].as!U == cast(U)0xAA); 
-					}
-					
-					/+ --- readwrite (ref) mode --- +/
-					{
-						T w; 
-						w.BITS[0] = true; 
-						enforce(w.BITS[0] == true); 
-						enforce(w.BITS[1] == false); 
-						enforce(w == 1); 
-						w.BITS[0] = false; 
-						enforce(w == 0); 
-						
-						w.BITS[nbits-1] = true; 
-						enforce(w.BITS[nbits-1] == true); 
-						enforce(w.BITS[].as!U == (cast(U)1 << (nbits-1))); 
-						w.BITS[nbits-1] = false; 
-						enforce(w == 0); 
-						
-						w.BITS[0..4] = cast(T)0xF; 
-						enforce(w.BITS[0..4].as!U == cast(U)0xF); 
-						enforce(w.BITS[].as!U == cast(U)0xF); 
-						w.BITS[0..4] = cast(T)0; 
-						enforce(w == 0); 
-						
-						w.BITS[] = cast(T)0xA5; 
-						enforce(w.BITS[].as!U == cast(U)0xA5); 
-					}
-				}
-			}
-			
-			{
-				byte b = cast(byte)0xF0; 
-				enforce(b.BITS[4..8].as!byte == -1); 
-				enforce(b.BITS[4..8].as!int == -1); 
-				enforce(b.BITS[4..8].as!long == -1); 
-				enforce(b.BITS[4..8].as!ubyte == 0xF); 
-				
-				short s = short.min; 
-				enforce(s.BITS[15] == true); 
-				enforce(s.BITS[].as!short == short.min); 
-				enforce(s.BITS[].as!int == short.min); 
-				enforce(s.BITS[].as!ushort == 0x8000); 
-				
-				int i = int.min; 
-				enforce(i.BITS[31] == true); 
-				enforce(i.BITS[].as!int == int.min); 
-				enforce(i.BITS[].as!uint == 0x8000_0000); 
-				
-				long l = long.min; 
-				enforce(l.BITS[63] == true); 
-				enforce(l.BITS[].as!long == long.min); 
-				enforce(l.BITS[].as!ulong == 0x8000_0000_0000_0000); 
-			}
-			
-			
-			return true; 
-		} 
-		
-		
-		
-		T swapBits(T)(in T a) if(isIntegral!T || isSomeChar!T)
-		{
-			import core.bitop : bitswap; 
-			static if(T.sizeof==8)
-			{ return (cast(T)(bitswap((cast(ulong)(a))))); }
-			else static if(T.sizeof==4)
-			{ return (cast(T)(bitswap((cast(uint)(a))))); }
-			else static if(T.sizeof==2)
-			{ return (cast(T)(bitswap((cast(uint)(a)))>>>16)); }
-			else static if(T.sizeof==1)
-			{
-				static immutable table = iota(0x100).map!((a)=>(cast(ubyte)(bitswap(a)>>>24))).array; 
-				return (cast(T)(table[(cast(ubyte)(a))])); 
-			}
-		} 
-		
-		auto swapBits(R)(R input) if(isInputRange!R)
-		=> input.map!swapBits.array; 
-		
-		ushort byteSwap(ushort a)
-		{ return cast(ushort)((a>>>8)|(a<<8)); } 
-		short byteSwap(short a)
-		{ return cast(short)((a>>>8)|(a<<8)); } 
-		
-		wstring byteSwap(wstring s)
-		{ return cast(wstring)((cast(ushort[])s).map!(c => cast(wchar)(c.byteSwap)).array); } 
-		dstring byteSwap(dstring s)
-		{ return cast(dstring)((cast(uint  [])s).map!(c => cast(dchar)(c.byteSwap)).array); } 
-		
-		T maskLowBits(T)(T a)
-		{
-			//Opt: slow
-			foreach_reverse(i; 0..T.sizeof*8) if(a.getBit(i)) return (cast(T)1<<(i+1))-1; 
-			return 0; 
-		} 
-		
-		int countHighZeroBits(T)(T a)
-		{
-			//Opt: slow
-			foreach_reverse(int i; 0..T.sizeof*8) if(a.getBit(i)) return cast(int)T.sizeof*8-1-i; 
-			return T.sizeof*8; 
-		} 
-		
-		T vec_sel	(T)(T a, T b, T c)
-		{ return c &  a | ~c	& b; } //CAL style
-		T bitselect	(T)(T a, T b, T c)
-		{ return a & ~c |	b & c; } //OCL style
-		T bfi	(T)(T a, T b, T c)
-		{ return a &  b | ~a & c; } //GCN style
-		
-		auto bitalign(uint lo, uint hi, uint ofs)
-		{ return cast(uint)((lo | (cast(ulong)hi<<32))>>ofs); } 
-		
-		
-		uint hammondDist(uint a, uint b)
-		{ return bitCount(a^b); } 
-		
-		int boolMask(in bool[] arr...)
-		{ return arr.enumerate.map!(a => a.value<<a.index).sum; } 
-		
-		bool toggle(ref bool b)
-		{ b = !b; return b; } 
-		
-		T negate(T)(ref T a)
-		{ a = -a; return a; } 
-		
-		T binaryToGray(T)(T x)
-		{ return x ^ (x >> 1); } 
-		
-		//?. optional chaining operator
-		
-		/+
-			auto ifNotNull(alias fun, T)(T p)
-			{
-				if(p !is null) return unaryFun!fun(p); 
-				else return typeof(return).init; 
-			} 
-			
-			auto ifNotNull(alias fun, T, U)(T p, lazy U def)
-			{
-				if(p !is null) return unaryFun!fun(p); 
-				else return def; 
-			} 
-		+/
-		
-		
-		
-		pragma(inline, true) ref T bitCast(T, S)(ref S value) if (T.sizeof <= S.sizeof)
-		=> *cast(T*) &value; 
-		
-		auto inc(T, V)(in T a, in V b=1) { return (cast(T)(a+b)); } 
-		auto dec(T, V)(in T a, in V b=1) { return inc(a, -b); } 
-		auto succ(T)(in T a) { return inc(a); } 
-		auto pred(T)(in T a) { return dec(a); } 
 	}
+}version(/+$DIDE_REGION Bitwise+/all)
+{
+	public import core.bitop : rol, ror,
+	bitCount = popcnt	,
+	//	bitSwap	= bitswap	,
+	byteSwap	= bswap	,
+	bitScan	= bsf	,
+	bitScan_reverse	= bsr	; 
+	
+	bool getBit(T)(T a, size_t idx)
+	=> a.BITS[idx]; 
+	
+	T setBit(T)(T a, size_t idx, bool v=true)
+	{ a.BITS[idx] = v; return a; }  T clearBit(T)(T a, size_t idx)
+	=> setBit(a, idx, false); 
+	
+	T getBits(T)(T a, size_t idx, size_t cnt)
+	=> a.BITS[idx .. idx+cnt].as!T; 
+	
+	T setBits(T)(T a, size_t idx, size_t cnt, T v)
+	{ a.BITS[idx .. idx+cnt] = v; return a; }  T clearBits(T)(T a, size_t idx, size_t cnt)
+	=> setBits(a, idx, cnt, 0); 
+	
+	T swapBits(T)(in T a) if(isIntegral!T || isSomeChar!T)
+	{
+		import core.bitop : bitswap; 
+		static if(T.sizeof==8)
+		{ return (cast(T)(bitswap((cast(ulong)(a))))); }
+		else static if(T.sizeof==4)
+		{ return (cast(T)(bitswap((cast(uint)(a))))); }
+		else static if(T.sizeof==2)
+		{ return (cast(T)(bitswap((cast(uint)(a)))>>>16)); }
+		else static if(T.sizeof==1)
+		{
+			static immutable table = iota(0x100).map!((a)=>(cast(ubyte)(bitswap(a)>>>24))).array; 
+			return (cast(T)(table[(cast(ubyte)(a))])); 
+		}
+	} 
+	
+	auto swapBits(R)(R input) if(isInputRange!R)
+	=> input.map!swapBits.array; 
+	
+	ushort byteSwap(ushort a)
+	{ return cast(ushort)((a>>>8)|(a<<8)); } 
+	short byteSwap(short a)
+	{ return cast(short)((a>>>8)|(a<<8)); } 
+	
+	wstring byteSwap(wstring s)
+	{ return cast(wstring)((cast(ushort[])s).map!(c => cast(wchar)(c.byteSwap)).array); } 
+	dstring byteSwap(dstring s)
+	{ return cast(dstring)((cast(uint  [])s).map!(c => cast(dchar)(c.byteSwap)).array); } 
+	
+	T maskLowBits(T)(T a)
+	{
+		//Opt: slow
+		foreach_reverse(i; 0..T.sizeof*8) if(a.getBit(i)) return (cast(T)1<<(i+1))-1; 
+		return 0; 
+	} 
+	
+	int countHighZeroBits(T)(T a)
+	{
+		//Opt: slow
+		foreach_reverse(int i; 0..T.sizeof*8) if(a.getBit(i)) return cast(int)T.sizeof*8-1-i; 
+		return T.sizeof*8; 
+	} 
+	
+	T vec_sel	(T)(T a, T b, T c)
+	{ return c &  a | ~c	& b; } //CAL style
+	T bitselect	(T)(T a, T b, T c)
+	{ return a & ~c |	b & c; } //OCL style
+	T bfi	(T)(T a, T b, T c)
+	{ return a &  b | ~a & c; } //GCN style
+	
+	auto bitalign(uint lo, uint hi, uint ofs)
+	{ return cast(uint)((lo | (cast(ulong)hi<<32))>>ofs); } 
+	
+	
+	uint hammondDist(uint a, uint b)
+	{ return bitCount(a^b); } 
+	
+	int boolMask(in bool[] arr...)
+	{ return arr.enumerate.map!(a => a.value<<a.index).sum; } 
+	
+	bool toggle(ref bool b)
+	{ b = !b; return b; } 
+	
+	T negate(T)(ref T a)
+	{ a = -a; return a; } 
+	
+	T binaryToGray(T)(T x)
+	{ return x ^ (x >> 1); } 
+	
+	//?. optional chaining operator
+	
+	/+
+		auto ifNotNull(alias fun, T)(T p)
+		{
+			if(p !is null) return unaryFun!fun(p); 
+			else return typeof(return).init; 
+		} 
+		
+		auto ifNotNull(alias fun, T, U)(T p, lazy U def)
+		{
+			if(p !is null) return unaryFun!fun(p); 
+			else return def; 
+		} 
+	+/
+	
+	
+	
+	pragma(inline, true) ref T bitCast(T, S)(ref S value) if (T.sizeof <= S.sizeof)
+	=> *cast(T*) &value; 
+	
+	auto inc(T, V)(in T a, in V b=1) { return (cast(T)(a+b)); } 
+	auto dec(T, V)(in T a, in V b=1) { return inc(a, -b); } 
+	auto succ(T)(in T a) { return inc(a); } 
+	auto pred(T)(in T a) { return dec(a); } 
+	void fillBits(E)(E[] data, size_t st, size_t en, bool value)
+	{ fillBits(data.ptr, data.sizeBytes, st, en, value); } 
+	
+	void fillBits(void* p, size_t lenBytes, size_t st, size_t en, bool value)
+	{
+		/*
+			Fill bits [st, en) in a byte buffer with `value` (0 or 1).
+			Bits are numbered from 0 (LSB of p[0]) upward.
+			- p	: pointer to buffer
+			- lenBytes 	: buffer size in bytes
+			- st	: starting bit (inclusive)
+			- en	: ending bit (exclusive)
+			- value	: true => set bits to 1, false => clear to 0
+		*/
+		
+		if(p is null || en <= st) return; 
+		
+		const size_t totalBits = lenBytes * 8; 
+		if(st >= totalBits) return; 
+		if(en > totalBits) en = totalBits; 
+		
+		ubyte* buf = cast(ubyte*) p; 
+		
+		size_t firstByte = st >> 3; 
+		size_t lastByte  = (en - 1) >> 3; 
+		uint   startBit  = cast(uint)(st & 7); 
+		uint   endBit    = cast(uint)((en - 1) & 7); // inclusive
+		
+		// Build mask for the first byte: bits [startBit .. 7]
+		ubyte headMask = cast(ubyte)(0xFFu << startBit); 
+		// Build mask for the last byte: bits [0 .. endBit]
+		ubyte tailMask = cast(ubyte)(endBit == 7 ? 0xFFu : ((1u << (endBit + 1)) - 1u)); 
+		
+		if(firstByte == lastByte)
+		{
+			ubyte mask = cast(ubyte)(headMask & tailMask); 
+			if(value) buf[firstByte] |=  mask; 
+			else buf[firstByte] &= ~mask; 
+			return; 
+		}
+		
+		// First byte
+		if(value) buf[firstByte] |=  headMask; 
+		else buf[firstByte] &= ~headMask; 
+		
+		// Middle bytes - use wide stores for speed
+		size_t midStart = firstByte + 1; 
+		size_t midEnd   = lastByte;       // exclusive
+		size_t midCount = midEnd - midStart; 
+		
+		if(midCount > 0)
+		{
+			const ulong word = value ? ulong.max : 0UL; 
+			ubyte* q = buf + midStart; 
+			
+			// Head-align to 8-byte boundary
+			while(midCount > 0 && (cast(size_t) q & 7) != 0)
+			{
+				*q++ = cast(ubyte) word; 
+				--midCount; 
+			}
+			
+			// 16-byte stores
+			while(midCount >= 16)
+			{
+				// Manually written 16-byte store; compiler emits movups/movdqu
+				q[0..16] = cast(ubyte)(value ? 0xFF : 0x00); 
+				q += 16; 
+				midCount -= 16; 
+			}
+			
+			// 8-byte stores
+			while(midCount >= 8)
+			{
+				*cast(ulong*) q = word; 
+				q += 8; 
+				midCount -= 8; 
+			}
+			
+			// Tail bytes
+			while(midCount > 0)
+			{
+				*q++ = cast(ubyte) word; 
+				--midCount; 
+			}
+		}
+		
+		// Last byte
+		if(value) buf[lastByte] |=  tailMask; 
+		else buf[lastByte] &= ~tailMask; 
+	} 
+	
+	void test_fillBits()
+	{
+		enum N = 40; ubyte[N] buf, expected; 
+		
+		// Fixed bit-range fills: (start, end) alternating 1/0.
+		// Value is set by parity of the iteration index.
+		static immutable ushort[2][16] ranges = 
+			[
+			[  0,   8], [  3,  17], [ 16,  16], [  5,  23],
+			[ 24,  48], [ 40,  72], [ 63,  65], [  1, 319],
+			[ 64, 128], [128, 200], [200, 256], [100, 100],
+			[  7, 311], [ 50, 150], [ 33,  99], [256, 320],
+		]; 
+		
+		// Seed the buffer with a known pattern.
+		foreach(i; 0 .. N) buf[i] = cast(ubyte)(0xA5 ^ (i * 37)); 
+		
+		// Apply fills and build expected in parallel using a per-bit reference.
+		expected[] = buf[]; 
+		foreach(k, r; ranges)
+		{
+			size_t st = r[0], en = r[1]; 
+			bool value = (k & 1) == 0;   // alternate 1, 0, 1, 0, ...
+			fillBits(buf[], st, en, value); 
+			foreach(i; st .. en)
+			{
+				if(i >= N * 8) break; 
+				if(value) expected[i >> 3] |=  cast(ubyte)(1u << (i & 7)); 
+				else expected[i >> 3] &= cast(ubyte)~(1u << (i & 7)); 
+			}
+			
+			enforce(equal(buf[], expected[])); 
+		}
+	} 
+	struct BitsRefSlice(D)
+	{
+		//this is for lvalues
+		private { D* pdata; size_t st, en; } 
+		
+		size_t opDollar(size_t pos)()
+		=> D.sizeof*8 - st; 
+		
+		bool opIndex()(size_t i)
+		=> BitsRefIndex!D(pdata, this.st+i).get; 
+		bool opIndexAssign()(bool v, size_t i)
+		=> BitsRefIndex!D(pdata, this.st+i).set(v); 
+		
+		auto opSlice(size_t st, size_t en)
+		=> BitsRefSlice!D(pdata, this.st+st, this.st+en); auto opSlice()
+		=> this[0..$]; 
+		
+		auto as(T)()
+		=> BitsValSlice!D(*pdata, st, en).as!T; 
+		auto as(T)(in T val)
+		{
+			const 	w 	= en - st,
+				msk0 	= w >= 64 ? ulong.max : ((1UL << w) - 1),
+				msk 	= msk0<<st; 
+			(*pdata) = (cast(D)((*pdata)&~msk | ((val&msk0)<<st))); 
+			return val; 
+		} 
+		
+		auto get() => BitsValSlice!D(*pdata, st, en).get; 
+		
+		auto access() => get; 
+		auto access(T)(in T val) => as = val; 
+		alias this = access; 
+	} struct BitsValSlice(D)
+	{
+		//this is for readonly rvalues
+		private { D data; size_t st, en; } 
+		
+		size_t opDollar(size_t pos)()
+		=> D.sizeof*8 - st; 
+		
+		bool opIndex()(size_t i)
+		=> BitsValIndex!D(data, this.st+i).get; 
+		
+		auto opSlice(size_t st, size_t en)
+		=> BitsValSlice!D(data, this.st+st, this.st+en); auto opSlice()
+		=> this[0..$]; 
+		
+		auto as(T)()
+		{
+			const 	w 	= en - st,
+				mask 	= w >= 64 ? ulong.max : ((1UL << w) - 1); 
+			auto res = (cast(T)((data>>st) & mask)); 
+			static if(isIntegral!T && isSigned!T)
+			{
+				const sh = T.sizeof*8 - (en-st); 
+				res = (cast(T)((cast(T)(res<<sh))>>sh)); /+sign extend+/
+			}
+			return res; 
+		} 
+		
+		static if(D.sizeof<=4)	{ alias DefaultType = uint; }
+		else	{ alias DefaultType = ulong; }
+		auto get() => as!DefaultType; 
+		alias this = get; 
+	} 
+	
+	struct BitsRefIndex(D)
+	{
+		//this is for lvalues
+		private { D* pdata; size_t idx; } 
+		
+		bool get() => BitsValIndex!D(*pdata, idx).get; 
+		bool set(bool v)
+		{
+			*pdata = (cast(D)((*pdata)&~(1UL<<idx)|((cast(D)(v))<<idx))); 
+			return v; 
+		} 
+		
+		bool access() => get; 
+		bool access(bool v) => set(v); 
+		alias this = access; 
+	} struct BitsValIndex(D)
+	{
+		//this is for readonly rvalues
+		private { D data; size_t idx; } 
+		
+		bool get() => !!((data>>idx)&1); 
+		alias this = get; 
+	} 
+	
+	auto BITS(D)(ref D data) if(!isArray!D)
+	{
+		static if(__traits(compiles, data = data))	return BitsRefSlice!D(&data, 0, D.sizeof*8); 
+		else	return BitsValSlice!D(data, 0, D.sizeof*8); 
+	} 
+	
+	auto BITS(D)(D data) if(!isArray!D)
+	=> BitsValSlice!D(data, 0, D.sizeof*8); 
+	
+	
+	bool test_bits()
+	{
+		{
+			ubyte b = 0x55; 	enforce(b.BITS[4..8]==5); 
+			b.BITS[4..8] = -1; 	enforce(b.BITS[]==0xF5); 
+			enforce(b.BITS[].as!int==-11); 
+			enforce((0x696).BITS[4..$].as!ubyte==0x69); 
+		}
+		
+		static foreach(T; AliasSeq!(byte, ubyte, short, ushort, int, uint, long, ulong))
+		{
+			{
+				enum nbits = T.sizeof*8; 
+				alias U = Unsigned!T; 
+				
+				/+ --- readonly (rvalue) mode --- +/
+				{
+					auto rd = (cast(T)0xAA).BITS; 
+					enforce(rd[0] == false); 
+					enforce(rd[1] == true); 
+					enforce(rd[nbits-1] == (nbits==8)); 
+					enforce(rd[].as!U == cast(U)0xAA); 
+					enforce(rd[0..4].as!U == cast(U)0xA); 
+					enforce(rd[4..8].as!U == cast(U)0xA); 
+					enforce((cast(T)0xAA).BITS[].as!U == cast(U)0xAA); 
+				}
+				
+				/+ --- readwrite (ref) mode --- +/
+				{
+					T w; 
+					w.BITS[0] = true; 
+					enforce(w.BITS[0] == true); 
+					enforce(w.BITS[1] == false); 
+					enforce(w == 1); 
+					w.BITS[0] = false; 
+					enforce(w == 0); 
+					
+					w.BITS[nbits-1] = true; 
+					enforce(w.BITS[nbits-1] == true); 
+					enforce(w.BITS[].as!U == (cast(U)1 << (nbits-1))); 
+					w.BITS[nbits-1] = false; 
+					enforce(w == 0); 
+					
+					w.BITS[0..4] = cast(T)0xF; 
+					enforce(w.BITS[0..4].as!U == cast(U)0xF); 
+					enforce(w.BITS[].as!U == cast(U)0xF); 
+					w.BITS[0..4] = cast(T)0; 
+					enforce(w == 0); 
+					
+					w.BITS[] = cast(T)0xA5; 
+					enforce(w.BITS[].as!U == cast(U)0xA5); 
+				}
+			}
+		}
+		
+		{
+			byte b = cast(byte)0xF0; 
+			enforce(b.BITS[4..8].as!byte == -1); 
+			enforce(b.BITS[4..8].as!int == -1); 
+			enforce(b.BITS[4..8].as!long == -1); 
+			enforce(b.BITS[4..8].as!ubyte == 0xF); 
+			
+			short s = short.min; 
+			enforce(s.BITS[15] == true); 
+			enforce(s.BITS[].as!short == short.min); 
+			enforce(s.BITS[].as!int == short.min); 
+			enforce(s.BITS[].as!ushort == 0x8000); 
+			
+			int i = int.min; 
+			enforce(i.BITS[31] == true); 
+			enforce(i.BITS[].as!int == int.min); 
+			enforce(i.BITS[].as!uint == 0x8000_0000); 
+			
+			long l = long.min; 
+			enforce(l.BITS[63] == true); 
+			enforce(l.BITS[].as!long == long.min); 
+			enforce(l.BITS[].as!ulong == 0x8000_0000_0000_0000); 
+		}
+		
+		
+		return true; 
+	} 
+	
+	
+	
+	struct BitsArrayRefSlice(D)
+	{
+		enum isReadOnly = is(D == const) || is(D == immutable); 
+		private {
+			D[]* pdata; size_t st, en; 
+			ref asArray() => *pdata; 
+		} 
+		
+		size_t opDollar(size_t pos)()
+		=> asArray.length * (D.sizeof*8) - st; 
+		
+		bool opIndex()(size_t i)
+		=> BitsArrayRefIndex!D(pdata, this.st+i).get; 
+		bool opIndex()(size_t i, bool def)
+		=> BitsArrayRefIndex!D(pdata, this.st+i).def(def); 
+		
+		auto opSlice(size_t st, size_t en)
+		=> BitsArrayRefSlice!D(pdata, this.st+st, this.st+en); auto opSlice()
+		=> this[0..$]; 
+		
+		static if(!isReadOnly)
+		{
+			bool opIndexAssign()(bool v, size_t i)
+			=> BitsArrayRefIndex!D(pdata, this.st+i).set(v); 
+			
+			void fill(bool val)
+			{ fillBits(asArray, st, en, val); } 
+		}
+	} struct BitsArrayValSlice(D)
+	{
+		enum isReadOnly = is(D == const) || is(D == immutable); 
+		private {
+			D[] data; size_t st, en; 
+			auto asArray() => data; 
+		} 
+		
+		size_t opDollar(size_t pos)()
+		=> asArray.length * (D.sizeof*8) - st; 
+		
+		bool opIndex()(size_t i)
+		=> BitsArrayValIndex!D(data, this.st+i).get; 
+		bool opIndex()(size_t i, bool def)
+		=> BitsArrayValIndex!D(data, this.st+i).def(def); 
+		
+		auto opSlice(size_t st, size_t en)
+		=> BitsArrayValSlice!D(data, this.st+st, this.st+en); auto opSlice()
+		=> this[0..$]; 
+		
+		static if(!isReadOnly)
+		{
+			bool opIndexAssign()(bool v, size_t i)
+			=> BitsArrayValIndex!D(data, this.st+i).set(v); 
+			
+			void fill(bool val)
+			{ fillBits(asArray, st, en, val); } 
+		}
+	} 
+	
+	struct BitsArrayRefIndex(D)
+	{
+		enum isReadOnly = is(D == const) || is(D == immutable); 
+		private {
+			D[]* pdata; size_t idx; 
+			auto asUByteArray() => (cast(ubyte[])(*pdata)); 
+		} 
+		
+		bool def(bool d) => ((idx/8 < asUByteArray.length)?(get):(d)); 
+		bool get() => asUByteArray[idx/8].BITS[idx%8]; 
+		bool access() => get; 
+		
+		static if(!isReadOnly)
+		{
+			bool set(bool v)
+			{ asUByteArray[idx/8].BITS[idx%8] = v; return v; } 
+			bool access(bool v) => set(v); 
+		}
+		alias this = access; 
+	} struct BitsArrayValIndex(D)
+	{
+		enum isReadOnly = is(D == const) || is(D == immutable); 
+		private {
+			D[] data; size_t idx; 
+			auto asUByteArray() => (cast(ubyte[])(data)); 
+		} 
+		
+		bool def(bool d) => ((idx/8 < asUByteArray.length)?(get):(d)); 
+		bool get() => asUByteArray[idx/8].BITS[idx%8]; 
+		bool access() => get; 
+		
+		static if(!isReadOnly)
+		{
+			bool set(bool v)
+			{ asUByteArray[idx/8].BITS[idx%8] = v; return v; } 
+			bool access(bool v) => set(v); 
+		}
+		alias this = access; 
+	} 
+	
+	auto BITS(D)(ref D data) if(isDynamicArray!D)
+	{
+		static if(
+			__traits(compiles, data = data)&&
+			__traits(compiles, data[0] = data[0])
+		)	return BitsArrayRefSlice!(ElementType!D)(&data, 0, D.sizeof*8); 
+		else	return BitsArrayValSlice!(ElementType!D)(data, 0, D.sizeof*8); 
+	} 
+	
+	auto BITS(D)(D data) if(isDynamicArray!D)
+	=> BitsArrayValSlice!(ElementType!D)(data, 0, D.sizeof*8); 
+	
+	auto BITS(D)(auto ref D data) if(isStaticArray!D)
+	=> BitsArrayValSlice!(ElementType!D)(data[], 0, D.sizeof*8); 
+	
+	void test_bitsArray()
+	{
+		ubyte[] a = [0xAA, 0x55, 0x40]; 
+		a.BITS[8..16].fill(1); enforce(a.equal([0xAA, 0xFF, 0x40])); 
+		
+		ubyte[3] b; b[] = a; 
+		b.BITS[8..16].fill(0); enforce(b[].equal([0xAA, 0, 0x40])); 
+	} 
+	
+	
+	/+
+		Note: /+H1: BITS+/ – bit‑field access & manipulation cheat‑sheet
+		==================================================
+		Works on: static array, dynamic array, signed/unsigned integer.
+		Also works in readonly mode (even if array elements are readonly).
+		
+		Access
+		------
+			/+Highlighted: (123).BITS[1..4].as!int+/	 slice as int
+			/+Highlighted: var.BITS[$-1] = 1;+/	 single bit set
+			/+Highlighted: var.BITS[idx, 0]+/	 get bit; 0 if out of bounds (default)
+		
+		Default type if not specified: ulong or uint (smallest that fits).
+		
+		Efficient fill
+		--------------
+			/+Highlighted: { ubyte[10] arr; arr.BITS[10..$].fill(1); }+/	 10..100x faster than for+setBit()
+	+/
+	
+	
+	
+	
+	
+	
 }version(/+$DIDE_REGION Arrays Ranges+/all)
 {
 	/// Arrays ops///////////////////////////////////////////////
@@ -4903,7 +5369,8 @@ version(/+$DIDE_REGION Numeric+/all)
 			auto res = StringBlockRange(str, maxBlockSize); 
 					
 			return res; 
-		} /*
+		} 
+		/*
 			void testByLineBlock(){
 						auto file = File(tempPath, `testByLineBlocks.tmp`);
 						scope(exit) file.remove;
@@ -4932,7 +5399,156 @@ version(/+$DIDE_REGION Numeric+/all)
 					}
 		*/
 		
-	}
+	}
+	struct SortedIntervals(Flag!"sorted" sorted=Yes.sorted, string predLow="a[0]", string predHigh="a[1]", R)
+	if(isForwardRange!R)
+	{
+		R intervals; 
+		
+		auto canFind_linear(string predFound="true", string predNotFound="false", T)(T val)
+		{
+			foreach(a; intervals)
+			{
+				if(val<mixin(predLow)) { static if(sorted) break; else continue; }
+				if(val>mixin(predHigh)) continue; 
+				return mixin(predFound); 
+			}
+			return mixin(predNotFound); 
+		} 
+		
+		auto canFind_binary(string predFound="true", string predNotFound="false", T)(T val)
+		{
+			static assert(sorted, "Binary search cannot work on unsorted intervals."); 
+			if(intervals.length)
+			{
+				bool tooLow() { ref a = intervals[0]; return val < mixin(predLow); } 
+				bool tooHigh() { ref a = intervals[$-1]; return val > mixin(predHigh); } 
+				
+				if(!tooLow && !tooHigh)
+				{
+					size_t low = 0, high = intervals.length - 1; 
+					while(low <= high)
+					{
+						size_t mid = (low + high) >> 1; 
+						ref a = intervals[mid]; 
+						if(val < mixin(predLow))
+						high = mid - 1; 
+						else if(mixin(predHigh) < val)
+						low = mid + 1; 
+						else
+						{
+							assert(
+								mixin(predLow) <= val && 
+								val <= mixin(predHigh)
+							); 
+							return mixin(predFound); 
+						}
+					}
+				}
+			}
+			return mixin(predNotFound); 
+		} 
+		
+		Unit[] makeBitmask(Unit = ulong)(size_t shift=0)
+		if (isUnsigned!Unit)
+		{
+			if(intervals.empty) return []; 
+			
+			enum bitsPerUnit = Unit.sizeof * 8; 
+			size_t maxBit; 
+			{
+				static if(sorted)	{ const maxIdx = intervals.length-1; }
+				else	{
+					auto extractHigh(ElementType R) => mixin(predHigh); 
+					const maxIdx = intervals.maxIndex!
+						((a, b)=>(extractHigh(a) < extractHigh(b))); 
+				}
+				
+				ref a = intervals[maxIdx]; 
+				maxBit = mixin(predHigh) >> shift; 
+			}
+			
+			auto result = new Unit[maxBit / bitsPerUnit + 1]; 
+			foreach(a; intervals)
+			{
+				const 	lo 	= mixin(predLow),
+					hi 	= mixin(predHigh),
+					start 	= (cast(size_t)(lo >> shift)),
+					end 	= (cast(size_t)(hi >> shift)); 
+				
+				enforce(
+					lo==(start << shift), 
+					i"low range cannot be shifted: $(shift) $(lo.format!"0x%X")".text
+				); 
+				enforce(
+					hi==(end << shift) + ((1<<shift)-1),
+					i"high range cannot be shifted: $(shift) $(hi.format!"0x%X")".text
+				); 
+				
+				result.BITS[start .. end+1].fill(1); 
+			}
+			
+			return result; 
+		} 
+	} 
+	
+	
+	auto sortedIntervals(string predLow="a[0]", string predHigh="a[1]", R)(R r) if(isForwardRange!R)
+	{ return SortedIntervals!(Yes.sorted, predLow, predHigh, R)(r); } 
+	
+	auto unsortedIntervals(string predLow="a[0]", string predHigh="a[1]", R)(R r) if(isForwardRange!R)
+	{ return SortedIntervals!(No.sorted, predLow, predHigh, R)(r); } 
+	
+	void test_findInSortedIntervals()
+	{
+		const int[2][] intervals = [[0, 5], [10, 15], [20, 25]]; 
+		const intervals2 = intervals.retro.array; 
+		
+		void doit(bool delegate(int) fun)
+		{
+			foreach(i; [0, 5, 10, 15, 20, 21, 25]) enforce(fun(i)); 
+			foreach(i; [-5, -1, 6, 9, 16, 26, 27]) enforce(!fun(i)); 
+		} 
+		
+		auto srt = intervals.sortedIntervals, unsrt = intervals2.unsortedIntervals; 
+		
+		doit(((i)=>(unsrt.canFind_linear(i)))); 
+		doit(((i)=>(srt.canFind_linear(i)))); 
+		doit(((i)=>(srt.canFind_binary(i)))); 
+		
+		enforce(srt.makeBitmask!ubyte.equal(only(0x3F, 0xFC, 0xF0, 0x03))); 
+		enforce(srt.makeBitmask!ushort.equal(only(0xFC3F, 0x3F0))); 
+		enforce(srt.makeBitmask!ulong.equal(only(0x3F0FC3F))); 
+		enforce(srt.makeBitmask!ulong(1).equal(only(0x1CE7))); 
+	} /+
+		Note: /+H1: SortedIntervals+/ – interval search cheat‑sheet
+		=============================================
+		Input: sorted or unsorted intervals (numbers, times, anything flexible).
+		
+		Choose data
+		-----------
+			/+Code: arr.unsortedIntervals+/
+			/+Code: arr.sortedIntervals+/
+		
+		Extract start/end
+		-----------------
+			/+Code: SortedIntervals!(["a.begin", "a.end"])+/	 inclusive ended
+			/+Code: SortedIntervals!(["a.begin", "a.end-1"])+/	 exclusive ended
+		
+		Algorithms
+		----------
+			/+Code: unsortedIntervals.canFind_linear(idx)+/
+			/+Code: sortedIntervals.canFind_linear(idx)+/
+			/+Code: sortedIntervals.canFind_binary(idx)+/
+			/+Code: intervals.makeBitmask!Unit(shr)+/ Unit: ubyte..ulong, optional shift
+		
+		Bitmask lookup
+		--------------
+			/+Code: bitmask.BITS[idx, 0]+/ returns 0 if out of bounds
+			/+Code: intervals.makeBitmask!uint(2).BITS[idx>>2, 0]+/	 right shift by 2
+		
+			Shift requirement: every start/end must shift losslessly.
+	+/
 	
 }version(/+$DIDE_REGION RNG+/all)
 {
@@ -5992,187 +6608,27 @@ version(/+$DIDE_REGION Numeric+/all)
 		} 
 		
 	}
-}version(/+$DIDE_REGION Multithread+/all)
-{
-	auto futureFetch(alias fun, RT = ReturnType!fun)(RT* data = null)
-	{
-		__gshared RT[] queue; 
-		
-		RT[] res; 
-		synchronized
-		{
-			if(data)
-			{ queue ~= *data; }
-			else
-			{
-				res = queue; 
-				queue = []; 
-			}
-		} 	
-		return res; 
-	} 
-	
-	void future(alias fun, Args...)(Args args)
-	{
-		static void futureWrapper(alias fun, Args...)(Args args)
-		{
-			auto res = fun(args); 
-			futureFetch!fun(&res); 
-		} 
-		
-		taskPool.put(task!(futureWrapper!(fun, Args))(args)); 
-	} 
-	
-	class MainThreadJob
-	{
-		/+
-			Note: This can be used to implement the following:
-			In a worker thread there are image processung stuff that 
-			can only be done in the main thread inside the onPaint event.
-			Implementation details for this example:
-			   /+
-				Code: onPaintJob = new MainThreadJob; 
-				...
-				onPaint()
-				{
-					...
-					onPaintJob.update; 
-					...
-				} 
-			+/   /+
-				Code: worker()
-				{
-					...
-					onPaintJob({ process; }); 
-					...
-				} 
-			+/   
-		+/
-		
-		private void delegate()[] queue; 
-		
-		//queue work and wait for it to finish.
-		void opCall(void delegate() f)
-		{
-			synchronized(this) queue ~= f; 
-			while(1)
-			{
-				sleep(3); 
-				bool found; 
-				synchronized(this) found = queue.canFind(f); 
-				if(!found) break; 
-			}
-		} 
-		
-		//must call this periodically from the main thread
-		void update()
-		{
-			synchronized(this)
-			{
-				void delegate() job; 
-				if(queue.length)
-				{
-					job = queue.front; 
-					job(); /+
-						other requests will wait, but not a problem 
-						because there is only one thread serving the queue
-					+/
-					queue.popFront; //it's also the signal to the caller
-				}
-			} 
-		} 
-	} 
-	
-	struct PROBE
-	{
-		string name; 
-		bool logZeroOnExit; 
-		
-		static struct Event {
-			DateTime when; 
-			float value; 
-			ubyte coreIdx; 
-			this(float value)
-			{
-				when = now; 
-				this.value = value; 
-				coreIdx = cast(ubyte) GetCurrentProcessorNumber; 
-			} 
-		} 
-		
-		__gshared Event[][string] events, recordedEvents; 
-		__gshared bool enabled; 
-		
-		static start()
-		{
-			synchronized(typeid(typeof(this)))
-			{
-				recordedEvents = null; 
-				events = null; 
-				enabled = true; 
-			} 
-		} 
-		
-		static stop()
-		{
-			synchronized(typeid(typeof(this)))
-			{
-				enabled = false; 
-				recordedEvents = events; 
-				events = null; 
-				LOG(recordedEvents.length); 
-			} 
-		} 
-		
-		static void log(string name, float value)
-		{
-			if(!enabled) return; 
-			synchronized(typeid(typeof(this)))
-			{ events[name] ~= Event(value); } 
-		} 
-		
-		/+
-			+ Register an event which have a duration.
-				It will log '1' immediatelly.
-				Later when the scope exits, it will log '0'.
-		+/
-		static if(0)
-		{
-			this(string name)
-			{
-				this.name = name; 
-				logZeroOnExit = true; 
-				log(name, 1); 
-			} 
-			
-			/// Register a current value for of name
-			this(string name, float value)
-			{ log(name, value); } 
-		}
-		else
-		{
-			static auto opCall(string name)
-			{
-				PROBE p; 
-				p.name = name; 
-				p.logZeroOnExit = true; 
-				log(name, 1); 
-				return p; 
-			} 
-			
-			static void opCall(string name, float value)
-			{ log(name, value); } 
-		}
-		~this()
-		{
-			if(logZeroOnExit)
-			log(name, 0); 
-		} 
-		
-		
-	} 
 }version(/+$DIDE_REGION ASM+/all)
 {
+	/+
+		H1: ⚠🚨☠💀⚠ DO NOT MOVE this away from here!!! ⚠💀☠🚨⚠
+		 ══════════════════════════════════════════════════════════════
+		  ⚠  WARNING  ⚠  WARNING  ⚠  WARNING  ⚠  WARNING  ⚠
+		  ☠  MOVING THIS WILL BREAK EVERYTHING  ☠
+		  💀  DANGER  💀  DANGER  💀  DANGER  💀  DANGER  💀
+		  ☣  BIOHAZARD  ☣  BIOHAZARD  ☣  BIOHAZARD  ☣
+		  🚨  DO NOT TOUCH  🚨  DO NOT TOUCH  🚨  DO NOT TOUCH  🚨
+		 ══════════════════════════════════════════════════════════════
+		 ⚠🚨☠💀☣️ DO NOT MOVE this away from here!!! ☣💀☠🚨⚠
+		 ══════════════════════════════════════════════════════════════
+		
+		/+
+			Todo: If it is moved next to "Multithread" region, it will cause a linker error.
+			I guess  because shared static this sucks ass.
+		+/
+	+/
+	
+	
 	public import ldc.llvmasm; 
 	public import core.simd : byte16, double2, float4, int4, long2, short8, ubyte16, uint4, ulong2, ushort8, void16,
 	loadUnaligned,  prefetch, storeUnaligned, SimdVector = Vector /+Because there is het.math.Vector already defined.+/; 
@@ -6191,7 +6647,7 @@ version(/+$DIDE_REGION Numeric+/all)
 	
 	mixin template asmFunctions()
 	{
-		//must import as a mixin, to enable inlining in each module. As LTO sucks.
+		//Todo: must import as a mixin, to enable inlining in each module. As LTO sucks.
 		
 		//example: 	__asm("movl $1, $0", "=*m,r", &i, j);
 		
@@ -8657,118 +9113,80 @@ version(/+$DIDE_REGION Containers+/all)
 		*/
 		
 	}version(/+$DIDE_REGION+/all) {
-		auto findInSortedIntervals_linear(string[] scripts = ["a[0]", "a[1]", "true", "false"], R, T)(R intervals, T val)
-		if(isInputRange!R)
-		{
-			foreach(a; intervals)
-			{
-				if(val<mixin(scripts[0])) break; 
-				if(val>mixin(scripts[1])) continue; 
-				return mixin(scripts[2]); 
-			}
-			return mixin(scripts[3]); 
-		} 
-		
-		
-		
 		/+
 			unicodeStandardLetter: these can be stylized by fonts, such as Arial/Consolas/Times. 
 			Other characters are usually the same, eg.: Chineese chars.
 			contains ranges of latin, greek, cyril, armenian chars. These can have different representations across each fonts
 		+/
-		static immutable wchar[2][] unicodeStandardLetterRanges = 
+		static immutable wchar[2][] UnicodeStandardLetterRanges = 
 		[
 			[0x0020, 0x024F], [0x0370, 0x058F], [0x1C80, 0x1C8F], [0x1E00, 0x1FFF], [0x2C60, 0x2C7F], 
 			[0x2DE0, 0x2DFF], [0xA640, 0xA69F], [0xA720, 0xA7FF], [0xAB30, 0xAB6F] 
 		]; 
 		
-		bool isUnicodeStandardLetter(dchar ch)
-		=> findInSortedIntervals_linear!(["a[0]", "a[1]", "true", "false"])(unicodeStandardLetterRanges, ch); 
-		
-		bool isUnicodeStandardLetter_binary(dchar c)
+		private
 		{
-			static immutable wchar[2][] ALPHA_TABLE = 
-				[
-				[0x0020, 0x024F], [0x0370, 0x058F], [0x1C80, 0x1C8F], [0x1E00, 0x1FFF],
-				[0x2C60, 0x2C7F], [0x2DE0, 0x2DFF], [0xA640, 0xA69F], [0xA720, 0xA7FF],
-				[0xAB30, 0xAB6F] 
-			]; 
+			//here are variouns optimization practices
 			
-			size_t high = ALPHA_TABLE.length - 1; 
-			//Shortcut search if c is out of range
-			size_t low = (c < ALPHA_TABLE[0][0] || ALPHA_TABLE[high][1] < c) ? high + 1 : 0; 
-			//Binary search
-			while(low <= high)
+			bool isUnicodeStandardLetter_linearUnsorted(dchar ch)
+			=> UnicodeStandardLetterRanges.unsortedIntervals.canFind_linear(ch); 
+			
+			bool isUnicodeStandardLetter_linearSorted(dchar ch)
+			=> UnicodeStandardLetterRanges.sortedIntervals.canFind_linear(ch); 
+			
+			bool isUnicodeStandardLetter_binary(dchar ch)
+			=> UnicodeStandardLetterRanges.sortedIntervals.canFind_binary(ch); 
+			
+			bool isUnicodeStandardLetter_bitmask(dchar ch)
 			{
-				size_t mid = (low + high) >> 1; 
-				if(c < ALPHA_TABLE[mid][0])
-				high = mid - 1; 
-				else if(ALPHA_TABLE[mid][1] < c)
-				low = mid + 1; 
-				else
-				{
-					assert(ALPHA_TABLE[mid][0] <= c && c <= ALPHA_TABLE[mid][1]); 
-					return true; 
-				}
-			}
-			return false; 
-		} 
-		
-		bool isUnicodeStandardLetter_fast(dchar ch)
-		{
-			static immutable unicodeStandardLetterRanges = 
+				__gshared ulong[] bitmask; 
+				if(!bitmask) { bitmask = UnicodeStandardLetterRanges.sortedIntervals.makeBitmask!ulong(4); }
+				return bitmask.BITS[ch>>4, /+default:+/false]; 
+			} 
+			
+			bool isUnicodeStandardLetter_bitmaskHardWired(dchar ch)
+			{
+				static immutable ulong[] UnicodeStandardLetterRanges_bitmap_sh4 = 
 				[
-				[0x0020, 0x024F], [0x0370, 0x058F], [0x1C80, 0x1C8F], [0x1E00, 0x1FFF],
-				[0x2C60, 0x2C7F], [0x2DE0, 0x2DFF], [0xA640, 0xA69F], [0xA720, 0xA7FF],
-				[0xAB30, 0xAB6F] 
-			]; 
-			
-			
-			static immutable bitMask = 
-				((){
-				ulong[] res; 
-				foreach(const r; unicodeStandardLetterRanges)
-				{
-					foreach(b; r[0]>>4 .. (r[1]>>4)+1UL)
-					{
-						enforce((r[0] & 15)==0); enforce((r[1] & 15)==15); 
-						const i = b / 64; const reqLen = i+1; 
-						if(res.length < reqLen) res.length = reqLen; 
-						res[i] = res[i].setBit(b % 64); 
-					}
-				}
-				return res; 
-			}()); 
-			
-			const b = (cast(uint)(ch))>>4, i = b / 64; 
-			bool res = i<bitMask.length && bitMask[i].getBit(b % 64); 
-			return res; 
+					18410715414129541116, 33554431, 0, 0, 0, 0, 0, 18446744069414584576, 0, 0, 0, 
+					3221225664, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
+					0, 0, 0, 0, 18445622503129743360, 33776997205278720
+				]; 
+				return UnicodeStandardLetterRanges_bitmap_sh4.BITS[ch>>4, /+default:+/false]; 
+			} 
 		} 
 		
+		public alias isUnicodeStandardLetter = isUnicodeStandardLetter_bitmaskHardWired; 
 		
-		/+
-			Todo: make benchmarks and a generator for this lookup operation.  Also a way of testing, verification of correctness.
-			/+
-				Code: auto _間=init間; 
-				foreach(i; 0..65536) (cast(dchar)(i)).isUnicodeStandardLetter; ((0x4163159F156A1).檢((update間(_間)))); 
-				foreach(i; 0..65536) (cast(dchar)(i)).isUnicodeStandardLetter_fast; ((0x416A759F156A1).檢((update間(_間)))); 
-				foreach(i; 0..65536) (cast(dchar)(i)).isUnicodeStandardLetter_binary; ((0x4171F59F156A1).檢((update間(_間)))); 
-				auto img = image2D(
-					ivec2(256, 256), 
-					iota(2^^16).map!((i)=>((((cast(dchar)(i)).isUnicodeStandardLetter_binary)?(clWhite):(clBlack))))
-				); 
-				((0x417F259F156A1).檢((update間(_間)))); 
-				img.saveTo(`c:\dl\isUnicodeStandardLetter_binary.bmp`); 
+		version(/+$DIDE_REGION+/none) {
+			void benchmark_isUnicodeStandardLetter()
+			{
+				auto _間=init間; 
+				static bool res; res = false; 
+				enum N = 16<<16; 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x4485859F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x448DA59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x4495659F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x449D359F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x44A5959F156A1).檢((update間(_間)))); 
 				
 				/+
 					benchmarks:
-					isUnicodeStandardLetter: 	0.49 ms
-					isUnicodeStandardLetter_fast: 	0.12 ms
-					isUnicodeStandardLetter_binary: 	0.29 ms
+					7.9, 6.5, 4.8, 2.5, 1.3
 				+/
-			+/
-		+/
-		
+				
+				//final verification
+				foreach(ch; 0..65536) {
+					const a = ch.isUnicodeStandardLetter_linearUnsorted; 
+					enforce(a==ch.isUnicodeStandardLetter_linearSorted); 
+					enforce(a==ch.isUnicodeStandardLetter_binary); 
+					enforce(a==ch.isUnicodeStandardLetter_bitmask); 
+					enforce(a==ch.isUnicodeStandardLetter_bitmaskHardWired); 
+				}
+			} 
+		}
+		
+		
 		
 		enum UnicodePrivateUserAreaBase = 0xF0000; 
 		
@@ -8778,68 +9196,48 @@ version(/+$DIDE_REGION Containers+/all)
 			return false; 
 		} 
 		
+		static immutable wchar[2][] UniversalAlphaRanges =
+		[
+			[0x00AA, 0x00AA],[0x00B5, 0x00B5],[0x00B7, 0x00B7],[0x00BA, 0x00BA],[0x00C0, 0x00D6],[0x00D8, 0x00F6],[0x00F8, 0x01F5],[0x01FA, 0x0217],
+			[0x0250, 0x02A8],[0x02B0, 0x02B8],[0x02BB, 0x02BB],[0x02BD, 0x02C1],[0x02D0, 0x02D1],[0x02E0, 0x02E4],[0x037A, 0x037A],[0x0386, 0x0386],
+			[0x0388, 0x038A],[0x038C, 0x038C],[0x038E, 0x03A1],[0x03A3, 0x03CE],[0x03D0, 0x03D6],[0x03DA, 0x03DA],[0x03DC, 0x03DC],[0x03DE, 0x03DE],
+			[0x03E0, 0x03E0],[0x03E2, 0x03F3],[0x0401, 0x040C],[0x040E, 0x044F],[0x0451, 0x045C],[0x045E, 0x0481],[0x0490, 0x04C4],[0x04C7, 0x04C8],
+			[0x04CB, 0x04CC],[0x04D0, 0x04EB],[0x04EE, 0x04F5],[0x04F8, 0x04F9],[0x0531, 0x0556],[0x0559, 0x0559],[0x0561, 0x0587],[0x05B0, 0x05B9],
+			[0x05BB, 0x05BD],[0x05BF, 0x05BF],[0x05C1, 0x05C2],[0x05D0, 0x05EA],[0x05F0, 0x05F2],[0x0621, 0x063A],[0x0640, 0x0652],[0x0660, 0x0669],
+			[0x0670, 0x06B7],[0x06BA, 0x06BE],[0x06C0, 0x06CE],[0x06D0, 0x06DC],[0x06E5, 0x06E8],[0x06EA, 0x06ED],[0x06F0, 0x06F9],[0x0901, 0x0903],
+			[0x0905, 0x0939],[0x093D, 0x094D],[0x0950, 0x0952],[0x0958, 0x0963],[0x0966, 0x096F],[0x0981, 0x0983],[0x0985, 0x098C],[0x098F, 0x0990],
+			[0x0993, 0x09A8],[0x09AA, 0x09B0],[0x09B2, 0x09B2],[0x09B6, 0x09B9],[0x09BE, 0x09C4],[0x09C7, 0x09C8],[0x09CB, 0x09CD],[0x09DC, 0x09DD],
+			[0x09DF, 0x09E3],[0x09E6, 0x09F1],[0x0A02, 0x0A02],[0x0A05, 0x0A0A],[0x0A0F, 0x0A10],[0x0A13, 0x0A28],[0x0A2A, 0x0A30],[0x0A32, 0x0A33],
+			[0x0A35, 0x0A36],[0x0A38, 0x0A39],[0x0A3E, 0x0A42],[0x0A47, 0x0A48],[0x0A4B, 0x0A4D],[0x0A59, 0x0A5C],[0x0A5E, 0x0A5E],[0x0A66, 0x0A6F],
+			[0x0A74, 0x0A74],[0x0A81, 0x0A83],[0x0A85, 0x0A8B],[0x0A8D, 0x0A8D],[0x0A8F, 0x0A91],[0x0A93, 0x0AA8],[0x0AAA, 0x0AB0],[0x0AB2, 0x0AB3],
+			[0x0AB5, 0x0AB9],[0x0ABD, 0x0AC5],[0x0AC7, 0x0AC9],[0x0ACB, 0x0ACD],[0x0AD0, 0x0AD0],[0x0AE0, 0x0AE0],[0x0AE6, 0x0AEF],[0x0B01, 0x0B03],
+			[0x0B05, 0x0B0C],[0x0B0F, 0x0B10],[0x0B13, 0x0B28],[0x0B2A, 0x0B30],[0x0B32, 0x0B33],[0x0B36, 0x0B39],[0x0B3D, 0x0B43],[0x0B47, 0x0B48],
+			[0x0B4B, 0x0B4D],[0x0B5C, 0x0B5D],[0x0B5F, 0x0B61],[0x0B66, 0x0B6F],[0x0B82, 0x0B83],[0x0B85, 0x0B8A],[0x0B8E, 0x0B90],[0x0B92, 0x0B95],
+			[0x0B99, 0x0B9A],[0x0B9C, 0x0B9C],[0x0B9E, 0x0B9F],[0x0BA3, 0x0BA4],[0x0BA8, 0x0BAA],[0x0BAE, 0x0BB5],[0x0BB7, 0x0BB9],[0x0BBE, 0x0BC2],
+			[0x0BC6, 0x0BC8],[0x0BCA, 0x0BCD],[0x0BE7, 0x0BEF],[0x0C01, 0x0C03],[0x0C05, 0x0C0C],[0x0C0E, 0x0C10],[0x0C12, 0x0C28],[0x0C2A, 0x0C33],
+			[0x0C35, 0x0C39],[0x0C3E, 0x0C44],[0x0C46, 0x0C48],[0x0C4A, 0x0C4D],[0x0C60, 0x0C61],[0x0C66, 0x0C6F],[0x0C82, 0x0C83],[0x0C85, 0x0C8C],
+			[0x0C8E, 0x0C90],[0x0C92, 0x0CA8],[0x0CAA, 0x0CB3],[0x0CB5, 0x0CB9],[0x0CBE, 0x0CC4],[0x0CC6, 0x0CC8],[0x0CCA, 0x0CCD],[0x0CDE, 0x0CDE],
+			[0x0CE0, 0x0CE1],[0x0CE6, 0x0CEF],[0x0D02, 0x0D03],[0x0D05, 0x0D0C],[0x0D0E, 0x0D10],[0x0D12, 0x0D28],[0x0D2A, 0x0D39],[0x0D3E, 0x0D43],
+			[0x0D46, 0x0D48],[0x0D4A, 0x0D4D],[0x0D60, 0x0D61],[0x0D66, 0x0D6F],[0x0E01, 0x0E3A],[0x0E40, 0x0E5B],[0x0E81, 0x0E82],[0x0E84, 0x0E84],
+			[0x0E87, 0x0E88],[0x0E8A, 0x0E8A],[0x0E8D, 0x0E8D],[0x0E94, 0x0E97],[0x0E99, 0x0E9F],[0x0EA1, 0x0EA3],[0x0EA5, 0x0EA5],[0x0EA7, 0x0EA7],
+			[0x0EAA, 0x0EAB],[0x0EAD, 0x0EAE],[0x0EB0, 0x0EB9],[0x0EBB, 0x0EBD],[0x0EC0, 0x0EC4],[0x0EC6, 0x0EC6],[0x0EC8, 0x0ECD],[0x0ED0, 0x0ED9],
+			[0x0EDC, 0x0EDD],[0x0F00, 0x0F00],[0x0F18, 0x0F19],[0x0F20, 0x0F33],[0x0F35, 0x0F35],[0x0F37, 0x0F37],[0x0F39, 0x0F39],[0x0F3E, 0x0F47],
+			[0x0F49, 0x0F69],[0x0F71, 0x0F84],[0x0F86, 0x0F8B],[0x0F90, 0x0F95],[0x0F97, 0x0F97],[0x0F99, 0x0FAD],[0x0FB1, 0x0FB7],[0x0FB9, 0x0FB9],
+			[0x10A0, 0x10C5],[0x10D0, 0x10F6],[0x1E00, 0x1E9B],[0x1EA0, 0x1EF9],[0x1F00, 0x1F15],[0x1F18, 0x1F1D],[0x1F20, 0x1F45],[0x1F48, 0x1F4D],
+			[0x1F50, 0x1F57],[0x1F59, 0x1F59],[0x1F5B, 0x1F5B],[0x1F5D, 0x1F5D],[0x1F5F, 0x1F7D],[0x1F80, 0x1FB4],[0x1FB6, 0x1FBC],[0x1FBE, 0x1FBE],
+			[0x1FC2, 0x1FC4],[0x1FC6, 0x1FCC],[0x1FD0, 0x1FD3],[0x1FD6, 0x1FDB],[0x1FE0, 0x1FEC],[0x1FF2, 0x1FF4],[0x1FF6, 0x1FFC],[0x203F, 0x2040],
+			[0x207F, 0x207F],[0x2102, 0x2102],[0x2107, 0x2107],[0x210A, 0x2113],[0x2115, 0x2115],[0x2118, 0x211D],[0x2124, 0x2124],[0x2126, 0x2126],
+			[0x2128, 0x2128],[0x212A, 0x2131],[0x2133, 0x2138],[0x2160, 0x2182],[0x3005, 0x3007],[0x3021, 0x3029],[0x3041, 0x3093],[0x309B, 0x309C],
+			[0x30A1, 0x30F6],[0x30FB, 0x30FC],[0x3105, 0x312C],[0x4E00, 0x9FA5],[0xAC00, 0xD7A3],
+		]; 
+		
 		/*
-			******************************
-					 * Return !=0 if unicode alpha.
-					 * Use table from C99 Appendix D.
+			* Return !=0 if unicode alpha.
+			* Use table from C99 Appendix D.
 		*/
 		///Copied from: ldc-master\dmd\root\utf.d
 		bool isUniAlpha(dchar c)
-		{
-			static immutable wchar[2][] ALPHA_TABLE =
-			[
-				[0x00AA, 0x00AA],[0x00B5, 0x00B5],[0x00B7, 0x00B7],[0x00BA, 0x00BA],[0x00C0, 0x00D6],[0x00D8, 0x00F6],[0x00F8, 0x01F5],[0x01FA, 0x0217],
-				[0x0250, 0x02A8],[0x02B0, 0x02B8],[0x02BB, 0x02BB],[0x02BD, 0x02C1],[0x02D0, 0x02D1],[0x02E0, 0x02E4],[0x037A, 0x037A],[0x0386, 0x0386],
-				[0x0388, 0x038A],[0x038C, 0x038C],[0x038E, 0x03A1],[0x03A3, 0x03CE],[0x03D0, 0x03D6],[0x03DA, 0x03DA],[0x03DC, 0x03DC],[0x03DE, 0x03DE],
-				[0x03E0, 0x03E0],[0x03E2, 0x03F3],[0x0401, 0x040C],[0x040E, 0x044F],[0x0451, 0x045C],[0x045E, 0x0481],[0x0490, 0x04C4],[0x04C7, 0x04C8],
-				[0x04CB, 0x04CC],[0x04D0, 0x04EB],[0x04EE, 0x04F5],[0x04F8, 0x04F9],[0x0531, 0x0556],[0x0559, 0x0559],[0x0561, 0x0587],[0x05B0, 0x05B9],
-				[0x05BB, 0x05BD],[0x05BF, 0x05BF],[0x05C1, 0x05C2],[0x05D0, 0x05EA],[0x05F0, 0x05F2],[0x0621, 0x063A],[0x0640, 0x0652],[0x0660, 0x0669],
-				[0x0670, 0x06B7],[0x06BA, 0x06BE],[0x06C0, 0x06CE],[0x06D0, 0x06DC],[0x06E5, 0x06E8],[0x06EA, 0x06ED],[0x06F0, 0x06F9],[0x0901, 0x0903],
-				[0x0905, 0x0939],[0x093D, 0x094D],[0x0950, 0x0952],[0x0958, 0x0963],[0x0966, 0x096F],[0x0981, 0x0983],[0x0985, 0x098C],[0x098F, 0x0990],
-				[0x0993, 0x09A8],[0x09AA, 0x09B0],[0x09B2, 0x09B2],[0x09B6, 0x09B9],[0x09BE, 0x09C4],[0x09C7, 0x09C8],[0x09CB, 0x09CD],[0x09DC, 0x09DD],
-				[0x09DF, 0x09E3],[0x09E6, 0x09F1],[0x0A02, 0x0A02],[0x0A05, 0x0A0A],[0x0A0F, 0x0A10],[0x0A13, 0x0A28],[0x0A2A, 0x0A30],[0x0A32, 0x0A33],
-				[0x0A35, 0x0A36],[0x0A38, 0x0A39],[0x0A3E, 0x0A42],[0x0A47, 0x0A48],[0x0A4B, 0x0A4D],[0x0A59, 0x0A5C],[0x0A5E, 0x0A5E],[0x0A66, 0x0A6F],
-				[0x0A74, 0x0A74],[0x0A81, 0x0A83],[0x0A85, 0x0A8B],[0x0A8D, 0x0A8D],[0x0A8F, 0x0A91],[0x0A93, 0x0AA8],[0x0AAA, 0x0AB0],[0x0AB2, 0x0AB3],
-				[0x0AB5, 0x0AB9],[0x0ABD, 0x0AC5],[0x0AC7, 0x0AC9],[0x0ACB, 0x0ACD],[0x0AD0, 0x0AD0],[0x0AE0, 0x0AE0],[0x0AE6, 0x0AEF],[0x0B01, 0x0B03],
-				[0x0B05, 0x0B0C],[0x0B0F, 0x0B10],[0x0B13, 0x0B28],[0x0B2A, 0x0B30],[0x0B32, 0x0B33],[0x0B36, 0x0B39],[0x0B3D, 0x0B43],[0x0B47, 0x0B48],
-				[0x0B4B, 0x0B4D],[0x0B5C, 0x0B5D],[0x0B5F, 0x0B61],[0x0B66, 0x0B6F],[0x0B82, 0x0B83],[0x0B85, 0x0B8A],[0x0B8E, 0x0B90],[0x0B92, 0x0B95],
-				[0x0B99, 0x0B9A],[0x0B9C, 0x0B9C],[0x0B9E, 0x0B9F],[0x0BA3, 0x0BA4],[0x0BA8, 0x0BAA],[0x0BAE, 0x0BB5],[0x0BB7, 0x0BB9],[0x0BBE, 0x0BC2],
-				[0x0BC6, 0x0BC8],[0x0BCA, 0x0BCD],[0x0BE7, 0x0BEF],[0x0C01, 0x0C03],[0x0C05, 0x0C0C],[0x0C0E, 0x0C10],[0x0C12, 0x0C28],[0x0C2A, 0x0C33],
-				[0x0C35, 0x0C39],[0x0C3E, 0x0C44],[0x0C46, 0x0C48],[0x0C4A, 0x0C4D],[0x0C60, 0x0C61],[0x0C66, 0x0C6F],[0x0C82, 0x0C83],[0x0C85, 0x0C8C],
-				[0x0C8E, 0x0C90],[0x0C92, 0x0CA8],[0x0CAA, 0x0CB3],[0x0CB5, 0x0CB9],[0x0CBE, 0x0CC4],[0x0CC6, 0x0CC8],[0x0CCA, 0x0CCD],[0x0CDE, 0x0CDE],
-				[0x0CE0, 0x0CE1],[0x0CE6, 0x0CEF],[0x0D02, 0x0D03],[0x0D05, 0x0D0C],[0x0D0E, 0x0D10],[0x0D12, 0x0D28],[0x0D2A, 0x0D39],[0x0D3E, 0x0D43],
-				[0x0D46, 0x0D48],[0x0D4A, 0x0D4D],[0x0D60, 0x0D61],[0x0D66, 0x0D6F],[0x0E01, 0x0E3A],[0x0E40, 0x0E5B],[0x0E81, 0x0E82],[0x0E84, 0x0E84],
-				[0x0E87, 0x0E88],[0x0E8A, 0x0E8A],[0x0E8D, 0x0E8D],[0x0E94, 0x0E97],[0x0E99, 0x0E9F],[0x0EA1, 0x0EA3],[0x0EA5, 0x0EA5],[0x0EA7, 0x0EA7],
-				[0x0EAA, 0x0EAB],[0x0EAD, 0x0EAE],[0x0EB0, 0x0EB9],[0x0EBB, 0x0EBD],[0x0EC0, 0x0EC4],[0x0EC6, 0x0EC6],[0x0EC8, 0x0ECD],[0x0ED0, 0x0ED9],
-				[0x0EDC, 0x0EDD],[0x0F00, 0x0F00],[0x0F18, 0x0F19],[0x0F20, 0x0F33],[0x0F35, 0x0F35],[0x0F37, 0x0F37],[0x0F39, 0x0F39],[0x0F3E, 0x0F47],
-				[0x0F49, 0x0F69],[0x0F71, 0x0F84],[0x0F86, 0x0F8B],[0x0F90, 0x0F95],[0x0F97, 0x0F97],[0x0F99, 0x0FAD],[0x0FB1, 0x0FB7],[0x0FB9, 0x0FB9],
-				[0x10A0, 0x10C5],[0x10D0, 0x10F6],[0x1E00, 0x1E9B],[0x1EA0, 0x1EF9],[0x1F00, 0x1F15],[0x1F18, 0x1F1D],[0x1F20, 0x1F45],[0x1F48, 0x1F4D],
-				[0x1F50, 0x1F57],[0x1F59, 0x1F59],[0x1F5B, 0x1F5B],[0x1F5D, 0x1F5D],[0x1F5F, 0x1F7D],[0x1F80, 0x1FB4],[0x1FB6, 0x1FBC],[0x1FBE, 0x1FBE],
-				[0x1FC2, 0x1FC4],[0x1FC6, 0x1FCC],[0x1FD0, 0x1FD3],[0x1FD6, 0x1FDB],[0x1FE0, 0x1FEC],[0x1FF2, 0x1FF4],[0x1FF6, 0x1FFC],[0x203F, 0x2040],
-				[0x207F, 0x207F],[0x2102, 0x2102],[0x2107, 0x2107],[0x210A, 0x2113],[0x2115, 0x2115],[0x2118, 0x211D],[0x2124, 0x2124],[0x2126, 0x2126],
-				[0x2128, 0x2128],[0x212A, 0x2131],[0x2133, 0x2138],[0x2160, 0x2182],[0x3005, 0x3007],[0x3021, 0x3029],[0x3041, 0x3093],[0x309B, 0x309C],
-				[0x30A1, 0x30F6],[0x30FB, 0x30FC],[0x3105, 0x312C],[0x4E00, 0x9FA5],[0xAC00, 0xD7A3],
-			]; 
-			
-			size_t high = ALPHA_TABLE.length - 1; 
-			//Shortcut search if c is out of range
-			size_t low = (c < ALPHA_TABLE[0][0] || ALPHA_TABLE[high][1] < c) ? high + 1 : 0; 
-			//Binary search
-			while(low <= high)
-			{
-				size_t mid = (low + high) >> 1; 
-				if(c < ALPHA_TABLE[mid][0])
-				high = mid - 1; 
-				else if(ALPHA_TABLE[mid][1] < c)
-				low = mid + 1; 
-				else
-				{
-					assert(ALPHA_TABLE[mid][0] <= c && c <= ALPHA_TABLE[mid][1]); 
-					return true; 
-				}
-			}
-			return false; 
-		} 
+		=> UniversalAlphaRanges.sortedIntervals.canFind_binary(c); 
 		
 		enum TextEncoding	 { ANSI, UTF8	,            UTF32BE,            UTF32LE,	UTF16BE, UTF16LE   } //UTF32 must be checked BEFORE UTF16
 		private const encodingHeaders =	[""	  ,	"\xEF\xBB\xBF", "\x00\x00\xFE\xFF",	"\xFF\xFE\x00\x00", "\xFE\xFF", "\xFF\xFE"]; 
@@ -8913,8 +9311,7 @@ version(/+$DIDE_REGION Containers+/all)
 		} 
 		
 		uint fourCC(string s)
-		{ return s.take(4).enumerate.map!(a => a.value << cast(uint)a.index*8).sum; } 
-		
+		{ return s.take(4).enumerate.map!(a => a.value << cast(uint)a.index*8).sum; } 
 		auto splitDLang(string src, string separ)
 		{
 			auto res = [""]; 
