@@ -2418,7 +2418,7 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 						[q{"scope" },q{(RGB( 50, 250, 189))}],
 						[q{
 							"assert", "break", "continue", "goto", 
-							"goto case", "return", "enforce"
+							"goto case", "return", "enforce", "throw"
 						},q{(RGB(251, 128, 174))}],
 						[q{"auto" },q{(RGB(  0, 255, 255))}],
 					]))
@@ -4297,7 +4297,7 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x2051F899FD657).檢(0x1D64BFDEAC48D)); 
+			((0x20528899FD657).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 

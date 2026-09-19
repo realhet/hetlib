@@ -15,9 +15,34 @@ auto curlGet(string url)
 
 auto curlGet_noThrow(string url)
 {
-	try
-	{ return curlGet(url); }catch(Exception e)
-	{ return "Error: "~e.msg; }
+	try	return curlGet(url); 
+	catch(Exception e)	return "Error: "~e.msg; 
+} 
+
+auto curlPostJson(string url, string body, out string responseBody)
+{
+	import std.net.curl : HTTP; 
+	auto http = HTTP(); 
+	http.url	= url,
+	http.method 	= HTTP.Method.post; 
+	http.addRequestHeader("Content-Type", "application/json"); 
+	http.addRequestHeader("Accept",       "application/json"); 
+	
+	responseBody = ""; 
+	http.onSend = 	((void[] data) {
+		const tmp = body.fetchFrontN(data.length); 
+		data[0..tmp.length] = (cast(void[])(tmp)); 
+		return tmp.length; 
+	}),
+	http.onReceiveHeader = 	((in char[] key, in char[] value){}),
+	http.onReceive = 	((ubyte[] data) {
+		responseBody ~= (cast(string)(data.idup)); 
+		return data.length; 
+	}); 
+	
+	http.perform(No.throwOnError); 
+	
+	return http; 
 } 
 
 struct Request
@@ -25,7 +50,10 @@ struct Request
 	 //this is also the response
 	string query; 
 	string owner; 	//every client is filtered by this. Can get one with identityStr()
-	string category; 	//if not empty, then only the last of this kind is served
+	string category; 	/+
+		- if not "", then only the last request of each category will be served.
+		- if "", then all requests will be server in a sequential order. It can be overloaded.
+	+/
 	bool valid;    //pop returns an invalid if the queue is empty
 	string response, error; 
 	
@@ -47,24 +75,15 @@ synchronized class RequestQueue
 		r.valid = true; 
 		if(r.category!="")
 		{
-				 auto idx = requests.map!(a => a.category==r.category && a.owner==r.owner).countUntil(true); 
-				 if(idx<0)
-			requests ~= r; 
-			else requests[idx] = r; 
-		}else
-		{ requests ~= r; }
+			const idx = requests.map!((a)=>(a.category==r.category && a.owner==r.owner)).countUntil(true); 
+			if(idx<0)	requests ~= r /+append+/; 
+			else	requests[idx] = r /+keep new, ignore the older one+/; 
+		}
+		else { requests ~= r /+always append+/; }
 	} 
 	
 	Request pop()
-	{
-		Request r; 
-		if(!requests.empty)
-		{
-			r = requests[0]; 
-			requests = requests[1 .. $]; 
-		}
-		return r; 
-	} 
+	=> requests.fetchFront; 
 } 
 
 synchronized class ResponseQueue
@@ -72,13 +91,14 @@ synchronized class ResponseQueue
 	private Request[] responses; 
 	
 	void push(Request r)
-	{
-		r.valid = true; 
-		responses ~= r; 
-	} 
+	{ r.valid = true; responses ~= r; } 
 	
 	Request pop(string owner)
 	{
+		/+
+			Todo: What happens with the responses when an owner disappears?
+			Not the memory is simply lost forever.
+		+/
 		Request r; 
 		auto i = responses.map!(a => a.owner==owner).countUntil(true); 
 		
@@ -93,11 +113,9 @@ synchronized class ResponseQueue
 	Request[] popAll(string owner)
 	{
 		Request[] res; 
-		while(1)
-		{
+		while(1) {
 			auto r = pop(owner); 
-			if(!r.valid)
-			break; 
+			if(!r.valid) break; 
 			res ~= r; 
 		}
 		return res; 
@@ -106,86 +124,6 @@ synchronized class ResponseQueue
 	int length() const
 	{ return responses.length.to!int; } 
 } 
-
-struct DigitalSignal
-{
-	private
-	{
-		ubyte _raw; 
-		import std.bitmanip; mixin(
-			bitfields!(
-				 bool, "current"	, 1,
-				 bool, "changed"	, 1,
-				 bool, "displayed",	1,
-				 int , "_dummy"   , 5
-			)
-		); 
-	} 
-	
-	void pulse(bool value)
-	{
-		current = value; 
-		changed = true; 
-	} 
-	
-	void set(bool value)
-	{
-		if(value != current)
-		pulse(value); 
-	} 
-	
-	void opAssign(in bool rhs)
-	{ set(rhs); } 
-	
-	bool get()
-	{
-			displayed = !displayed; 
-		
-		/*
-			if(changed){ displayed = !displayed; changed = false; }
-				   else displayed = current;
-		*/
-		
-			return displayed; 
-	} 
-} 
-
-struct DigitalSignal_smoothed
-{
-	float minDeltaTime = 0.3; //sec
-	
-	private DigitalSignal ds; 
-	private float lastDisplayChanged = 0; 
-	private bool lastDisplayed; 
-	
-	void pulse	(bool after)	
-	{ ds.pulse(after); } 
-	void set	(bool value)	
-	{ ds.set(value); } 
-	void opAssign	(in bool rhs)
-	{ set(rhs); } 
-	
-	bool get(float now)
-	{
-		const dt = now-lastDisplayChanged; 
-		
-		if(dt >= minDeltaTime)
-		{
-			const act  = ds.get; 
-			if(lastDisplayed != act)
-			{
-				lastDisplayed = act; 
-				lastDisplayChanged = now; 
-			}
-		}
-		
-		return lastDisplayed; 
-	} 
-	
-	bool get()
-	{ return get(QPS.value(second)); } //Todo: datetime
-} 
-
 
 class HttpQueue
 {
@@ -208,7 +146,7 @@ class HttpQueue
 	private: 
 		/+
 		Note: here if I use new RequestQueue, then it will be the same shared instance between all HttpQueue classes. 
-				Here I need a separate instance. Terminated and state_ is ok, but newExpression means a global constructor here!!
+		Here I need a separate instance. Terminated and state_ is ok, but newExpression means a global constructor here!!
 	+/
 		shared RequestQueue inbox; 
 		shared ResponseQueue outbox; 
@@ -216,7 +154,10 @@ class HttpQueue
 		shared int terminated = 0; //1= terminate, 2 = ack
 		shared State state_; 
 	
-		static void httpWorker(string name, shared RequestQueue inbox, shared ResponseQueue outbox, shared int* terminated, shared State* state_)
+		static void httpWorker(
+		string name, 	shared RequestQueue inbox, 	shared ResponseQueue outbox, 
+			shared int* terminated, 	shared State* state_
+	)
 	{
 		import core.thread; 
 		Thread.getThis.isDaemon = true; 
@@ -240,13 +181,13 @@ class HttpQueue
 				st.comm = true; 
 				st.commCnt++; 
 				
-				try
-				{
+				try {
 					r.response = curlGet(r.query); 
 					if(log)
 					LOG("Done fetching: ", r.query, QPS.value(second)-t0); 
 					st.error = false; 
-				}catch(Exception e)
+				}
+				catch(Exception e)
 				{
 					if(log)
 					WARN("ERROR fetching: ", r.query, QPS.value(second)-t0, e.msg); 
@@ -255,11 +196,11 @@ class HttpQueue
 					st.errorCnt++; 
 				}
 				
-				if(r.owner ~= "")
-				outbox.push(r); 
+				if(r.owner != "") outbox.push(r); 
 				
 				st.comm = false; 
-			}else
+			}
+			else
 			{
 				st.idle = true; 
 				sleep(1); 
@@ -270,7 +211,6 @@ class HttpQueue
 	
 		struct StatusLedState
 	{
-		 //StatusLedState /////////////////////////////////
 		BinarySignalSmootherNew!4 smComm; 
 		int lastCommCnt; 
 		enum maxTimeOut = 5; //must be high, because CURL is blocking. Even if it's called from different threads.
@@ -330,7 +270,13 @@ class HttpQueue
 	{ inbox.push(Request(url, identityStr(owner), category)); } 
 	
 		void post(string url, string category="")
-	{ request(null, url, category); } 
+	{
+		/+
+			owner is "", so it will forgotten after perform().
+			Not the same as HTTP POST!!!
+		+/
+		request(null, url, category); 
+	} 
 	
 		int pending()
 	{ return outbox.length; } 
@@ -368,8 +314,13 @@ auto globalHttpReceive(T)(in T owner)
 
 void testHttpQueue()
 {
-	const urls = ["google.com", "https://www.w3.org/MarkUp/Test/xhtml-print/20050519/tests/jpeg444.jpg", "https://www.youtube.com/", "will not access because of category"],
-				categories = ["", "", "1", "1"]; 
+	const 	urls = [
+		"google.com", 
+		"https://www.w3.org/MarkUp/Test/xhtml-print/20050519/tests/jpeg444.jpg", 
+		"will not access because of category", 
+		"https://www.youtube.com/"
+	],
+		categories = ["", "", "cat1", "cat1"]; 
 	
 	foreach(i, url; urls)
 	globalHttpRequest("testHttpQueue", url, categories[i]); 
@@ -378,11 +329,10 @@ void testHttpQueue()
 	while(1)
 	foreach(r; globalHttpReceive("testHttpQueue"))
 	{
-			cnt++; 
-			print(r.owner, r.query, r.category, r.error, r.response.length); 
+		cnt++; 
+		print(r.owner, r.query, r.category, r.error, r.response.length); 
 		
-		//safePrint(format(`File #%d arrived. %s %(%x %)`, cnt, r.response[0..min(16, $)], cast(ubyte[])(r.response)[0..min(16, $)]));
-			if(cnt==3)
+		if(cnt==3)
 		{
 			safePrint("http test successful. Press enter to continue"); 
 			readln; 

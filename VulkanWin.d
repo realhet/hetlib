@@ -6147,7 +6147,45 @@ $(V_size+G_size)".text
 						}
 						
 						return sqrt(d0); 
-					} 
+					} /*
+						Todo: Upgrade for a 2 sided cubic bezier surface curve:
+						
+						1. extract the best t value
+						
+						  float bestDist2 = 1e38;
+						  float bestT     = 0.;
+						  ...
+						  // ... inside the loop:
+						  float d2 = dot(uv_to_p, uv_to_p);
+						  if (d2 < bestDist2)
+						  {
+						    bestDist2 = d2;
+						    bestT     = t;
+						  }
+						
+						2. Use bestT to calculate tangent
+						  // --- Sign computation at the winning t ---
+						  // Closest point on curve:
+						  vec2 C = ((a3 * bestT + a2) * bestT + a1) * bestT + a0; // = B(bestT) - uv
+						  // Tangent at bestT:
+						  vec2 T = (3. * a3 * bestT + 2. * a2) * bestT + a1;
+						  // Vector from closest point to query: q - C = -(C)
+						  // (since C = B(bestT) - uv, we have q - B(bestT) = -C)
+						  vec2 V = -C;
+						  // 2D cross product gives the side
+						  float cross_z = T.x * V.y - T.y * V.x;
+						  float dist = sqrt(bestDist2);
+						  return cross_z >= 0. ? dist : -dist; //this way the result can be negative too.
+						
+						3. protect against tangent is near to zero:
+						  float lenT2 = dot(T, T);
+						  float cross_z = (lenT2 > 1e-12) ? (T.x * V.y - T.y * V.x) : 0.;
+						
+						2 options for jigsaw puzzle: 
+						 * sliding window of 4 bezier params: 0.33..0.66 interval with a 
+						    started from single newtonian starting point.
+						* C1 connected beziers like in TTF fonts
+					*/
 				}
 				,
 				cubic_exact =

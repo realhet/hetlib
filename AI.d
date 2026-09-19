@@ -111,7 +111,7 @@ class AiChat
 			Todo: toJson should generate proper JSON string literals. Currently 
 			C literals are used for simplicity.
 		+/; 
-		string[string] responseHeader; 
+		//string[string] responseHeader; 
 		
 		//prepare curl
 		auto http = HTTP(); 
@@ -120,14 +120,21 @@ class AiChat
 		http.method 	= HTTP.Method.post,
 		http.url 	= chat.apiUrl,
 		http.onSend 	= ((void[] data) {
-			auto m = cast(void[]) msg; 
-			size_t length = m.length > data.length ? data.length : m.length; 
-			if(length == 0) return 0; 
-			data[0 .. length] = m[0 .. length]; 
-			msg = msg[length..$]; 
-			return length; 
+			const tmp = msg.fetchFrontN(data.length); 
+			data[0..tmp.length] = (cast(void[])(tmp)); 
+			return tmp.length; 
+			
+			version(/+$DIDE_REGION+/none) {
+				//before 260919
+				auto m = cast(void[]) msg; 
+				size_t length = m.length > data.length ? data.length : m.length; 
+				if(length == 0) return 0; 
+				data[0 .. length] = m[0 .. length]; 
+				msg = msg[length..$]; 
+				return length; 
+			}
 		}),
-		http.onReceiveHeader 	= ((in char[] key, in char[] value) { responseHeader[key.idup] = value.idup; }),
+		http.onReceiveHeader 	= ((in char[] key, in char[] value) {/+responseHeader[key.idup] = value.idup; +/}),
 		http.onReceive 	= ((ubyte[] data) {
 			if(!chat.workerPending)
 			{

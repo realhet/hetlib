@@ -125,6 +125,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			//hetlib imports
 			public import het.math; 
+			import het.parser; //Todo: this is a problem. It is needed for the json reader only.
 			
 			//Windows imports
 			public import core.sys.windows.windows : 
@@ -226,6 +227,8 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			het.math.unittest_main; //1ms
 			
+			auto _間=init間; initializeKeywordDictionaries; ((0x308859F156A1).檢((update間(_間)))); /+20ms (!!!)+//+Todo: this is bad that it's not inside parser!!!+/
+			
 			const s1 = "hello", s2 = "Nobody inspects the spammish repetition"; 
 			enforce(xxh32(s1)==0xfb0077f9); 
 			enforce(xxh32(s2, 123456) == 0xc2845cee); 
@@ -294,7 +297,6 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		shared static this() {
 			cast()appStarted = now; 
 			cast()appStartedDay = appStarted.localDayStart; 
-			het.parser.initializeKeywordDictionaries; 
 		} 
 		
 		void hiddenConsole(void delegate() a) { console.hide; console(a); } 
@@ -2734,20 +2736,6 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			res ~= P.fieldDeclarations ~ "\n"; 
 			if(hasChildren) res ~= format!"mixin SmartParentTemplate; \n"; 
 			if(hasParent) res ~= format!"mixin SmartChildTemplate!%s; \n"(P.names[0]); 
-			version(/+$DIDE_REGION+/none) {
-				res ~= format!"this(%s){ %s static if(__traits(compiles, { _construct; })) _construct; %s%s}\n"
-					(
-					P.paramDeclarations, P.fieldInitializations, 
-					hasParent ? "_thisChildCreated;" : "",
-					customConstructor
-				); 
-				res ~= format!"~this(){ %s %s static if(__traits(compiles, { _destruct; })) _destruct; }\n"
-					(
-					hasChildren ? "_thisParentDestroying;" : "",
-					hasParent ? "_thisChildDestroying;" : "",
-				); 
-			}
-			
 			res ~= iq{
 				this($(P.paramDeclarations))
 				{
@@ -2766,41 +2754,6 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			return res; 
 		} 
 		
-		version(/+$DIDE_REGION+/none) {
-			version(/+$DIDE_REGION+/none) {
-				mixin template SmartClass(string fieldDefs, Flag!"hasChildren" hasChildren = No.hasChildren, string customConstructor = "")
-				{ mixin(generateSmartClassCode!(fieldDefs, hasChildren, customConstructor)); } 
-				
-				mixin template SmartClass(string fieldDefs, string customConstructor, Flag!"hasChildren" hasChildren = No.hasChildren)
-				{ mixin(generateSmartClassCode!(fieldDefs, hasChildren, customConstructor)); } 
-				
-				mixin template SmartClassParent(string fieldDefs)
-				{ mixin SmartChild!(fieldDefs, Yes.hasChildren); } 
-			}
-			
-			mixin template SmartClassGenerator()
-			{
-				/+
-					Note: This shoud be mixed in into a place to see the imports of the actual fieldDefs.
-					Usage: /+Code: mixin SmartClassGenerator;+/
-					Example: High level Vulkan classes
-				+/
-				
-				version(/+$DIDE_REGION+/none) {
-					string generateSmartClassCode(string fieldDefs, Flag!"hasChildren" hasChildren, string customConstructor)()
-					{
-						//pragma(msg, generateSmartClassCode!(fieldDefs, hasChildren, customConstructor)); 
-						
-						
-						mixin("void f("~fieldDefs~");"); 
-						return generateSmartClassCode_impl!(FunctionParameterProcessor!f, hasChildren, customConstructor); 
-						
-						/+Todo: Read the manual and fix this mixin template mess!  Use minimal string mixins!+/
-					} 
-				}
-			} 
-		}
-		
 		mixin template SmartClass(Flag!"hasChildren" hasChildren, string def, string constr = "")
 		{
 			mixin(iq{private static void _proto($(def)) {} }.text); 
@@ -2809,7 +2762,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		mixin template SmartParent(string def, string constr = "") { mixin SmartClass!(Yes.hasChildren, def, constr); } 
 		mixin template SmartChild (string def, string constr = "") { mixin SmartClass!(No.hasChildren, def, constr); } 
-		
+		
 		version(/+$DIDE_REGION Experimental thing that uses an anonym class to send parameters+/all)
 		{
 			version(none)
@@ -2839,6 +2792,22 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		
 		
 	}
+	
+	version(/+$DIDE_REGION ToType+/all)
+	{
+		//DConf 26, 5:001:29 https://youtu.be/T137HXaqgKQ?t=18089
+		//https://dlang.org/spec/traits.html#toType
+		alias ToType(string val) = __traits(toType, val); 
+		
+		/+
+			Example: /+
+				Code: alias T = void delegate(int, string); 	T.mangleof.writeln; 
+				alias U = ToType!(T.mangleof); 	U.stringof.writeln; 
+			+/
+		+/
+	}
+	
+	
 	
 	version(/+$DIDE_REGION+/all)
 	{
@@ -3458,15 +3427,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B52E59F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1AFF859F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B5F659F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B0C059F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B6A059F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B71559F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B16A59F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B1DF59F156A1})); 
 						+/
 					+/
 				+/
@@ -3753,7 +3722,75 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		} 
 	}
 	
-	
+	version(/+$DIDE_REGION ASM+/all)
+	{
+		/+
+			H1: ⚠🚨☠💀⚠ DO NOT MOVE this away from here!!! ⚠💀☠🚨⚠
+			 ══════════════════════════════════════════════════════════════
+			  ⚠  WARNING  ⚠  WARNING  ⚠  WARNING  ⚠  WARNING  ⚠
+			  ☠  MOVING THIS WILL BREAK EVERYTHING  ☠
+			  💀  DANGER  💀  DANGER  💀  DANGER  💀  DANGER  💀
+			  ☣  BIOHAZARD  ☣  BIOHAZARD  ☣  BIOHAZARD  ☣
+			  🚨  DO NOT TOUCH  🚨  DO NOT TOUCH  🚨  DO NOT TOUCH  🚨
+			 ══════════════════════════════════════════════════════════════
+			 ⚠🚨☠💀☣️ DO NOT MOVE this away from here!!! ☣💀☠🚨⚠
+			 ══════════════════════════════════════════════════════════════
+			
+			/+
+				Todo: If it is moved next to "Multithread" region, it will cause a linker error.
+				I guess  because shared static this sucks ass.
+			+/
+		+/
+		
+		
+		public import ldc.llvmasm; 
+		public import core.simd : byte16, double2, float4, int4, long2, short8, ubyte16, uint4, ulong2, ushort8, void16,
+		loadUnaligned,  prefetch, storeUnaligned, SimdVector = Vector /+Because there is het.math.Vector already defined.+/; 
+		
+		/+
+			Note: Important note on SSE constants:
+				/+Code: enum          ubyte16 a = [1, 2, 3];+/	⛔ It calculates BAD results!!!
+				/+Code: static immutable ubyte16 a = [1, 2, 3];+/ 	⚠ It works, but the compiler crashes when used in pragma(msg).
+			Possible workarounds:
+				/+Code: mixin([1, 2, 3])+/ 	put the array literal inside mixin().
+				/+Code: [1, 2, 3].dup+/	pass it through the std library. array(), dup() template functions will work.
+			/+Link: https://forum.dlang.org/post/ekicvpjxpjwwsdallwnk@forum.dlang.org+/
+		+/
+		
+		//Imported builtins ////////////////////////////////////////////
+		
+		mixin template asmFunctions()
+		{
+			//Todo: must import as a mixin, to enable inlining in each module. As LTO sucks.
+			
+			//example: 	__asm("movl $1, $0", "=*m,r", &i, j);
+			
+			
+			//public import ldc.gccbuiltins_x86 : pshufb	= __builtin_ia32_pshufb128; //note: this maps to signed bytes. I wand unsigneds for chars and for color channels.
+			//byte16 pshufb(byte16 a, byte16 b){return __asm!ubyte16("pshufb $2, $1", "=x,0,x", a, b); }
+			T pshufb(T, U)(T a, in U b) { return __asm!ubyte16("pshufb $2, $1", "=x,0,x", a, b); } 
+			
+			T palignr(ubyte im, T)(T a, in T b) { return __asm!ubyte16("palignr $3, $2, $1", "=x,0,x,i", a, b, im); } 
+			
+			//__builtin_ia32_pcmpestri128
+			T pcmpestri(ubyte im, T)(T a, in T b) { return __asm!ubyte16("pcmpestri $3, $2, $1", "=x,0,x,i", a, b, im); } 
+			
+			//Todo: In old LDC 1.28   it generates a mask, but it's bad.  So I use this instead.
+			ubyte16 pcmpeqb(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pcmpeqb $2, $1", "=x,0,x", a, b); } 
+			ubyte16 pmaxub(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pmaxub $2, $1", "=x,0,x", a, b); } 
+			ubyte16 pminub(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pminub $2, $1", "=x,0,x", a, b); } 
+			ubyte16 pavgb(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pavgb $2, $1", "=x,0,x", a, b); } 
+			
+			ubyte16 punpcklbw(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpcklbw $2, $1", "=x,0,x", a, b); } 
+			ubyte16 punpckhbw(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhbw $2, $1", "=x,0,x", a, b); } 
+			ubyte16 punpcklwd(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpcklwd $2, $1", "=x,0,x", a, b); } 
+			ubyte16 punpckhwd(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhwd $2, $1", "=x,0,x", a, b); } 
+			ubyte16 punpckldq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckldq $2, $1", "=x,0,x", a, b); } 
+			ubyte16 punpckhdq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhdq $2, $1", "=x,0,x", a, b); } 
+			ubyte16 punpcklqdq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpcklqdq $2, $1", "=x,0,x", a, b); } 
+			ubyte16 punpckhqdq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhqdq $2, $1", "=x,0,x", a, b); } 
+		} 
+	}
 }
 version(/+$DIDE_REGION Numeric+/all)
 {
@@ -4779,11 +4816,11 @@ version(/+$DIDE_REGION Numeric+/all)
 			else return T.sizeof; 
 		} 
 		
+		size_t sizeBits(T)(in T a)
+		=> a.sizeBytes * 8; 
+		
 		void requireLength(T, L)(ref T[] arr, L len)
-		{
-			if(arr.length<len)
-			arr.length = len; 
-		} 
+		{ if(arr.length<len) arr.length = len; } 
 		
 		auto frontOr(R, T)(R r, T e = ElementType!R.init)if(isInputRange!R)
 		{
@@ -4821,7 +4858,7 @@ version(/+$DIDE_REGION Numeric+/all)
 		
 		auto fetchFrontN(T)(ref T[] arr, sizediff_t count)
 		{
-			auto 	i 	= min(arr.length, count),
+			auto 	i 	= min(arr.length, count.max(0)),
 				res 	= arr[0..i]; 
 			arr = arr[i..$]; 
 			return res; 
@@ -6606,76 +6643,89 @@ version(/+$DIDE_REGION Numeric+/all)
 			} 
 					
 		} 
+		
+		struct DigitalSignal
+		{
+			private
+			{
+				ubyte _raw; 
+				
+				import std.bitmanip; 
+				mixin(
+					bitfields!(
+						 bool, "current"	, 1,
+						 bool, "changed"	, 1,
+						 bool, "displayed",	1,
+						 int , "_dummy"   , 5
+					)
+				); 
+			} 
+			
+			void pulse(bool value)
+			{
+				current = value; 
+				changed = true; 
+			} 
+			
+			void set(bool value)
+			{
+				if(value != current)
+				pulse(value); 
+			} 
+			
+			void opAssign(in bool rhs)
+			{ set(rhs); } 
+			
+			bool get()
+			{
+					displayed = !displayed; 
+				
+				/*
+					if(changed){ displayed = !displayed; changed = false; }
+						   else displayed = current;
+				*/
+				
+					return displayed; 
+			} 
+		} 
+		
+		struct DigitalSignal_smoothed
+		{
+			float minDeltaTime = 0.3; //sec
+			
+			private DigitalSignal ds; 
+			private float lastDisplayChanged = 0; 
+			private bool lastDisplayed; 
+			
+			void pulse	(bool after)	
+			{ ds.pulse(after); } 
+			void set	(bool value)	
+			{ ds.set(value); } 
+			void opAssign	(in bool rhs)
+			{ set(rhs); } 
+			
+			bool get(float now)
+			{
+				const dt = now-lastDisplayChanged; 
+				
+				if(dt >= minDeltaTime)
+				{
+					const act  = ds.get; 
+					if(lastDisplayed != act)
+					{
+						lastDisplayed = act; 
+						lastDisplayChanged = now; 
+					}
+				}
+				
+				return lastDisplayed; 
+			} 
+			
+			bool get()
+			{ return get(QPS.value(second)); } //Todo: datetime
+		} 
 		
 	}
-}version(/+$DIDE_REGION ASM+/all)
-{
-	/+
-		H1: ⚠🚨☠💀⚠ DO NOT MOVE this away from here!!! ⚠💀☠🚨⚠
-		 ══════════════════════════════════════════════════════════════
-		  ⚠  WARNING  ⚠  WARNING  ⚠  WARNING  ⚠  WARNING  ⚠
-		  ☠  MOVING THIS WILL BREAK EVERYTHING  ☠
-		  💀  DANGER  💀  DANGER  💀  DANGER  💀  DANGER  💀
-		  ☣  BIOHAZARD  ☣  BIOHAZARD  ☣  BIOHAZARD  ☣
-		  🚨  DO NOT TOUCH  🚨  DO NOT TOUCH  🚨  DO NOT TOUCH  🚨
-		 ══════════════════════════════════════════════════════════════
-		 ⚠🚨☠💀☣️ DO NOT MOVE this away from here!!! ☣💀☠🚨⚠
-		 ══════════════════════════════════════════════════════════════
-		
-		/+
-			Todo: If it is moved next to "Multithread" region, it will cause a linker error.
-			I guess  because shared static this sucks ass.
-		+/
-	+/
-	
-	
-	public import ldc.llvmasm; 
-	public import core.simd : byte16, double2, float4, int4, long2, short8, ubyte16, uint4, ulong2, ushort8, void16,
-	loadUnaligned,  prefetch, storeUnaligned, SimdVector = Vector /+Because there is het.math.Vector already defined.+/; 
-	
-	/+
-		Note: Important note on SSE constants:
-			/+Code: enum          ubyte16 a = [1, 2, 3];+/	⛔ It calculates BAD results!!!
-			/+Code: static immutable ubyte16 a = [1, 2, 3];+/ 	⚠ It works, but the compiler crashes when used in pragma(msg).
-		Possible workarounds:
-			/+Code: mixin([1, 2, 3])+/ 	put the array literal inside mixin().
-			/+Code: [1, 2, 3].dup+/	pass it through the std library. array(), dup() template functions will work.
-		/+Link: https://forum.dlang.org/post/ekicvpjxpjwwsdallwnk@forum.dlang.org+/
-	+/
-	
-	//Imported builtins ////////////////////////////////////////////
-	
-	mixin template asmFunctions()
-	{
-		//Todo: must import as a mixin, to enable inlining in each module. As LTO sucks.
-		
-		//example: 	__asm("movl $1, $0", "=*m,r", &i, j);
-		
-		
-		//public import ldc.gccbuiltins_x86 : pshufb	= __builtin_ia32_pshufb128; //note: this maps to signed bytes. I wand unsigneds for chars and for color channels.
-		//byte16 pshufb(byte16 a, byte16 b){return __asm!ubyte16("pshufb $2, $1", "=x,0,x", a, b); }
-		T pshufb(T, U)(T a, in U b) { return __asm!ubyte16("pshufb $2, $1", "=x,0,x", a, b); } 
-		
-		T palignr(ubyte im, T)(T a, in T b) { return __asm!ubyte16("palignr $3, $2, $1", "=x,0,x,i", a, b, im); } 
-		
-		//__builtin_ia32_pcmpestri128
-		T pcmpestri(ubyte im, T)(T a, in T b) { return __asm!ubyte16("pcmpestri $3, $2, $1", "=x,0,x,i", a, b, im); } 
-		
-		//Todo: In old LDC 1.28   it generates a mask, but it's bad.  So I use this instead.
-		ubyte16 pcmpeqb(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pcmpeqb $2, $1", "=x,0,x", a, b); } 
-		ubyte16 pmaxub(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pmaxub $2, $1", "=x,0,x", a, b); } 
-		ubyte16 pminub(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pminub $2, $1", "=x,0,x", a, b); } 
-		ubyte16 pavgb(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("pavgb $2, $1", "=x,0,x", a, b); } 
-		
-		ubyte16 punpcklbw(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpcklbw $2, $1", "=x,0,x", a, b); } 
-		ubyte16 punpckhbw(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhbw $2, $1", "=x,0,x", a, b); } 
-		ubyte16 punpcklwd(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpcklwd $2, $1", "=x,0,x", a, b); } 
-		ubyte16 punpckhwd(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhwd $2, $1", "=x,0,x", a, b); } 
-		ubyte16 punpckldq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckldq $2, $1", "=x,0,x", a, b); } 
-		ubyte16 punpckhdq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhdq $2, $1", "=x,0,x", a, b); } 
-		ubyte16 punpcklqdq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpcklqdq $2, $1", "=x,0,x", a, b); } 
-		ubyte16 punpckhqdq(in ubyte16 a, in ubyte16 b) { return __asm!ubyte16("punpckhqdq $2, $1", "=x,0,x", a, b); } 
-	} 
 }
 
 version(/+$DIDE_REGION Containers+/all)
@@ -9164,11 +9214,11 @@ version(/+$DIDE_REGION Containers+/all)
 				auto _間=init間; 
 				static bool res; res = false; 
 				enum N = 16<<16; 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x4485859F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x448DA59F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x4495659F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x449D359F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x44A5959F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x4495559F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x449D759F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x44A5359F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x44AD059F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x44B5659F156A1).檢((update間(_間)))); 
 				
 				/+
 					benchmarks:
@@ -17343,7 +17393,6 @@ Fragmentation: $(frag.format!"%5.1f")%".text;
 	} 
 }version(/+$DIDE_REGION Stream+/all)
 {
-	import het.parser; 
 	
 	//Todo: Try binary serialization: https://github.com/atilaneves/cerealed
 	
