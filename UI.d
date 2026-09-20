@@ -5845,6 +5845,7 @@ version(/+$DIDE_REGION+/all)
 											{
 												Row(
 													{
+														flags.noBackground = true; 
 														outerSize = vec2(r.prefix.length, 1)*fh; 
 														const float siz = fh; 
 														void customDraw(Drawing dr, .Container cntr)
@@ -8528,7 +8529,7 @@ struct im
 							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
 							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
 						}
-						((0x3B85CEB16D5C4).檢 (ImStorageManager.stats)); 
+						((0x3B887EB16D5C4).檢 (ImStorageManager.stats)); 
 					}
 				}
 				
