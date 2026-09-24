@@ -51,7 +51,10 @@ version(/+$DIDE_REGION+/all)
 			auto textures_accessInfo(TexHandle stIdx)
 			{
 				auto info = oldTextures.accessInfo((cast(int)(stIdx))); 
-				static struct Res { int width, height; } 
+				static struct Res {
+					int width, height; 
+					auto size() => ivec2(width, height); 
+				} 
 				with(info) return Res(width, height); 
 			} 
 			
@@ -100,7 +103,10 @@ version(/+$DIDE_REGION+/all)
 				auto textures_accessInfo(TexHandle stIdx)
 				{
 					auto v = gányolás_textures_getSize(stIdx); 
-					static struct Res { int width, height; } 
+					static struct Res {
+						int width, height; 
+						auto size() => ivec2(width, height); 
+					} 
 					return Res(v.x, v.y); 
 				} 
 				
@@ -1357,6 +1363,11 @@ version(/+$DIDE_REGION+/all)
 		
 		version(/+$DIDE_REGION SelectionManager  virtual functs+/all)
 		{
+			/+
+				Todo: Make a common selectionmanager!
+				Now there is het.ui.SelectionManager and dide.ContainerSelectionManager.
+			+/
+			
 			bool getSelected()
 			{ return false; } 
 			void setSelected(bool b)
@@ -5555,7 +5566,10 @@ version(/+$DIDE_REGION+/all)
 		T[] delegate() onBringToFront; //Use bringSelectedItemsToFront() for default behavior
 		bool deselectBelow; 
 		
-		void update(bool mouseEnabled, View2D view, T[] items)
+		void update(
+			bool mouseEnabled, View2D view, T[] items, 
+			void delegate(T, vec2) afterMove = null
+		)
 		{
 			
 			void selectNone()
@@ -5650,7 +5664,6 @@ version(/+$DIDE_REGION+/all)
 					}
 					else
 					{ a.isSelected = (selectOp == SelectOp.clearAdd) ? false : a.oldSelected; }
-					
 				}
 			}
 			
@@ -5660,10 +5673,18 @@ version(/+$DIDE_REGION+/all)
 				if(a.isSelected)
 				{
 					a.outerPos += mouseDelta; 
-					static if(__traits(compiles, { a.cachedDrawing.free; }))
-					a.cachedDrawing.free; 
+					//This kind of move is losing precision quickly, but it survives zooming.
+					
+					if(afterMove) afterMove(a, mouseDelta); 
+					
+					
+					
+					version(/+$DIDE_REGION+/none) {
+						//removed: 260924
+						static if(__traits(compiles, { a.cachedDrawing.free; }))
+						a.cachedDrawing.free; 
+					}
 				}
-				
 			}
 			
 			
@@ -5730,6 +5751,12 @@ version(/+$DIDE_REGION+/all)
 		} 
 	} 
 	
+	struct VisibleRowRange
+	{
+		bounds2 visibleBounds; 
+		float rowHeight=0; 
+		int rowCount, start, end; 
+	} 
 	
 	static class VirtualTreeView(Item) : VirtualListBase
 	if(is(Item==struct))
@@ -5806,9 +5833,10 @@ version(/+$DIDE_REGION+/all)
 			}
 		} 
 		
-		void UI(string _M_=__MODULE__, size_t _L_=__LINE__)
+		VisibleRowRange UI(string _M_=__MODULE__, size_t _L_=__LINE__)
 		(void delegate() onSetup/+must set outerSize in onSetup! Optionally can set fontHeight+/, void delegate(Item*) onItem=null)
 		{
+			VisibleRowRange vrr; 
 			with(im)
 			{
 				CustomContainer!(.Container, _M_, _L_)
@@ -5829,9 +5857,13 @@ version(/+$DIDE_REGION+/all)
 						imAppend(new Cell(vec2(maxRowWidth, rows.length*rowHeight), vec2(0))); 
 						/+Container({ outerPos = vec2(maxRowWidth, rows.length*rowHeight); outerSize = vec2(0); }); +/
 						
+						vrr.rowHeight = rowHeight, 
+						vrr.rowCount = rows.length.to!int; 
+						
 						flags._saveVisibleBounds = true; 
 						if(const visibleBounds = imstVisibleBounds(thisId))
 						{
+							vrr.visibleBounds = visibleBounds; 
 							void doit(int i, TreeRow r)
 							{
 								with(im)
@@ -5899,10 +5931,10 @@ version(/+$DIDE_REGION+/all)
 									); 
 								}
 							} 
-							foreach(
-								i; 	(ifloor(visibleBounds.top    * invRowHeight    )).max(0) ..
-									(iceil(visibleBounds.bottom * invRowHeight + 1)).clamp(0, rows.length.to!int)
-							)
+							
+							vrr.start 	= (ifloor(visibleBounds.top    * invRowHeight    )).max(0),
+							vrr.end 	= (iceil(visibleBounds.bottom * invRowHeight + 1)).clamp(0, rows.length.to!int); ; 
+							foreach(i; 	vrr.start .. vrr.end)
 							{
 								doit(i, rows[i]); /+must put inside a function, so the customDraw can capture its stack.+/
 								/+Todo: Do it with a better way that dr.addDrawCallback()+/
@@ -5913,6 +5945,7 @@ version(/+$DIDE_REGION+/all)
 					}
 				); 
 			}
+			return vrr; 
 		} 
 	} 
 	
@@ -8184,13 +8217,13 @@ struct im
 			private View2D[2] targetSurfaceViews; 
 			private TargetSurface selectedTargetSurface; 
 			
-			@property view_world()
-			=> targetSurfaceViews[0]; 	@property view_gui()
+			@property viewWorld()
+			=> targetSurfaceViews[0]; 	@property viewGui()
 			=> targetSurfaceViews[1]; @property targetView()
 			=> targetSurfaceViews[selectedTargetSurface]; 
 			
-			void setTargetSurfaces(View2D view_world, View2D view_gui)
-			{ targetSurfaceViews = [view_world, view_gui]; } 
+			void setTargetSurfaces(View2D viewWorld, View2D viewGui)
+			{ targetSurfaceViews = [viewWorld, viewGui]; } 
 			
 			/+
 				Todo: this should be the only opportunity to switch between 
@@ -8253,7 +8286,7 @@ struct im
 				dropdownState.beginFrame; 
 				
 				//this is needed for DockAlignment
-				rootContainer.clientArea = view_gui.screenBounds_anim.bounds2; 
+				rootContainer.clientArea = viewGui.screenBounds_anim.bounds2; 
 				//Maybe it is the same as the bounds for clipping rects: flags.clipChildren
 				
 				static DeltaTimer dt; 
@@ -8370,7 +8403,7 @@ struct im
 							260829: Hint generation was positioned up here, after the dropdown window. 
 								It was at the very bottom.
 						+/
-						const guiBounds = view_gui.screenBounds_anim.bounds2; 
+						const guiBounds = viewGui.screenBounds_anim.bounds2; 
 						/+Todo: What if the hint comes from viewWorld?+/
 						generateHints(guiBounds); 
 						
@@ -8529,7 +8562,7 @@ struct im
 							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
 							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
 						}
-						((0x3B887EB16D5C4).檢 (ImStorageManager.stats)); 
+						((0x3BBE1EB16D5C4).檢 (ImStorageManager.stats)); 
 					}
 				}
 				
@@ -11890,7 +11923,7 @@ struct im
 					//then if it clips the sceen, put it on top.
 					if(dropdownContainer.flags.targetSurface == TargetSurface.gui)
 					{
-						const maxy = view_gui.screenBounds_anim.bounds2.bottom; 
+						const maxy = viewGui.screenBounds_anim.bounds2.bottom; 
 						if(dropdownContainer.outerBottom > maxy)
 						dropdownContainer.outerPos.y = 
 							bnd.top - 2 - dropdownContainer.outerHeight; 

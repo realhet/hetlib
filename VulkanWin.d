@@ -475,6 +475,62 @@ version(/+$DIDE_REGION+/all)
 			transpose 	= mirrorDiag 	//Swap X and Y coordinates
 		} 
 		
+		TexOrientation inverseTexOrientation(in TexOrientation a)
+		=> a.predSwitch(
+			TexOrientation.mirrorXDiag, TexOrientation.mirrorYDiag,
+			TexOrientation.mirrorYDiag, TexOrientation.mirrorXDiag, a
+		); 
+		/+Verify if the inverse of inverse of X is the same of X+/
+		static assert(
+			iota(8).map!((i)=>(
+				i==inverseTexOrientation
+					(inverseTexOrientation(cast(TexOrientation)(i)))
+			)).all
+		); 
+		
+		TexOrientation transformTexOrientation(in TexOrientation a, in TexOrientation b)
+		{
+			/+
+				Composition of two orientations: /+Highlighted: result = b ∘ a+/ (apply /+Highlighted: a+/ first, then /+Highlighted: b+/). 
+				Encoding: bit0 = mirrorX, bit1 = mirrorY, bit2 = diagonal.
+			+/
+			const 	ax = a.BITS[0]	, ay = a.BITS[1]	, ad = a.BITS[2],
+				bx = b.BITS[0]	, by = b.BITS[1]	, bd = b.BITS[2]; 
+			return (cast(TexOrientation)(
+				(ax ^ ((ad)?(by):(bx)))<<0 |
+				(ay ^ ((ad)?(bx):(by)))<<1 |
+				(ad ^ bd             )<<2
+			)); 
+		} 
+		
+		//Verify transformTexOrientation()
+		static assert(
+			transformTexOrientation(
+				TexOrientation.mirrorX, 
+				TexOrientation.mirrorDiag
+			) == TexOrientation.mirrorXDiag
+		); 
+		static assert(
+			transformTexOrientation(
+				TexOrientation.mirrorDiag, 
+				TexOrientation.mirrorX
+			) == TexOrientation.mirrorYDiag
+		); 
+		static assert(
+			transformTexOrientation(
+				TexOrientation.rot90, 
+				TexOrientation.rot90
+			) == TexOrientation.rot180
+		); 
+		static assert(
+			transformTexOrientation(
+				TexOrientation.mirrorXYDiag, 
+				TexOrientation.mirrorXYDiag
+			) == TexOrientation.normal
+		); 
+		
+		
+		
 		struct TexFlags
 		{
 			ushort _raw; 
@@ -3460,7 +3516,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1B41D82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1BA7E82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -5583,18 +5639,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2B04B82886ADB).檢(
+					((0x2B6AC82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2B0BD82886ADB))))
+				if((互!((bool),(0),(0x2B71E82886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2B15182886ADB).檢((互!((float/+w=12+/),(1.000),(0x2B16882886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2B7B282886ADB).檢((互!((float/+w=12+/),(1.000),(0x2B7C982886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5607,8 +5663,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2B33D82886ADB).檢 (imVG)),
-					((0x2B36382886ADB).檢 (imFPS)); 
+					((0x2B99E82886ADB).檢 (imVG)),
+					((0x2B9C482886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -6057,6 +6113,8 @@ $(V_size+G_size)".text
 						This approach applied to more complex parametric curves: https://www.shadertoy.com/view/3tsXDB
 					*/
 					
+					/*Opt: optimize all the parameters, iteration, all the starting points of newtonian approximation*/
+					
 					const int bezier_num_iterations=3; /*def:3*/
 					const int bezier_num_start_params=3; /*def:3*/
 					
@@ -6147,47 +6205,100 @@ $(V_size+G_size)".text
 						}
 						
 						return sqrt(d0); 
-					} /*
-						Todo: Upgrade for a 2 sided cubic bezier surface curve:
-						
-						1. extract the best t value
-						
-						  float bestDist2 = 1e38;
-						  float bestT     = 0.;
-						  ...
-						  // ... inside the loop:
-						  float d2 = dot(uv_to_p, uv_to_p);
-						  if (d2 < bestDist2)
-						  {
-						    bestDist2 = d2;
-						    bestT     = t;
-						  }
-						
-						2. Use bestT to calculate tangent
-						  // --- Sign computation at the winning t ---
-						  // Closest point on curve:
-						  vec2 C = ((a3 * bestT + a2) * bestT + a1) * bestT + a0; // = B(bestT) - uv
-						  // Tangent at bestT:
-						  vec2 T = (3. * a3 * bestT + 2. * a2) * bestT + a1;
-						  // Vector from closest point to query: q - C = -(C)
-						  // (since C = B(bestT) - uv, we have q - B(bestT) = -C)
-						  vec2 V = -C;
-						  // 2D cross product gives the side
-						  float cross_z = T.x * V.y - T.y * V.x;
-						  float dist = sqrt(bestDist2);
-						  return cross_z >= 0. ? dist : -dist; //this way the result can be negative too.
-						
-						3. protect against tangent is near to zero:
-						  float lenT2 = dot(T, T);
-						  float cross_z = (lenT2 > 1e-12) ? (T.x * V.y - T.y * V.x) : 0.;
-						
-						2 options for jigsaw puzzle: 
-						 * sliding window of 4 bezier params: 0.33..0.66 interval with a 
-						    started from single newtonian starting point.
-						* C1 connected beziers like in TTF fonts
-					*/
+					} 
 				}
 				,
+				/+
+					Todo: Upgrade for a 2 sided cubic bezier surface curve:
+					
+					1. extract the best t value
+					
+					  float bestDist2 = 1e38;
+					  float bestT     = 0.;
+					  ...
+					  // ... inside the loop:
+					  float d2 = dot(uv_to_p, uv_to_p);
+					  if (d2 < bestDist2)
+					  {
+					    bestDist2 = d2;
+					    bestT     = t;
+					  }
+					
+					2. Use bestT to calculate tangent
+					  // --- Sign computation at the winning t ---
+					  // Closest point on curve:
+					  vec2 C = ((a3 * bestT + a2) * bestT + a1) * bestT + a0; // = B(bestT) - uv
+					  // Tangent at bestT:
+					  vec2 T = (3. * a3 * bestT + 2. * a2) * bestT + a1;
+					  // Vector from closest point to query: q - C = -(C)
+					  // (since C = B(bestT) - uv, we have q - B(bestT) = -C)
+					  vec2 V = -C;
+					  // 2D cross product gives the side
+					  float cross_z = T.x * V.y - T.y * V.x;
+					  float dist = sqrt(bestDist2);
+					  return cross_z >= 0. ? dist : -dist; //this way the result can be negative too.
+					
+					3. protect against tangent is near to zero:
+					  float lenT2 = dot(T, T);
+					  float cross_z = (lenT2 > 1e-12) ? (T.x * V.y - T.y * V.x) : 0.;
+					
+					2 options for jigsaw puzzle: 
+					 * sliding window of 4 bezier params: 0.33..0.66 interval with a 
+					    started from single newtonian starting point.
+					* C1 connected beziers like in TTF fonts
+					
+					
+					//HERE IS THE WORKING CODE. It was tested in Jogsaw Puzzle.
+					
+					/+
+						Highlighted: float cubicBezierDist(vec2 uv, vec2 p0, vec2 p1, vec2 p2, vec2 p3, bool twoSided)
+						{
+							vec2 a3 = (-p0 + 3. * p1 - 3. * p2 + p3); 
+							vec2 a2 = (3. * p0 - 6. * p1 + 3. * p2); 
+							vec2 a1 = (-3. * p0 + 3. * p1); 
+							vec2 a0 = p0 - uv; 
+							
+							BezierResult best = BezierResult(1e38, 0.);
+							float t0=0.; 
+							for(int i=0;i<bezier_num_start_params;i++)
+							{
+								float t=t0; 
+								for(int j=0;j<bezier_num_iterations;j++)
+								{ t=cubic_bezier_normal_iteration(bezier_method, t,a0,a1,a2,a3); }
+								t=clamp(t,0.,1.); 
+								vec2 uv_to_p=((a3*t+a2)*t+a1)*t+a0; 
+								
+								float dist = dot(uv_to_p,uv_to_p);
+								if(dist < best.dist)
+								{
+									best.dist = dist; //actually it is the square of dist!
+									best.t = t;
+								}
+								
+								t0+=1./float(bezier_num_start_params-1); 
+							}
+							
+							best.dist = sqrt(best.dist);
+							
+							if(twoSided)
+							{
+								// Closest point on curve:
+								vec2 P = ((a3 * best.t + a2) * best.t + a1) * best.t + a0; // = B(bestT) - uv
+								// Tangent
+								vec2 T = (3. * a3 * best.t + 2. * a2) * best.t + a1;
+								// Vector from closest point to query: q - C = -(C)
+								// (since C = B(bestT) - uv, we have q - B(bestT) = -C)
+								vec2 V = -P;
+								// 2D cross product gives the side
+							    float cross_z = T.x * V.y - T.y * V.x;
+								return cross_z > 0. ? -best.dist : best.dist; //this way the result can be negative too.
+							}
+							else 
+								return best.dist; 
+						}
+					+/
+				+/
+				
 				cubic_exact =
 				q{
 					/*
