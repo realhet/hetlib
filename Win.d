@@ -1604,7 +1604,6 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 		//extra information from external source in screen space. All is in world coords
 		vec2 clientSize; 
 		V mousePos, mouseLast; 
-		
 		B screenBounds_anim, screenBounds_dest; 	/+
 			Todo: maybe anim/destination should be 2 identical viewTransform struct.
 			Not a boolean parameter in EVERY member...
@@ -1658,8 +1657,11 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 		
 		public: 
 		
-		@property bool isMouseInside() const
-		{ return mousePos in subScreenBounds_anim; } 
+		@property isMouseInside() const
+		=> mousePos in subScreenBounds_anim; 
+		
+		@property mouseDelta()const 
+		=> mousePos - mouseLast; 
 		
 		this()
 		{} 

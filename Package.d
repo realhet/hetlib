@@ -3253,9 +3253,17 @@ version(/+$DIDE_REGION Global System stuff+/all)
 						/+
 							Todo: 260718 Flooding >1KB text at 60FPS is bad!!! 
 							In the debugger is does .5 sec lagspikes. Not affecting small texts, though.
+							
+							260926: Is is because the blob is being overwritten while the IDE reads is 
+								-> Chance of Data Corruption!!!
+							
+							setBlob has 2 options:
+							- streaming mode: Wait  for the IDE to finish reading.
+								Use a byte in the allocated block for this as understanding the circular buffer tail is more difficult.
+							- sampling mode: Only write the block if the IDE was finished reading the previous data.
 						+/
 						
-						auto blobAddress = dbg.setBlob(location, cast(void[])txt); 
+						auto blobAddress = dbg.setBlob(location, (cast(void[])(txt))); 
 						dbg.sendLog("LOG:INSP_TXT_BLB:"~location.to!string(16)~":"~blobAddress.to!string(16)); 
 					}
 				}
@@ -3427,15 +3435,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1AFF859F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B1BB59F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B0C059F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B28359F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B16A59F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B1DF59F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B32D59F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B3A259F156A1})); 
 						+/
 					+/
 				+/
@@ -7954,6 +7962,21 @@ version(/+$DIDE_REGION Containers+/all)
 			}
 		} 
 		
+		string safeUTF8orLatin1_warn(in void[] src)
+		{
+			auto tmp = (cast(string)(src)); 
+			try { validate(tmp); }
+			catch(Exception e)
+			{
+				WARN("Invalid UTF8 string, converting to Latin1!\n"~e.simpleMsg~"\n"~tmp.hexDump); 
+				import std.encoding; 
+				string tmp2; 
+				transcode((cast(Latin1String)(tmp)), tmp2); 
+				tmp = tmp2; 
+			}
+			return tmp; 
+		} 
+		
 		//builds c zterminated string
 		void strMake(string src, char* dst, size_t dstLen)
 		{
@@ -9214,11 +9237,11 @@ version(/+$DIDE_REGION Containers+/all)
 				auto _間=init間; 
 				static bool res; res = false; 
 				enum N = 16<<16; 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x4495559F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x449D759F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x44A5359F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x44AD059F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x44B5659F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x44C9559F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x44D1759F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x44D9359F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x44E1059F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x44E9659F156A1).檢((update間(_間)))); 
 				
 				/+
 					benchmarks:
@@ -13454,8 +13477,10 @@ version(/+$DIDE_REGION Date Time handling+/all)
 		float blinkf(float freq=3)
 		{ return (QPS.value(second)*freq).fract; } 
 		
-		float blinks(float freq=3)
-		{ return (sin(blinkf(freq) * ((2)*(π)))+1)/2; } 
+		float blinks(alias fun=sin)(float freq=3)
+		{ return (fun(blinkf(freq) * ((2)*(π)))+1)/2; } 
+		float blinkc(float freq=3)
+		=> blinks!cos(freq); 
 		
 		
 		synchronized class Perf
@@ -16238,8 +16263,8 @@ version(/+$DIDE_REGION debug+/all)
 				ulong copyAndCalcBlobAddress(void* ptr)
 				{
 					ptr[0..buf.length] = buf; 
-					return 	(cast(ulong)(buf.length)) |
-						((cast(ulong)(ptr))-(cast(ulong)(data.memoryPool.ptr)))<<32; 
+					return (cast(ulong)(buf.length)) |
+					((cast(ulong)(ptr))-(cast(ulong)(data.memoryPool.ptr)))<<32; 
 				} 
 				
 				if(auto a = id in blobs)
@@ -16409,18 +16434,37 @@ version(/+$DIDE_REGION debug+/all)
 			
 			void processLogMessage(string s)
 			{
-				if(s.isWild("LOG:*"))	{
-					if(onDebugLog)
-					onDebugLog(wild[0]); 
-				}
-				else if(s.isWild("EXCEPTION:*"))	{
-					if(onDebugException)
-					onDebugException(wild[0]); 
-				}
-				else if(s.isWild("START:*"))	{
-					if(onDebugStart)
-					onDebugStart(wild[0]); 
-				}
+				bool TRY()(string prefix, void delegate(string) event)
+				{
+					if(s.startsWith(prefix))
+					{
+						if(event) event(s[prefix.length..$]); 
+						return true; 
+					}
+					else return false; 
+				} 
+				
+				
+				if(TRY("LOG:", onDebugLog)) return; 
+				if(TRY("EXCEPTION:", onDebugException)) return; 
+				if(TRY("START:", onDebugStart)) return; 
+				
+				
+				/+
+					//260926: removed slow isWilds
+					if(s.isWild("LOG:*"))	{
+						if(onDebugLog)
+						onDebugLog(wild[0]); 
+					}
+					else if(s.isWild("EXCEPTION:*"))	{
+						if(onDebugException)
+						onDebugException(wild[0]); 
+					}
+					else if(s.isWild("START:*"))	{
+						if(onDebugStart)
+						onDebugStart(wild[0]); 
+					}
+				+/
 			} 
 			
 			void updateLog()
@@ -16436,15 +16480,20 @@ version(/+$DIDE_REGION debug+/all)
 					if(d.empty) break; 
 					
 					//safely interpret it as UTF8. If fails, convert it from Latin1
-					auto s = cast(string)d; 
-					try
-					{ validate(s); }catch(Exception)
-					{
-						import std.encoding; 
-						transcode(cast(Latin1String)d, s); 
-					}
 					
-					processLogMessage(s); 
+					/+260926 ELBASZVA!!! processLogMessage(d.dupSafeUTF8orLatin1_warn); +/
+					/+
+						auto s = cast(string)d; 
+						try
+						{ validate(s); }catch(Exception)
+						{
+							import std.encoding; 
+							transcode(cast(Latin1String)d, s); 
+						}
+					+/
+					
+					processLogMessage(d.safeUTF8orLatin1_warn); 
+					/+260926: na most megy.+/
 				}
 			} 
 			
@@ -16607,8 +16656,15 @@ version(/+$DIDE_REGION debug+/all)
 			{
 				if(!data) return null; 
 				const 	base = blobAddress>>>32,
-					length = cast(uint)blobAddress; 
-				enforce(base>=0 && base+length<=Data.memoryPool.length, "blobAddress out of range"); 
+					length = (cast(uint)(blobAddress)); 
+				
+				//260926: removed enforce(base>=0 && base+length<=Data.memoryPool.length, "blobAddress out of range"); 
+				
+				enforce(
+					base      <=Data.memoryPool.length && 
+					base+length<=Data.memoryPool.length, 
+					"blobAddress out of range"
+				); 
 				return data.memoryPool[base..base+length]; 
 			} 
 			

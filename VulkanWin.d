@@ -4158,7 +4158,7 @@ class VulkanWindow: Window, IGfxContentDestination
 			override void onUpdateUIBeginFrame()
 			{
 				import het.ui:im; 
-				im._beginFrame(viewWorld, viewGUI); 
+				im._beginFrame(viewWorld, viewGUI, deltaTime); 
 			} 
 			
 			override void onUpdateUIEndFrame()
@@ -4207,6 +4207,7 @@ class VulkanWindow: Window, IGfxContentDestination
 				void bugFix()
 				{
 					staticDrGUI.gfx.begin; 
+					staticDrWorld.gfx.begin; 
 					/+
 						Todo: /+H1: BUG!!!! 🐞+/
 						
@@ -4238,6 +4239,13 @@ class VulkanWindow: Window, IGfxContentDestination
 						bugFix; 
 					}
 				); 
+				
+				/+
+					A bigger bugfix. Flush the end of the streams with some invisible garbage
+					because the last few graphics primitives are keep getting lost because of a fucking bug.
+				+/
+				foreach(dr; AliasSeq!(staticDrWorld, staticDrGUI))
+				{ dr.pointSize = 0; foreach(i; 0..64) dr.point(vec2(0)); staticDrWorld.pointSize = 1; }
 				
 				version(/+$DIDE_REGION RGNFraw main ang GUI surfaces+/all)
 				{
@@ -5639,18 +5647,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2B6AC82886ADB).檢(
+					((0x2B83182886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2B71E82886ADB))))
+				if((互!((bool),(0),(0x2B8A382886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2B7B282886ADB).檢((互!((float/+w=12+/),(1.000),(0x2B7C982886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2B93782886ADB).檢((互!((float/+w=12+/),(1.000),(0x2B94E82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5663,8 +5671,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2B99E82886ADB).檢 (imVG)),
-					((0x2B9C482886ADB).檢 (imFPS)); 
+					((0x2BB2382886ADB).檢 (imVG)),
+					((0x2BB4982886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -9241,7 +9249,7 @@ $(V_size+G_size)".text
 						
 						//outColor = mix(outColor, vec4(1,0,1,1), .25); 
 					} 
-					 
+					
 					//⚠$(CustomShaderCode) must be at the very bottom, without newLine after it.
 					$(CustomShaderCode)
 				})); 

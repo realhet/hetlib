@@ -158,16 +158,15 @@ version(/+$DIDE_REGION+/all)
 	//enums/constants ///////////////////////////////////////
 	
 	//adjust the size of the original Tab character
-	enum 
-		VisualizeContainers	= (常!(bool)(0)),
-		VisualizeContainerIds	= (常!(bool)(0)),
-		VisualizeGlyphs	= (常!(bool)(0)),
-		VisualizeTabColors	= (常!(bool)(0)), //Todo: spaces at row ends
-		//VisualizeHitStack	= (常!(bool)(0)),
-		VisualizeSliders	= (常!(bool)(0)),
-		VisualizeCodeLineIndices 	= (常!(bool)(0)), //Todo: ezt csak a row-ban kene megcsinalni, runtime opcionalisra.
-			
-		addHitRectAsserts	= (常!(bool)(0)); //Verifies that Cell.Id is non null and unique
+	enum VisualizeContainers	= (常!(bool)(0)),
+	VisualizeContainerIds	= (常!(bool)(0)),
+	VisualizeGlyphs	= (常!(bool)(0)),
+	VisualizeTabColors	= (常!(bool)(0)), //Todo: spaces at row ends
+	VisualizeHitStack	= (常!(bool)(1)),
+	VisualizeSliders	= (常!(bool)(0)),
+	VisualizeCodeLineIndices 	= (常!(bool)(0)), //Todo: ezt csak a row-ban kene megcsinalni, runtime opcionalisra.
+		
+	addHitRectAsserts	= (常!(bool)(0)); //Verifies that Cell.Id is non null and unique
 	//Todo: DIDE, look inside  enum statement  not just  enum block.   enum; enum{}
 	
 	//Todo: bug: NormalFontHeight = 18*4	-> RemoteUVC.d crashes.
@@ -5317,7 +5316,7 @@ version(/+$DIDE_REGION+/all)
 						invN 	= 1.0f/N,
 						minSize 	= min(minRemainingSize, fullSize * invN); 
 					
-					const at = calcAnimationT(im.deltaTime/+1.0f/60+/, .01), sd = .01f; 
+					const at = calcAnimationT(im.deltaTime_sec/+1.0f/60+/, .01), sd = .01f; 
 					
 					if(remainingSize < minSize)
 					{
@@ -8239,7 +8238,9 @@ struct im
 			@property targetSurfaceScreenPixelSize()
 			=> targetView.invScale_anim; 
 		}
-		float deltaTime=0; 
+		
+		Time deltaTime=0*second; 
+		float deltaTime_sec=0; 
 		
 		
 		version(/+$DIDE_REGION Frame handling+/all)
@@ -8251,11 +8252,13 @@ struct im
 			=> canProcessUserInput && dialogKeysEnabled; 
 			
 			//Todo: package visibility is not working as it should -> remains public
-			void _beginFrame(View2D viewWorld, View2D viewGUI)
+			void _beginFrame(View2D viewWorld, View2D viewGUI, Time deltaTime)
 			{
 				//called from mainform.update
 				
 				enforce(!inFrame, "im.beginFrame() already called."); 
+				
+				this.deltaTime = deltaTime, deltaTime_sec = deltaTime.value(second); 
 				
 				_canProcessUserInput = mainWindow.canProcessUserInput; 
 				
@@ -8289,8 +8292,7 @@ struct im
 				rootContainer.clientArea = viewGui.screenBounds_anim.bounds2; 
 				//Maybe it is the same as the bounds for clipping rects: flags.clipChildren
 				
-				static DeltaTimer dt; 
-				deltaTime = dt.update; 
+				
 			} 
 			
 			struct HitTestSideInfo
@@ -8453,7 +8455,7 @@ struct im
 				//((0x339F2EB16D5C4).檢 (hitTestManager.hitStack.map!text.join('\n'))); 
 				
 				version(/+$DIDE_REGION Advance HitTest to the next frame. +/all)
-				{ hitTestManager.nextFrame; }//-------------------------------------------------
+				{ hitTestManager.nextFrame(deltaTime_sec); }//-------------------------------------------------
 				
 				//clicking away from popup closes the popup
 				if(
@@ -8529,17 +8531,10 @@ struct im
 				
 				if(funAfter) funAfter(); 
 				
+				if(VisualizeHitStack) hitTestManager.draw(drGUI); 
+				
 				//set mouse cursor icon once per frame
 				mainWindow.mouseCursor = mouseCursor; 
-				
-				version(/+$DIDE_REGION+/none) {
-					if(VisualizeHitStack && drVisualizeHitStack)
-					{
-						drVisualizeHitStack.glDraw(targetSurfaces[1].view); 
-						//Todo: problem with hitStack: it is assumed to be on GUI view
-					}
-					drVisualizeHitStack.destroy; 
-				}
 				
 				//not needed, gc is perfect.  foreach(r; root) if(r){ r.destroy; r=null; } root.clear;
 				//Todo: ezt tesztelni kene sor cell-el is! Hogy mekkorak a gc spyke-ok, ha manualisan destroyozok.
@@ -8562,7 +8557,7 @@ struct im
 							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
 							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
 						}
-						((0x3BBE1EB16D5C4).檢 (ImStorageManager.stats)); 
+						((0x3BB5CEB16D5C4).檢 (ImStorageManager.stats)); 
 					}
 				}
 				
@@ -8583,13 +8578,11 @@ struct im
 		}
 		version(/+$DIDE_REGION HitTest+/all)
 		{
-			HitTestManager hitTestManager; 
-			
 			static struct HitInfo
 			{
 				Id id; 
 				bool enabled; 
-				bool hover, captured, clicked, pressed, released; 
+				bool mouseHover, hover, captured, clicked, pressed, released; 
 				float hover_smooth, captured_smooth; 
 				bounds2 hitBounds; //this is in ui coordinates. Problematic with zoomable and GUI views.
 				vec2 localPos; //relative to outerPos
@@ -8625,21 +8618,71 @@ struct im
 				void simulateKey(KeyCombo key)
 				{ simulateKey(key.pressed, key.down, key.released); } 
 			} 
-			static struct HitTestManager
+			static struct SmoothHoverGroup(Id)
 			{
+				bool[Id] hover;  // Items that were notified this frame.
+				float[Id] hover_smooth;  // After applying a smooth lowpass filter
 				
-				static float hoverFollow(in float act, in bool target)
+				/+smoothHover will have a minimum of 1 frame delay. Update is at the end of +/
+				
+				void update(R)(R hits, float deltaTime_sec)
 				{
-					/+target: make this dependent on deltaTime!+/
-					enum upSpeed = 0.5f, downSpeed = 0.25f; 
-					if(target)	{ return mix(act, 1, upSpeed); }
-					else	{
-						float res = mix(act, 0, downSpeed); 
-						if(res<0.02f) res = 0; return res; 
+					auto ids = hits.map!"a.id".filter!"a"; 
+					hover = assocArray(ids, true.repeat); 
+					
+					const 	upSpeed 	= calcAnimationT(deltaTime_sec, 0.5),
+						downSpeed 	= calcAnimationT(deltaTime_sec, 0.9),
+						cutoff	= 0.02f /+below this we snap to 0 and remove+/; 
+					
+					//raise
+					foreach(id; hover.byKey)
+					hover_smooth[id] = mix(hover_smooth.get(id, 0), 1, upSpeed); 
+					
+					//decay
+					Id[] toRemove; 
+					foreach(id, ref value; hover_smooth)
+					{
+						if(id !in hover) {
+							value = mix(value, 0, downSpeed); 
+							if(value<=cutoff) toRemove ~= id; 
+						}
+					}
+					foreach(id; toRemove) hover_smooth.remove(id); 
+				} 
+			} 
+			
+			static struct MouseCaptureDetector(Id)
+			{
+				Id capturedId, clickedId, pressedId, releasedId; 
+				
+				void update(R)(R hits)
+				{
+					const topId = hits.retro.filter!"a.clickable && a.id".map!"a.id".frontOr(Id.init); 
+					
+					//if LMB was just pressed, then it will be the captured control
+					//if LMB released, and the captured id is also hovered, the it is clicked.
+					
+					clickedId = pressedId = releasedId = Id.init; 
+					//normally it's 0 all the time, except that one frame it's clicked.
+					
+					ref mouse = mainWindow.mouse; //Todo: get the mouse state from elsewhere!
+					
+					if(topId && mouse.LMB && mouse.justPressed && im.canProcessUserInput)
+					{ pressedId = capturedId = topId; }
+					if(mouse.justReleased)
+					{
+						if(capturedId)
+						{
+							releasedId = capturedId; 
+							if(topId==capturedId)
+							clickedId = capturedId; 
+						}
+						capturedId = Id.init; 
 					}
 				} 
-				
-				
+			} 
+			static struct HitTestManager
+			{
 				static struct HitTestRec
 				{
 					Id id; 	//in the next frame this must be the isSame
@@ -8651,71 +8694,31 @@ struct im
 					bool clickable; 
 				} 
 				
-				HitTestRec[] hitStack, lastHitStack; 
-				
-				float[Id] smoothHover; 
-				private void updateSmoothHover(ref HitTestRec[] actHitStack)
+				private
 				{
-					//raise hover values
-					auto hoveredIds = actHitStack.map!"a.id".filter!"a".array.sort; 
-					foreach(id; hoveredIds)
-					smoothHover[id] = hoverFollow(smoothHover.get(id, 0), true); 
+					HitTestRec[] hitStack, lastHitStack; 
 					
-					//lower (and remove) hover values
-					Id[] toRemove; 
-					foreach(id, ref value; smoothHover)
-					{
-						if(!hoveredIds.canFind(id))
-						{
-							value = hoverFollow(value, false); 
-							if(!value) toRemove ~= id; 
-						}
-					}
-					
-					foreach(h; toRemove)
-					smoothHover.remove(h); 
+					SmoothHoverGroup!Id hoverGroup; 
+					MouseCaptureDetector!Id mouseCaptureDetector; 
 				} 
 				
-				Id capturedId, clickedId, pressedId, releasedId; 
-				private void updateMouseCapture(ref HitTestRec[] hits)
-				{
-					//const topClickableId = hits.get(hits.length-1).id;
-					const topId = hits.retro.filter!(h => h.clickable).take(1).array.get(0).id; 
-					
-					//if LMB was just pressed, then it will be the captured control
-					//if LMB released, and the captured id is also hovered, the it is clicked.
-					
-					clickedId = pressedId = releasedId = Id.init; 
-					//normally it's 0 all the time, except that one frame it's clicked.
-					
-					with(mainWindow)
-					{
-						//Todo: get the mouse state from elsewhere!!!!!!!!!!!!!
-						if(topId && mouse.LMB && mouse.justPressed && canProcessUserInput)
-						{
-							//Note: isForeground will not work with a toolwindow
-							pressedId = capturedId = topId; 
-						}
-						if(mouse.justReleased)
-						{
-							if(capturedId)
-							{
-								releasedId = capturedId; 
-								if(topId==capturedId)
-								clickedId = capturedId; 
-							}
-							capturedId = Id.init; 
-						}
-					}
-				} 
+				auto getLastHitStack() => lastHitStack/+Accessed from DIDE for debugging purposes+/; 
 				
-				void nextFrame()
+				void nextFrame(float deltaTime_sec)
 				{
+					//update stuff based on the most recent frame
+					hoverGroup.update(hitStack, deltaTime_sec); 
+					mouseCaptureDetector.update(hitStack); 
+					
+					((0x3CD33EB16D5C4).檢(stats)); 
+					((0x3CD5AEB16D5C4).檢(hoverGroup.hover)); 
+					((0x3CD8CEB16D5C4).檢 (hoverGroup.hover_smooth.byKeyValue.map!((a)=>(a.key.text~`	`~/+🟢+/`#`.replicate(iceil(a.value*25)))).array.replicate(1).join('\n')~"THE_END")); 
+					((0x3CE3EEB16D5C4).檢 (hitStack.map!text.join('\n'))); 
+					
+					//latch onto the next frame
 					lastHitStack = hitStack; 
 					hitStack = []; 
-					
-					updateSmoothHover(lastHitStack); 
-					updateMouseCapture(lastHitStack); 
+					//after this, both draw() and the next frameUpdate can access the most recent values by using check().
 				} 
 				
 				void addHitRect(in Id id, in bounds2 hitBounds, in vec2 localPos, in bool clickable)
@@ -8736,12 +8739,13 @@ struct im
 					{
 						const idx = lastHitStack.map!"a.id".countUntil(id); 
 						h.id 	= id,
-						h.hover	= lastHitStack.map!"a.id".canFind(id),
-						h.pressed	= pressedId ==id,
-						h.released	= releasedId==id,
-						h.clicked	= clickedId ==id,
-						h.captured	= h.pressed || capturedId==id && h.hover,
-						h.hover_smooth	= smoothHover.get(id, 0),
+						h.mouseHover 	= hoverGroup.hover.get(id, false),
+						h.hover	= h.mouseHover,
+						h.pressed	= mouseCaptureDetector.pressedId ==id,
+						h.released	= mouseCaptureDetector.releasedId==id,
+						h.clicked	= mouseCaptureDetector.clickedId ==id,
+						h.captured	= h.hover && h.pressed || mouseCaptureDetector.capturedId==id,
+						h.hover_smooth	= hoverGroup.hover_smooth.get(id, 0),
 						h.captured_smooth 	= max(h.hover_smooth, h.captured),
 						h.hitBounds	= lastHitStack.get(idx).hitBounds,
 						h.localPos	= lastHitStack.get(idx).localPos; 
@@ -8750,31 +8754,23 @@ struct im
 					//Todo: architectural bug: captured is delayed by 1 frame according to repeated
 				} 
 				
-				version(/+$DIDE_REGION+/none) {
-					void draw(DrawingOld dr)
-					{
-						if(VisualizeHitStack)
-						{
-							dr.lineWidth = (QPS.value(second)*3).fract; 
-							dr.color = clFuchsia; 
-							
-							hitStack.map!"a.hitBounds".each!(b => dr.drawRect(b)); 
-							
-							dr.lineWidth = 1; 
-							dr.lineStyle = LineStyle.normal; 
-						}
-					} 
-				}
-				
-				auto stats()
+				void draw(IDrawing dr)
 				{
-					return format(
-						"HitTest lengths: hitStack:%s, lastHitStack::%s, smoothHover::%s", 
-						hitStack.length, lastHitStack.length, smoothHover.length
-					); 
+					dr.lineWidth = blinkf * -3; dr.color = clFuchsia; 
+					lastHitStack.map!"a.hitBounds".each!((b){ dr.drawRect(b.inflated(vec2(blinks, blinkc)*-3)); }); 
+					
+					((0x3D511EB16D5C4).檢 (lastHitStack.map!"a.hitBounds".map!q{a.text~'\n'}.join)); 
+					
+					dr.lineWidth = 1; 
 				} 
 				
+				auto stats()
+				=> format!"HitTest lengths: hitStack:%s, lastHitStack:%s, hover:%s, hover_smooth:%s"
+				(hitStack.length, lastHitStack.length, hoverGroup.hover.length, hoverGroup.hover_smooth.length); 
+				
 			} 
+			
+			HitTestManager hitTestManager; 
 			
 			static auto hitTest(.Container container)
 			{
@@ -8935,10 +8931,10 @@ struct im
 				const userBlocking = 	["Esc", "Enter", "LMB", "RMB", "MMB", "Space"]
 					.map!((k)=>(inputs[k].active)).any; 
 				
-				if(inputs.MX.delta==0 && inputs.MY.delta==0)	mouseStopped_secs += deltaTime; 
+				if(inputs.MX.delta==0 && inputs.MY.delta==0)	mouseStopped_secs += deltaTime_sec; 
 				else	mouseStopped_secs = 0; 
 				
-				if(hints.empty)	noHint_secs += deltaTime; 
+				if(hints.empty)	noHint_secs += deltaTime_sec; 
 				else	noHint_secs = 0; 
 				
 				//enter hint mode
@@ -9613,8 +9609,8 @@ struct im
 			
 			auto subCells()
 			=> thisContainer.subCells; 
-			auto subCells(T : .Cell)()
-			=> thisContainer.subCells.map!((c)=>((cast(T)(c)))).filter!((c)=>(c !is null)); 
+			auto subCells(Id : .Cell)()
+			=> thisContainer.subCells.map!((c)=>((cast(Id)(c)))).filter!((c)=>(c !is null)); 
 			auto subContainers()
 			=> thisContainer.subContainers; 
 			
@@ -10947,7 +10943,7 @@ struct im
 					theme.isWhite, imEnabled, focused, imSelected, 
 					hit.captured, hit.hover_smooth
 				); 
-				if(hit.hover) mouseCursor = mixin(舉!((MouseCursor),q{HAND})); 
+				if(hit.mouseHover) mouseCursor = mixin(舉!((MouseCursor),q{HAND})); 
 			}
 			
 			version(/+$DIDE_REGION Handle the recursive composition+/all)
