@@ -8713,8 +8713,10 @@ struct im
 					/+
 						((0x3CD33EB16D5C4).檢(stats)); 
 						((0x3CD5AEB16D5C4).檢(hoverGroup.hover)); 
-						((0x3CD8CEB16D5C4).檢 (hoverGroup.hover_smooth.byKeyValue.map!((a)=>(a.key.text~`	`~/+🟢+/`#`.replicate(iceil(a.value*25)))).array.replicate(1).join('\n')~"THE_END")); 
-						((0x3CE3EEB16D5C4).檢 (hitStack.map!text.join('\n'))); 
+						const debugStr = hoverGroup.hover_smooth.byKeyValue.map!((a)=>(a.key.text~`	`~`🟢`.replicate(iceil(a.value*50)))).join('\n')~"THE_END"; 
+						((0x3CE1DEB16D5C4).檢 (debugStr.length)); 
+						((0x3CE4FEB16D5C4).檢 (debugStr)); 
+						((0x3CE7AEB16D5C4).檢 (hitStack.map!text.join('\n'))); 
 					+/
 					
 					//latch onto the next frame
@@ -8761,7 +8763,7 @@ struct im
 					dr.lineWidth = blinkf * -3; dr.color = clFuchsia; 
 					lastHitStack.map!"a.hitBounds".each!((b){ dr.drawRect(b.inflated(vec2(blinks, blinkc)*-3)); }); 
 					
-					/+((0x3D511EB16D5C4).檢 (lastHitStack.map!"a.hitBounds".map!q{a.text~'\n'}.join)); +/
+					/+((0x3D54DEB16D5C4).檢 (lastHitStack.map!"a.hitBounds".map!q{a.text~'\n'}.join)); +/
 					
 					dr.lineWidth = 1; 
 				} 

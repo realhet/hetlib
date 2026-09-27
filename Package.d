@@ -3235,7 +3235,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				{
 					static assert(A.length==1); 
 					auto data = args[0].asArray; 
-					auto blobAddress = dbg.setBlob(location, data); 
+					if(const blobAddress = dbg.setBlob_wait(location, data))
 					dbg.sendLog(
 						"LOG:INSP_IMG_BLB:"~location.to!string(16)~":"~blobAddress.to!string(16)
 							~":"~typeof(data[0]).stringof
@@ -3261,9 +3261,11 @@ version(/+$DIDE_REGION Global System stuff+/all)
 							- streaming mode: Wait  for the IDE to finish reading.
 								Use a byte in the allocated block for this as understanding the circular buffer tail is more difficult.
 							- sampling mode: Only write the block if the IDE was finished reading the previous data.
+							
+							260927: Solving with setBlob_wait() and getBlob_ack()
 						+/
 						
-						auto blobAddress = dbg.setBlob(location, (cast(void[])(txt))); 
+						if(const blobAddress = dbg.setBlob_wait(location, (cast(void[])(txt))))
 						dbg.sendLog("LOG:INSP_TXT_BLB:"~location.to!string(16)~":"~blobAddress.to!string(16)); 
 					}
 				}
@@ -3435,15 +3437,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B1BB59F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B21259F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B28359F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B2DA59F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B32D59F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B3A259F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B38459F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B3F959F156A1})); 
 						+/
 					+/
 				+/
@@ -3748,6 +3750,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				Todo: If it is moved next to "Multithread" region, it will cause a linker error.
 				I guess  because shared static this sucks ass.
 			+/
+			/+260901: I removed one shared static this() from whatever module, moved the initialization into this and now it works...+/
 		+/
 		
 		
@@ -9245,11 +9248,11 @@ version(/+$DIDE_REGION Containers+/all)
 				auto _間=init間; 
 				static bool res; res = false; 
 				enum N = 16<<16; 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x44D9A59F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x44E1C59F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x44E9859F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x44F1559F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x44F9B59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x44E7159F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x44EF359F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x44F6F59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x44FEC59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x4507259F156A1).檢((update間(_間)))); 
 				
 				/+
 					benchmarks:
@@ -16171,6 +16174,8 @@ version(/+$DIDE_REGION debug+/all)
 				enum circularBufferSize = 64<<10,
 				memoryPoolSize = 64<<20; 
 				
+				static assert(memoryPoolSize <= int.max /+Stay safely inside uint range. ->BlobRec.ofs+/); 
+				
 				struct BreakRec
 				{ uint locationHash, state; } 
 				static assert(BreakRec.sizeof==8); 
@@ -16217,7 +16222,12 @@ version(/+$DIDE_REGION debug+/all)
 				struct Data
 				{
 					enum uint DbgVersion = 
-					26_09_26__10_34 /+`DbgVersion` added. It modifies the DbgDataHash value.+/; 
+					//26_09_26__10_34 /+`DbgVersion` added. It modifies the DbgDataHash value.+/
+					26_09_26__13_38 /+
+						One byte ACK added to the end of large dbg allocated blocks.
+						New stuff: DBG_BLOCK_READY, DBG_BLOCK_FINISHED, 
+						setBlob_wait(), getBlob_access(), getBlob_ack()
+					+/; 
 					enum uint CurrentStructHash = getStructHash!Data + DbgVersion; 
 					
 					/+
@@ -16265,34 +16275,66 @@ version(/+$DIDE_REGION debug+/all)
 			bool isActive()
 			{ return data !is null; } 
 			
-			struct BlobRec { void* ptr; uint length; } 
+			struct BlobRec { uint ofs, length; } 
 			BlobRec[ulong] blobs; 
 			//Todo: statistics: number of blobs, size of blobs
 			
+			enum DBG_POSTFIX_LEN 	= 1/+bytes+/,
+			DBG_BLOCK_READY 	= 0xF0,
+			DBG_BLOCK_FINISHED 	= 0xFE; 
 			
-			ulong setBlob(ulong id, void[] buf)
+			ulong setBlob_wait(ulong id, void[] buf)
 			{
 				if(!data) return 0; 
 				
+				const fullLen = (buf.length + DBG_POSTFIX_LEN).to!uint; 
+				
+				ulong calcOfs(void* ptr) => (cast(ulong)(ptr)) - (cast(ulong)(data.memoryPool.ptr)); 
+				void* calcPtr(uint ofs) => (cast(void*)((cast(ulong)(data.memoryPool.ptr)) + ofs)); 
+				
 				ulong copyAndCalcBlobAddress(void* ptr)
 				{
-					ptr[0..buf.length] = buf; 
+					ptr[0 .. buf.length] = buf; 
+					
+					(cast(ubyte*)(ptr))[buf.length] = DBG_BLOCK_READY; 
+					
 					return (cast(ulong)(buf.length)) |
-					((cast(ulong)(ptr))-(cast(ulong)(data.memoryPool.ptr)))<<32; 
+					calcOfs(ptr)<<32; 
 				} 
 				
 				if(auto a = id in blobs)
 				{
-					if(buf.length==a.length)
-					{ return copyAndCalcBlobAddress(a.ptr); }
+					auto aptr = calcPtr(a.ofs); 
 					
-					allocator.free(a.ptr); 
+					version(/+$DIDE_REGION Wait for DIDE to finish reading it+/all)
+					{
+						auto peekSynchState()
+						=> (cast(ubyte*)(aptr))[a.length - DBG_POSTFIX_LEN]; 
+						while(peekSynchState != DBG_BLOCK_FINISHED)
+						{
+							enforce(
+								peekSynchState == DBG_BLOCK_READY, 
+								i"FATAL DBG ERROR: Corrupt synchState $(peekSynchState
+.format!"0x%X")".text
+							); 
+							sleep(1); 
+						}
+					}
+					
+					//try to reuse previous buffer
+					if(mixin(界3(q{a.sizeBytes - (a.sizeBytes>>>4)},q{fullLen},q{a.sizeBytes})))
+					{
+						//fast path: no reallocation needed.
+						return copyAndCalcBlobAddress(aptr); 
+					}
+					
+					allocator.free(aptr); 
 					blobs.remove(id); 
 				}
 				
-				if(auto p = allocator.alloc(buf.length))
+				if(auto p = allocator.alloc(fullLen))
 				{
-					blobs[id] = BlobRec(p, buf.length.to!uint); 
+					blobs[id] = BlobRec(calcOfs(p).to!uint, fullLen); 
 					return copyAndCalcBlobAddress(p); 
 				}
 				
@@ -16666,20 +16708,27 @@ version(/+$DIDE_REGION debug+/all)
 			{ return data ? data.exe_hwnd : 0; } 	@property exe_hwnd(int val)
 			{ if(data) data.exe_hwnd = val; } 
 			
-			void[] getBlob(ulong blobAddress)
+			void[] getBlob_access(ulong blobAddress)
 			{
 				if(!data) return null; 
 				const 	base = blobAddress>>>32,
-					length = (cast(uint)(blobAddress)); 
-				
-				//260926: removed enforce(base>=0 && base+length<=Data.memoryPool.length, "blobAddress out of range"); 
+					length = (cast(uint)(blobAddress)),
+					fullLen = length + DebugLogClient.DBG_POSTFIX_LEN; 
 				
 				enforce(
-					base      <=Data.memoryPool.length && 
-					base+length<=Data.memoryPool.length, 
+					base         <=Data.memoryPool.length && 
+					base + fullLen <=Data.memoryPool.length, 
 					"blobAddress out of range"
 				); 
 				return data.memoryPool[base..base+length]; 
+			} 
+			
+			void getBlob_ack(ulong blobAddress)
+			{
+				if(!data) return; 
+				const 	base = blobAddress>>>32,
+					length = (cast(uint)(blobAddress)); 
+				data.memoryPool[base+length] = DebugLogClient.DBG_BLOCK_FINISHED; 
 			} 
 			
 		} 
@@ -17178,11 +17227,11 @@ version(/+$DIDE_REGION debug+/all)
 		alias Chunk = ubyte[alignment]; 
 		Chunk[] memory; 
 		struct Block {
-			uint st, en; 
+			uint st, en; //these are chunk indices!
 			@property length() const
-			{ return en-st; } 
+			=> en-st; 
 			@property sizeBytes() const
-			{ return length*Chunk.sizeof; } 
+			=> length * Chunk.sizeof; 
 		} 
 		
 		static bool lessThanBySize(in Block a, in Block b)
@@ -17197,6 +17246,8 @@ version(/+$DIDE_REGION debug+/all)
 		Block[uint] usedBlocks; 
 		RedBlackTree!(Block, lessThanBySize, false) freeBlocksBySize; 
 		RedBlackTree!(Block, lessThanByPos, false) freeBlocksByPos; 
+		
+		//Opt: RedBlackTree and AA are GC killers!!!
 		
 		void addFreeBlock(Block fb)
 		{
@@ -17341,6 +17392,7 @@ version(/+$DIDE_REGION debug+/all)
 			}
 			return false; 
 		} 
+		
 		
 		@property countUsed()
 		=> usedBlocks.length; 	@property sizeUsed() => mixin(求sum(q{b},q{usedBlocks.byValue},q{b.sizeBytes})); 
