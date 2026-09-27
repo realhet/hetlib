@@ -6917,7 +6917,9 @@ version(/+$DIDE_REGION Containers+/all)
 						
 				//advance in one step
 				head += fullLen; //no atomic needed as one writes and the other reads
-						
+				
+				//Todo: auto h = atomicLoad!(MemoryOrder.acquire)(head);
+				
 				return true; 
 			} 
 					
@@ -6941,10 +6943,16 @@ version(/+$DIDE_REGION Containers+/all)
 				}
 				if(dstLen>0)
 				{ memcpy(dst, &(buf[o]), dstLen); }
-						
+				
 				//advance in one step
 				tail += fullLen; //no atomic needed as one writes and the other reads
-						
+				
+				/+
+					Todo: Use /+Code: atomicStore!(MemoryOrder.release)(head, newHead);+/
+					It prevents the compiler to reorder operations.
+					Verify that 'nothing happens' in DISASM!
+				+/
+				
 				return true; 
 			} 
 					
@@ -9237,11 +9245,11 @@ version(/+$DIDE_REGION Containers+/all)
 				auto _間=init間; 
 				static bool res; res = false; 
 				enum N = 16<<16; 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x44C9559F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x44D1759F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x44D9359F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x44E1059F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x44E9659F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x44D9A59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x44E1C59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x44E9859F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x44F1559F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x44F9B59F156A1).檢((update間(_間)))); 
 				
 				/+
 					benchmarks:
@@ -16205,8 +16213,13 @@ version(/+$DIDE_REGION debug+/all)
 					} 
 				} 
 				
+				
 				struct Data
 				{
+					enum uint DbgVersion = 
+					26_09_26__10_34 /+`DbgVersion` added. It modifies the DbgDataHash value.+/; 
+					enum uint CurrentStructHash = getStructHash!Data + DbgVersion; 
+					
 					/+
 						Note: Important note:	All fields must be initialized to ZERO or VOID.	
 						Otherwise a very	large initialization block will be placed on the	data segment.
@@ -16241,6 +16254,7 @@ version(/+$DIDE_REGION debug+/all)
 					align(64) ubyte[memoryPoolSize] memoryPool = void; //allocator on the client uses this to send big blobs
 				} 
 			}
+			
 			
 			
 			private SharedMemClient!Data sharedMem; 
@@ -16301,9 +16315,9 @@ version(/+$DIDE_REGION debug+/all)
 				sharedMem = new SharedMemClient!Data(dataFileName); 
 				data = sharedMem.data; 
 				
-				if(data && data.dbgDataStructHash != getStructHash!Data)
+				if(data && data.dbgDataStructHash != Data.CurrentStructHash)
 				{
-					//Todo: show this error on the server side
+					//Todo: show this error on the server side, but how? This is a wrong protocol version!!!
 					/+
 						writeln(
 						"DebugClient: Incompatible dbgDataStructHash.  "~
@@ -16574,7 +16588,7 @@ version(/+$DIDE_REGION debug+/all)
 				
 				if(data)
 				{
-					data.dbgDataStructHash = getStructHash!Data; 
+					data.dbgDataStructHash = Data.CurrentStructHash; 
 					//client will compare its structureHash to this one.
 				}
 				

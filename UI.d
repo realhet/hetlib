@@ -162,7 +162,7 @@ version(/+$DIDE_REGION+/all)
 	VisualizeContainerIds	= (常!(bool)(0)),
 	VisualizeGlyphs	= (常!(bool)(0)),
 	VisualizeTabColors	= (常!(bool)(0)), //Todo: spaces at row ends
-	VisualizeHitStack	= (常!(bool)(1)),
+	VisualizeHitStack	= (常!(bool)(0)),
 	VisualizeSliders	= (常!(bool)(0)),
 	VisualizeCodeLineIndices 	= (常!(bool)(0)), //Todo: ezt csak a row-ban kene megcsinalni, runtime opcionalisra.
 		
@@ -8710,10 +8710,12 @@ struct im
 					hoverGroup.update(hitStack, deltaTime_sec); 
 					mouseCaptureDetector.update(hitStack); 
 					
-					((0x3CD33EB16D5C4).檢(stats)); 
-					((0x3CD5AEB16D5C4).檢(hoverGroup.hover)); 
-					((0x3CD8CEB16D5C4).檢 (hoverGroup.hover_smooth.byKeyValue.map!((a)=>(a.key.text~`	`~/+🟢+/`#`.replicate(iceil(a.value*25)))).array.replicate(1).join('\n')~"THE_END")); 
-					((0x3CE3EEB16D5C4).檢 (hitStack.map!text.join('\n'))); 
+					/+
+						((0x3CD33EB16D5C4).檢(stats)); 
+						((0x3CD5AEB16D5C4).檢(hoverGroup.hover)); 
+						((0x3CD8CEB16D5C4).檢 (hoverGroup.hover_smooth.byKeyValue.map!((a)=>(a.key.text~`	`~/+🟢+/`#`.replicate(iceil(a.value*25)))).array.replicate(1).join('\n')~"THE_END")); 
+						((0x3CE3EEB16D5C4).檢 (hitStack.map!text.join('\n'))); 
+					+/
 					
 					//latch onto the next frame
 					lastHitStack = hitStack; 
@@ -8759,7 +8761,7 @@ struct im
 					dr.lineWidth = blinkf * -3; dr.color = clFuchsia; 
 					lastHitStack.map!"a.hitBounds".each!((b){ dr.drawRect(b.inflated(vec2(blinks, blinkc)*-3)); }); 
 					
-					((0x3D511EB16D5C4).檢 (lastHitStack.map!"a.hitBounds".map!q{a.text~'\n'}.join)); 
+					/+((0x3D511EB16D5C4).檢 (lastHitStack.map!"a.hitBounds".map!q{a.text~'\n'}.join)); +/
 					
 					dr.lineWidth = 1; 
 				} 
