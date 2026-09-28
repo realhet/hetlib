@@ -18005,6 +18005,7 @@ Source field: 	$("baseDeco") 	Source field: 	$(a)"
 						
 						//Todo: error handling when there is no classloader for the class in json
 						
+						
 						/+
 							print("className in Json:", className); 
 							print("Trying to load class:", classFullName); 
@@ -18013,10 +18014,11 @@ Source field: 	$("baseDeco") 	Source field: 	$(a)"
 							print("data1:", data); 
 						+/
 						
+						
 						//call a different loader if needed
 						if(classFullName.length && fullyQualifiedName!Type != classFullName)
 						{
-							//print("Calling appropriate loader", classFullName);
+							/+print("Calling appropriate loader", classFullName); +/
 							
 							//Todo: ezt felvinni a legtetejere es megcsinalni, hogy csak egyszer legyen a tipus ellenorizve
 							//Todo: Csak descendant classok letrehozasanak engedelyezese, kulonben accessviola
@@ -18119,8 +18121,14 @@ Source field: 	$("baseDeco") 	Source field: 	$(a)"
 					}
 				} 
 				
-				if(state.options.checkIgnoredFields)	loadFields!true; 
-				else	loadFields!false; 
+				auto canLoadFields = true; 
+				static if(is(T == class)) canLoadFields = data !is null; 
+				
+				if(canLoadFields)
+				{
+					if(state.options.checkIgnoredFields)	loadFields!true; 
+					else	loadFields!false; 
+				}
 			}
 			else static if(isArray!T)
 			{
