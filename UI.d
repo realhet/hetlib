@@ -5565,7 +5565,7 @@ version(/+$DIDE_REGION+/all)
 		T[] delegate() onBringToFront; //Use bringSelectedItemsToFront() for default behavior
 		bool deselectBelow; 
 		
-		void update(
+		bool update(
 			bool mouseEnabled, View2D view, T[] items, 
 			void delegate(T, vec2) afterMove = null
 		)
@@ -5695,6 +5695,8 @@ version(/+$DIDE_REGION+/all)
 				
 				mouseOp = MouseOp.idle; 
 			}
+			
+			return mouseOp!=MouseOp.idle; 
 		} 
 	} 
 	
@@ -8557,7 +8559,7 @@ struct im
 							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
 							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
 						}
-						((0x3BB5CEB16D5C4).檢 (ImStorageManager.stats)); 
+						((0x3BB84EB16D5C4).檢 (ImStorageManager.stats)); 
 					}
 				}
 				

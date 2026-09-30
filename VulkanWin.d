@@ -732,6 +732,13 @@ version(/+$DIDE_REGION+/all)
 	
 	class GeometryStreamProcessor
 	{
+		/+
+			Note: This is a class containing static routines used both on CPU and GPU.
+			Later it could be a central class, but now GfxAssembler/GfxBuilder/IDrawing are the main interfaces.
+			
+			/+Todo: implement new font engine, so this can make sense.+/
+		+/
+		
 		protected
 		{
 			enum SharedCode = 
@@ -3516,7 +3523,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1BA7E82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1BB8C82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -5647,18 +5654,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2B83182886ADB).檢(
+					((0x2B93F82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2B8A382886ADB))))
+				if((互!((bool),(0),(0x2B9B182886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2B93782886ADB).檢((互!((float/+w=12+/),(1.000),(0x2B94E82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2BA4582886ADB).檢((互!((float/+w=12+/),(1.000),(0x2BA5C82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5671,8 +5678,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2BB2382886ADB).檢 (imVG)),
-					((0x2BB4982886ADB).檢 (imFPS)); 
+					((0x2BC3182886ADB).檢 (imVG)),
+					((0x2BC5782886ADB).檢 (imFPS)); 
 				}
 			}
 			
