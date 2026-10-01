@@ -181,6 +181,12 @@ version(/+$DIDE_REGION+/all)
 	
 	enum TargetSurface { world = 0, gui = 1 } 
 	
+	struct UserInteraction
+	{
+		bool handled; //true when any operation is active. It temporarily blocks other operations.
+		bool modified; //set when the user successfully modified the underlying data
+	} 
+	
 	version(/+$DIDE_REGION+/none) {
 		immutable DefaultFontName = //this is the cached font
 		"Segoe UI"
@@ -5540,6 +5546,7 @@ version(/+$DIDE_REGION+/all)
 		
 		vec2 dragSource; 
 		bounds2 dragBounds; 
+		bool anyMoved; 
 		
 		bounds2 selectionBounds()
 		{
@@ -5565,11 +5572,20 @@ version(/+$DIDE_REGION+/all)
 		T[] delegate() onBringToFront; //Use bringSelectedItemsToFront() for default behavior
 		bool deselectBelow; 
 		
-		bool update(
-			bool mouseEnabled, View2D view, T[] items, 
-			void delegate(T, vec2) afterMove = null
+		bool update(bool canStart, View2D view, T[] items, void delegate(T, vec2) afterMove = null)
+		{
+			//this is compatible with old stuff (261001)
+			UserInteraction userInteraction; 
+			update(userInteraction, __traits(parameters)); 
+			return userInteraction.handled; 
+		} 
+		
+		void update(
+			ref UserInteraction userInteraction, 
+			bool canStart, View2D view, T[] items, void delegate(T, vec2) afterMove = null
 		)
 		{
+			if(userInteraction.handled) canStart = false; 
 			
 			void selectNone()
 			{
@@ -5623,7 +5639,7 @@ version(/+$DIDE_REGION+/all)
 			if(getBounds(item).contains!"[)"(mouseAct))
 			hoveredItem = item; 
 			
-			if(LMB_pressed && mouseEnabled)
+			if(LMB_pressed && canStart)
 			{
 				//Left Mouse pressed //
 				if(hoveredItem)
@@ -5675,6 +5691,7 @@ version(/+$DIDE_REGION+/all)
 					//This kind of move is losing precision quickly, but it survives zooming.
 					
 					if(afterMove) afterMove(a, mouseDelta); 
+					anyMoved = true; 
 					
 					
 					
@@ -5687,16 +5704,18 @@ version(/+$DIDE_REGION+/all)
 			}
 			
 			
-			if(LMB_released)
+			if(mouseOp && !LMB)
 			{
 				 //left mouse released //
 				
 				//...
+				if(anyMoved.chkClear) userInteraction.modified = true; 
+				/+Todo: track movement+/
 				
 				mouseOp = MouseOp.idle; 
 			}
 			
-			return mouseOp!=MouseOp.idle; 
+			userInteraction.handled |= mouseOp!=MouseOp.idle; 
 		} 
 	} 
 	
@@ -8559,7 +8578,7 @@ struct im
 							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
 							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
 						}
-						((0x3BB84EB16D5C4).檢 (ImStorageManager.stats)); 
+						((0x3BE62EB16D5C4).檢 (ImStorageManager.stats)); 
 					}
 				}
 				

@@ -288,7 +288,7 @@ version(/+$DIDE_REGION+/all)
 		string[] keys; 
 		
 		this(KeyComboEntry src)
-		{ keys = src.keys.dup; } 
+		{ keys = src.keys; } 
 		
 		this(string s)
 		{
@@ -328,6 +328,9 @@ version(/+$DIDE_REGION+/all)
 		{ return valid && inputs.keyModifierMask==keyModifierMask && entries(keys.length-1).released; } 
 		bool typed()
 		{ return valid && inputs.keyModifierMask==keyModifierMask && entries(keys.length-1).repeated; } 
+		
+		bool mainActive()
+		=> valid && entries(keys.length-1).active; 
 	} 
 	
 	struct KeyCombo
@@ -366,6 +369,16 @@ version(/+$DIDE_REGION+/all)
 		{ return combos.any!"a.released"; } 
 		
 		//bool changed () { return combos.map!changed .any; }
+		
+		
+		///Tell if the main key without the modifiers is still active.
+		bool mainActive()
+		{
+			foreach(a; combos) if(a.mainActive) return true; 
+			return false; 
+		} 
+		alias mainHold 	= mainActive,
+		mainDown 	= mainActive; 
 	} 
 	
 	void callVerb(string name, T)(T obj)

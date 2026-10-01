@@ -265,7 +265,6 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			
 			test_fillBits; test_bits; test_bitsArray; test_findInSortedIntervals; //260914
 			
-			
 			//startup ---------------------------------------------------------------------
 			
 			CoInitializeEx(null, 0); //fixes problem with "file explorer wont refrest when different filetype selected.". No need for COINIT_APARTMENTTHREADED, just a 0 is enough.
@@ -3451,15 +3450,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B37459F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B36F59F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B43C59F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B43759F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B4E659F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B55B59F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B4E159F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B55659F156A1})); 
 						+/
 					+/
 				+/
@@ -9262,11 +9261,11 @@ version(/+$DIDE_REGION Containers+/all)
 				auto _間=init間; 
 				static bool res; res = false; 
 				enum N = 16<<16; 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x44FD359F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x4505559F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x450D159F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x4514E59F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x451D459F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x44FCE59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x4505059F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x450CC59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x4514959F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x451CF59F156A1).檢((update間(_間)))); 
 				
 				/+
 					benchmarks:
@@ -11997,11 +11996,22 @@ version(/+$DIDE_REGION Colors+/all)
 	
 	class FileOps
 	{
+		@STORED @property
+		{
+			//this property can be saved to ini
+			File openedFile() const => fileName; 
+			void openedFile(File f)
+			{
+				if(f!=openedFile)
+				{ new_(false); if(f) open(f); }
+			} 
+		} 
+		
 		enum Op
 		{ FileLoad, FileSave, UndoLoad, UndoSave} 
 		
 		private {
-			alias Data = ubyte[]; 
+			alias Data = immutable(ubyte)[]; 
 			
 			//filename, protected from outside
 			File fileName_; 
@@ -12032,12 +12042,14 @@ version(/+$DIDE_REGION Colors+/all)
 			Data lastData; //saved before chg()
 			UndoRec[] undoBuf, redoBuf; 
 			
-			File delegate(File) onSave; 
-			File delegate() onLoad; 
-			void delegate(Op) onFileOp; 
+			/+
+				File delegate(File) onSave; 
+				File delegate() onLoad; 
+			+/
+			void delegate(Op, ref Data data) onFileOp; 
 		} 
 		
-		this(FileDialog fileDialog_, void delegate(Op) onFileOp_)
+		this(FileDialog fileDialog_, void delegate(Op, ref Data) onFileOp_)
 		{
 			assert(fileDialog_); 
 			assert(onFileOp_); 
@@ -12063,13 +12075,12 @@ version(/+$DIDE_REGION Colors+/all)
 		{ return canRedo ? redoBuf[$-1].caption : ""; } 
 		
 		string fileCaption()  const
-		{ return (isChanged?"*":"")~(fileName.toString=="" ? "unnamed" : fileName.toString); } 
+		{ return i"[$(((fileName.toString=="")?("unnamed") :(fileName.fullName)))]$(((isChanged)?("*") :("")))".text; } 
 		
 		size_t memUsage() const
 		{
-			return fileData.sizeof +
-						 undoBuf.map!"a.data.sizeof".sum +
-						 redoBuf.map!"a.data.sizeof".sum; 
+			return fileData.sizeof +	undoBuf.map!"a.data.sizeof".sum +
+				redoBuf.map!"a.data.sizeof".sum; 
 		} 
 		
 		string stats() const
@@ -12087,8 +12098,7 @@ version(/+$DIDE_REGION Colors+/all)
 			return trySaveBeforeNewOrOpen; 
 		} 
 		
-		struct action
-		{} 
+		struct action {} 
 		
 		//user commands
 		@action
@@ -12168,13 +12178,13 @@ version(/+$DIDE_REGION Colors+/all)
 		{
 			blockChg = true; 
 			fileData = data_; 
-			onFileOp(isFile ? Op.FileLoad : Op.UndoLoad); 
+			onFileOp(((isFile)?(Op.FileLoad):(Op.UndoLoad)), fileData); 
 			blockChg = false; 
 		} 
 			Data contentSave(bool isFile)
 		{
 			fileData = null; 
-			onFileOp(isFile ? Op.FileSave : Op.UndoSave); 
+			onFileOp(((isFile)?(Op.FileSave):(Op.UndoSave)), fileData); 
 			return fileData; 
 		} 
 		
@@ -12200,14 +12210,15 @@ version(/+$DIDE_REGION Colors+/all)
 			
 			if(!fn)
 			{
-				fn = onLoad(); //!!!!!!!!!!!!!!!Ezeket a dialogokat inkabb egy FileDialog class-al kene csinalni.
+				fn = fileDialog.open; 
+				/+if(onLoad) fn = onLoad(); //!!!!!!!!!!!!!!!Ezeket a dialogokat inkabb egy FileDialog class-al kene csinalni.+/
 				if(!fn)
 				return false; 
 			}
 			
 			fileName = fn; 
 			lastOpWasNew = false; 
-			contentLoad(fn.read, true); 
+			contentLoad((cast(Data)(fn.read)), true); 
 			lastData = contentSave(false); //Why???????
 			clearUndo; 
 			
