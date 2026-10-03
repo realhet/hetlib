@@ -2478,17 +2478,22 @@ version(/+$DIDE_REGION Global System stuff+/all)
 	///align and nested structs matter.
 	uint getStructHash(S)()
 	{
-		size_t h = hashOf("structHash", S.sizeof); 
+		/+
+			Note: (aa/array/string).hashOf(seed) is CRAP! 
+			So I have to use unseeded hashOf() on those.
+		+/
+		
+		size_t h = "structHash".hashOf.hashOf(S.sizeof); 
 		static foreach(f; FieldNameTuple!S)
 		{
 			{
 				alias m = mixin("S.", f); 
 				alias T = typeof(m); 
-				h = hashOf(f, h); 
-				h = hashOf(m.sizeof, h); 
-				h = hashOf(m.offsetof, h); 
-				h = hashOf(T.stringof, h); 
-				static if(is(T==struct)) h = hashOf(getStructHash!T, h); 
+				h = f.hashOf.hashOf(h); 
+				h = m.sizeof.hashOf(h); 
+				h = m.offsetof.hashOf(h); 
+				h = T.stringof.hashOf.hashOf(h); 
+				static if(is(T==struct)) h = getStructHash!T.hashOf(h); 
 			}
 		}
 		return h & 0xFFFFFFFF; 
@@ -3450,15 +3455,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B36F59F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B3F259F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B43759F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B4BA59F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B4E159F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B55659F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B56459F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B5D959F156A1})); 
 						+/
 					+/
 				+/
@@ -9261,11 +9266,11 @@ version(/+$DIDE_REGION Containers+/all)
 				auto _間=init間; 
 				static bool res; res = false; 
 				enum N = 16<<16; 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x44FCE59F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x4505059F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x450CC59F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x4514959F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x451CF59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x4505159F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x450D359F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x4514F59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x451CC59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x4525259F156A1).檢((update間(_間)))); 
 				
 				/+
 					benchmarks:
