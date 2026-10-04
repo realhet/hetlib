@@ -753,7 +753,7 @@ version(/+$DIDE_REGION Global System stuff+/all)
 				{ string text; } 
 				
 				alias RANGE 	= ValueRange,
-				RANGE_log 	= logRange,
+				RANGE_log 	= logRange, LOGRANGE = logRange,
 				RANGE_circular 	= circularRange, 
 				RANGE_endless 	= endlessRange; 
 				/+
@@ -3455,15 +3455,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B3F259F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B40759F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B4BA59F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B4CF59F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B56459F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B5D959F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B57959F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B5EE59F156A1})); 
 						+/
 					+/
 				+/
@@ -5623,6 +5623,8 @@ version(/+$DIDE_REGION Numeric+/all)
 	{
 		struct RNG
 		{
+			/+Note: In LCGs, low bits are trash quality.+/
+			
 			auto seedStream = SeedStream_pascal(0x41974702); 
 					
 			ref uint seed()
@@ -5656,16 +5658,16 @@ version(/+$DIDE_REGION Numeric+/all)
 				seedStream.popFront; 
 				return seed*0x1.0p-32; 
 			} 
-					
+			
 			uint random(uint n)
 			{
 				seedStream.popFront; 
 				return (ulong(seed)*n)>>32; 
 			} 
-					
+			
 			int random(int n)
 			{ return int(random(uint(n))); } 
-					
+			
 			ulong random(ulong n)
 			{
 				if(n<=0xFFFF_FFFF) return random(cast(uint)n); 
@@ -5677,16 +5679,26 @@ version(/+$DIDE_REGION Numeric+/all)
 			
 			auto randomGaussPair()
 			{
-				float x1, x2, w; 
+				vec2 randomVec2()
+				{
+					seedStream.popFront; 
+					return vec2(
+						(float(seed.BITS[ 0..16])), 
+						(float(seed.BITS[16..32]))
+					) * 0x1.0p-16f; 
+				} 
+				
+				vec2 p; float w; 
+				
 				do {
-					x1 = randomFloat; 
-					x2 = randomFloat; 
-					w = x1*x1 + x2*x2; 
+					p = randomVec2; 
+					w = dot(p, p); 
 				}while(w>1); 
 				w = sqrt((-2*log(w))/w); 
-				return tuple(
-					x1*w * ((seedStream.front&1)?-1:1), 
-					x2*w * ((seedStream.front&2)?-1:1)
+				
+				return p * w * vec2(
+					((seed.BITS[17])?(-1):(1)),
+					((seed.BITS[19])?(-1):(1))
 				); 
 			} 
 			
@@ -9266,11 +9278,11 @@ version(/+$DIDE_REGION Containers+/all)
 				auto _間=init間; 
 				static bool res; res = false; 
 				enum N = 16<<16; 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x4505159F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x450D359F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x4514F59F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x451CC59F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x4525259F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x4513359F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x451B559F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x4523159F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x452AE59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x4533459F156A1).檢((update間(_間)))); 
 				
 				/+
 					benchmarks:
