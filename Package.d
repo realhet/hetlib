@@ -5775,6 +5775,27 @@ version(/+$DIDE_REGION Numeric+/all)
 					}
 		+/
 		
+		/+
+			Todo: unittest randomGaussPair
+			
+			PS = 5; COL = clWhite; alpha = .8; 
+			int[3] cnt; enum N=256*4; 
+			foreach(i; 0..N)
+			{
+				const p = randomGaussPair, len = (magnitude(p.x)); 
+				if(len<1) cnt[0]++; 
+				if(len<2) cnt[1]++; 
+				if(len<3) cnt[2]++; 
+				point(p); 
+			}
+			must be close to std dev probabilities:
+			((0x83AA6A97795A).檢(cnt[0]/(float(N)))); 
+			((0x83DB6A97795A).檢(cnt[1]/(float(N)))); 
+			((0x840C6A97795A).檢(cnt[2]/(float(N)))); 
+			LW = 1; alpha = 1; 
+			circle(vec2(0, 0), 1); circle(vec2(0, 0), 2); circle(vec2(0, 0), 3); 
+		+/
+		
 	}version(/+$DIDE_REGION+/all) {
 		//a simple one from Delphi
 		struct SeedStream
@@ -9278,11 +9299,11 @@ version(/+$DIDE_REGION Containers+/all)
 				auto _間=init間; 
 				static bool res; res = false; 
 				enum N = 16<<16; 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x4513359F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x451B559F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x4523159F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x452AE59F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x4533459F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x4538859F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x4540A59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x4548659F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x4550359F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x4558959F156A1).檢((update間(_間)))); 
 				
 				/+
 					benchmarks:

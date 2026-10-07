@@ -209,7 +209,7 @@ version(/+$DIDE_REGION+/all)
 		InternalTabWidth	= 3.25f	*(DefaultFontHeight/18.0f),	 InternalTabAspect	= InternalTabWidth	/ DefaultFontHeight,
 			
 		MinScrollThumbSize	= 4, 
-		DefaultScrollThickness 	= 15; 
+		DefaultScrollBarThickness 	= 15; 
 	
 	//static assert(DefaultFontHeight==18, "//fucking keep it on 18!!!!"); 
 	
@@ -3608,17 +3608,26 @@ version(/+$DIDE_REGION+/all)
 			FlexAmount flex_; 
 		} 
 		
-		auto getHScrollBar()
-		{ return flags._hasHScrollBar ? im.hScrollInfo.getScrollBar(id) : null; } 
-		auto getVScrollBar()
-		{ return flags._hasVScrollBar ? im.vScrollInfo.getScrollBar(id) : null; } 
-		auto getHScrollOffset()
-		{ return flags._hasHScrollBar ? im.hScrollInfo.getScrollOffset(id) : 0; } 
-		auto getVScrollOffset()
-		{ return flags._hasVScrollBar ? im.vScrollInfo.getScrollOffset(id) : 0; } 
-		auto getScrollOffset()
-		{ return vec2(getHScrollOffset, getVScrollOffset); } 
-		
+		@property
+		{
+			auto getHScrollBar()
+			{ return flags._hasHScrollBar ? im.hScrollInfo.getScrollBar(id) : null; } 
+			auto getVScrollBar()
+			{ return flags._hasVScrollBar ? im.vScrollInfo.getScrollBar(id) : null; } 
+			auto getHScrollOffset()
+			{ return flags._hasHScrollBar ? im.hScrollInfo.getScrollOffset(id) : 0; } 
+			auto getVScrollOffset()
+			{ return flags._hasVScrollBar ? im.vScrollInfo.getScrollOffset(id) : 0; } 
+			auto getScrollOffset()
+			{ return vec2(getHScrollOffset, getVScrollOffset); } 
+			
+			auto getVisibleBounds()
+			{
+				if(!flags._measured) WARN("Container should be measured first! "~id.text.quoted); 
+				const ofs = getScrollOffset; 
+				return bounds2(ofs, ((innerSize).名!q{size})); 
+			} 
+		} 
 		
 		void clearSubCells()
 		{ subCells = []; } 
@@ -3844,7 +3853,7 @@ version(/+$DIDE_REGION+/all)
 				vFlow 	= getVFlowConfig, 
 				maxFlow 	= max(hFlow, vFlow); 
 			
-			const 	scrollThickness 	= DefaultScrollThickness,
+			const 	scrollThickness 	= DefaultScrollBarThickness,
 				e 	= 1/+minimum area that must remain after the scrollbar.+/; 
 			
 			bool alloc(char o)()
@@ -3998,9 +4007,9 @@ version(/+$DIDE_REGION+/all)
 				
 				//setup the scrollbars
 				if(flags._hasHScrollBar)
-				im.hScrollInfo.update(this, calcContentWidth, innerWidth); 
+				im.hScrollInfo.updateScrollInfo(this, calcContentWidth, innerWidth); 
 				if(flags._hasVScrollBar)
-				im.vScrollInfo.update(this, calcContentHeight, innerHeight); 
+				im.vScrollInfo.updateScrollInfo(this, calcContentHeight, innerHeight); 
 				
 				/+
 					restore size after rearrange. 
@@ -5759,15 +5768,69 @@ version(/+$DIDE_REGION+/all)
 	} 
 	static class VirtualListBase
 	{
-		float maxRowWidth = 0; 
-		void measureVisibleRows(bool doStretch)
+		bool stretchRows = true; /+
+			stretches all the visible rows to the right edge of the ListView,
+			This way selection highlights can look better.
+		+/
+		
+		
+		float lastOuterWidth = 0; 
+		void appendContentSizeMarkerCell(vec2 contentSize)
 		{
-			maxRowWidth = 0; 
+			//HScrollBar fix: width must be compensated, because contentSize comes from 1 frame earlier
 			
+			float outerWidthDelta = 0; 
+			if(im.outerWidth && lastOuterWidth) outerWidthDelta = im.outerWidth-lastOuterWidth; 
+			lastOuterWidth = im.outerWidth; 
+			
+			im.imAppend(new Cell(vec2(max(contentSize.x+outerWidthDelta, 0), contentSize.y), vec2(0))); 
+		} 
+		
+		float maxRowWidth = 0; 
+		//Must be called inside listview creation
+		void measureVisibleListRows_impl(bool doStretch, float minRowWidth = 0)
+		{
+			minRowWidth.maximize(0); 
+			maxRowWidth = minRowWidth; 
+			
+			//important to olny deal with Rows! There can be a Cell and a Slider too.
 			auto rowCtrls() => im.thisContainer.subCells.drop(1).map!((a)=>((cast(het.ui.Row)(a)))); 
-			foreach(r; rowCtrls) { r.needMeasure; r.measure; maxRowWidth.maximize(r.outerWidth); }
+			foreach(r; rowCtrls) {
+				r.needMeasure; r.measure; 
+				maxRowWidth.maximize(r.outerWidth); 
+			}
 			
 			if(doStretch) foreach(r; rowCtrls) { r.outerWidth = maxRowWidth; }
+		} 
+		
+		void measureVisibleListRows()
+		{
+			float vsbWidth() => ((im.flags.vScrollState)?(DefaultScrollBarThickness+1):(0)); 
+			measureVisibleListRows_impl(
+				doStretch: stretchRows, 
+				((stretchRows)?(im.innerWidth - vsbWidth):(0))
+			); 
+		} 
+		
+		//This tries to create the scrollbars earlier. It calls measure first.
+		bounds2 getVisibleBounds()
+		{
+			const canGetEarlyVisibleBounds = im.thisContainer.outerHeight!=0; 
+			if(canGetEarlyVisibleBounds)
+			{
+				im.thisContainer.measure; 
+				im.createScrollBars(im.thisId); 
+				return im.thisContainer.getVisibleBounds; 
+			}
+			else
+			{
+				/+
+					fallback: Try to save the actual visible bounds in Draw()
+					Downside: 1 frame delay.
+				+/
+				im.flags._saveVisibleBounds = true; 
+				return imstVisibleBounds(im.thisId); 
+			}
 		} 
 	} 
 	
@@ -5777,6 +5840,101 @@ version(/+$DIDE_REGION+/all)
 		float rowHeight=0; 
 		int rowCount, start, end; 
 	} 
+	
+	static class VirtualListView : VirtualListBase 
+	{
+		VisibleRowRange UI_content(
+			in size_t rowCount, in float rowHeight, 
+			void delegate() onSetup=null, void delegate(size_t) onItem = null
+		)
+		{
+			with(im)
+			{
+				VisibleRowRange vrr; vrr.rowCount = rowCount.to!int, vrr.rowHeight = rowHeight; 
+				
+				imApply(Theme.tool); 
+				with(flags)
+				vScrollState	= ScrollState.auto_,
+				hScrollState	= ScrollState.auto_,
+				clipSubCells	= true; 
+				if(onSetup) onSetup(); 
+				
+				/+ total content size placeholder +/
+				appendContentSizeMarkerCell(vec2(maxRowWidth, rowCount*rowHeight)); 
+				
+				const float invRowHeight 	= 1/rowHeight; 
+				if(const visibleBounds = getVisibleBounds/+imstVisibleBounds(thisId)+/)
+				{
+					vrr.start 	= (ifloor(visibleBounds.top    * invRowHeight    )).max(0),
+					vrr.end 	= (iceil(visibleBounds.bottom * invRowHeight + 1)).clamp(0, rowCount.to!int),
+					vrr.visibleBounds = visibleBounds; 
+					foreach(i; vrr.start .. vrr.end)
+					{
+						Row(
+							((i).名!q{id}),
+							{
+								rowFlags.wordWrap = false; 
+								outerPos = vec2(0, i*rowHeight); 
+								outerHeight = rowHeight; 
+								onItem(i); 
+							}
+						); 
+					}
+				}
+				
+				measureVisibleListRows; 
+				
+				return vrr; 
+			}
+		} 
+		
+		VisibleRowRange UI_content(
+			in VisibleRowRange vrr, 
+			void delegate() onSetup=null, void delegate(size_t) onItem = null
+		)
+		{
+			with(im)
+			{
+				imApply(Theme.tool); 
+				with(flags)
+				clipSubCells = true; 
+				if(onSetup) onSetup(); 
+				
+				/+total content size placeholder: not needed at all because there is no scrollbars.+/
+				
+				foreach(i; vrr.start .. vrr.end)
+				{
+					Row(
+						((i).名!q{id}),
+						{
+							rowFlags.wordWrap = false; 
+							outerPos = vec2(0, i*vrr.rowHeight - vrr.visibleBounds.top); 
+							outerHeight = vrr.rowHeight; 
+							onItem(i); 
+						}
+					); 
+				}
+				
+				measureVisibleListRows; 
+				
+				return vrr; 
+			}
+		} 
+		
+		void UI(string _M_=__MODULE__, size_t _L_=__LINE__)
+			(
+			in size_t rowCount, in float rowHeight, 
+			void delegate() onSetup, void delegate(Item*) onItem = null
+		)
+		{
+			with(im)
+			{
+				Container!(.Container, _M_, _L_)
+				(((this).名!q{id}), { UI_content(rowCount, rowHeight, onSetup, onItem); }); 
+			}
+		} 
+	} 
+	
 	
 	static class VirtualTreeView(Item) : VirtualListBase
 	if(is(Item==struct))
@@ -5802,6 +5960,8 @@ version(/+$DIDE_REGION+/all)
 		DateTime rowsUpdated, changed; 
 		bool showBullet = true; /+if there is no open/close icon, a bullet mark looks nice in front of the item name+/
 		bool showRoot = true; 
+		
+		float lastOuterWidth=0; 
 		
 		Item* getParentItem(Item* child)
 		{
@@ -5852,120 +6012,120 @@ version(/+$DIDE_REGION+/all)
 				rowsUpdated = now; 
 			}
 		} 
-		
-		VisibleRowRange UI(string _M_=__MODULE__, size_t _L_=__LINE__)
-		(void delegate() onSetup/+must set outerSize in onSetup! Optionally can set fontHeight+/, void delegate(Item*) onItem=null)
+		VisibleRowRange UI_content(void delegate() onSetup/+must set outerSize in onSetup! Optionally can set fontHeight+/, void delegate(Item*) onItem=null)
 		{
 			VisibleRowRange vrr; 
 			with(im)
 			{
-				CustomContainer!(.Container, _M_, _L_)
-				(
-					((this).名!q{id}), Theme.tool,
+				with(flags)
+				vScrollState 	= ScrollState.auto_,
+				hScrollState 	= ScrollState.auto_,
+				clipSubCells 	= true; 
+				if(rowsUpdated<changed) makeRows; 
+				if(onSetup) onSetup(); 
+				
+				//total size placeholder
+				const float 	fh 	= style.fontHeight/+For faster access. Many things depend on 'fh'.+/, 
+					rowHeight 	= fh, 
+					invRowHeight 	= 1/rowHeight; 
+				
+				appendContentSizeMarkerCell(vec2(maxRowWidth, rows.length*rowHeight)); 
+				
+				vrr.rowHeight = rowHeight, 
+				vrr.rowCount = rows.length.to!int; 
+				
+				if(const visibleBounds = getVisibleBounds)
+				{
+					vrr.visibleBounds = visibleBounds; 
+					void doit(int i, TreeRow r)
 					{
-						with(flags)
-						vScrollState 	= ScrollState.auto_,
-						hScrollState 	= ScrollState.auto_,
-						clipSubCells 	= true; 
-						if(rowsUpdated<changed) makeRows; 
-						if(onSetup) onSetup(); 
-						
-						//total size placeholder
-						const float 	fh 	= style.fontHeight/+For faster access. Many things depend on 'fh'.+/, 
-							rowHeight 	= fh, 
-							invRowHeight 	= 1/rowHeight; 
-						imAppend(new Cell(vec2(maxRowWidth, rows.length*rowHeight), vec2(0))); 
-						/+Container({ outerPos = vec2(maxRowWidth, rows.length*rowHeight); outerSize = vec2(0); }); +/
-						
-						vrr.rowHeight = rowHeight, 
-						vrr.rowCount = rows.length.to!int; 
-						
-						flags._saveVisibleBounds = true; 
-						if(const visibleBounds = imstVisibleBounds(thisId))
+						with(im)
 						{
-							vrr.visibleBounds = visibleBounds; 
-							void doit(int i, TreeRow r)
-							{
-								with(im)
+							Row(
+								((identityStr(r.item)/+Opt: this is slowwww+/).名!q{id}),
 								{
-									Row(
-										((identityStr(r.item)/+Opt: this is slowwww+/).名!q{id}),
-										{
-											rowFlags.wordWrap = false; outerPos = vec2(0, i*rowHeight); outerHeight = fh; 
-											
-											version(/+$DIDE_REGION Tree graphics+/all)
+									rowFlags.wordWrap = false; outerPos = vec2(0, i*rowHeight); outerHeight = fh; 
+									
+									version(/+$DIDE_REGION Tree graphics+/all)
+									{
+										Row(
 											{
-												Row(
-													{
-														flags.noBackground = true; 
-														outerSize = vec2(r.prefix.length, 1)*fh; 
-														const float siz = fh; 
-														void customDraw(Drawing dr, .Container cntr)
-														{
-															dr.color = clGray; dr.lineWidth = 1.0625f; 
-															float x = siz*.5f; 
-															foreach(ch; r.prefix.byChar)
-															{
-																if(ch.among('+', 'I')) dr.vLine(x, 0, siz); 
-																if(ch.among('+', 'L')) {
-																	dr.circle(vec2(x+.5*siz, 0), siz*.5f, -π/2, 0); 
-																	if(showBullet) dr.hLine(x+.5f*siz, siz*.5f, x+.75f*siz); 
-																}
-																x += fh; 
-															}
-														} 
-														addDrawCallback(&customDraw); 
-													}
-												); 
-											}
-											
-											version(/+$DIDE_REGION Tree Open/Close Button+/all)
-											{
-												if(r.item.canOpen)
+												flags.noBackground = true; 
+												outerSize = vec2(r.prefix.length, 1)*fh; 
+												const float siz = fh; 
+												void customDraw(Drawing dr, .Container cntr)
 												{
-													if(
-														Btn(
-															Margin.init, VAlign.center,
-															{
-																outerSize = vec2(fh); fh = 14; 
-																Text(symbolStr((r.item.opened)?("ChevronDown") :("ChevronRight"))); 
-															}
-														).pressed
-													) {
-														r.item.toggle; 
-														this.changed = now; 
+													dr.color = clGray; dr.lineWidth = 1.0625f; 
+													float x = siz*.5f; 
+													foreach(ch; r.prefix.byChar)
+													{
+														if(ch.among('+', 'I')) dr.vLine(x, 0, siz); 
+														if(ch.among('+', 'L')) {
+															dr.circle(vec2(x+.5*siz, 0), siz*.5f, -π/2, 0); 
+															if(showBullet) dr.hLine(x+.5f*siz, siz*.5f, x+.75f*siz); 
+														}
+														x += fh; 
 													}
-												}
-												else
-												{ if(showBullet) { Spacer(fh*0.275f); Text("●"); Spacer(fh*0.275f); }}
+												} 
+												addDrawCallback(&customDraw); 
 											}
-											
-											Spacer(fh*.25f); 
-											
-											if(onItem)	onItem(r.item); 
-											else	{
-												static if(__traits(compiles, { r.item.UI(); }))	r.item.UI(); 
-												else	Text(r.item.text); 
+										); 
+									}
+									
+									version(/+$DIDE_REGION Tree Open/Close Button+/all)
+									{
+										if(r.item.canOpen)
+										{
+											if(
+												Btn(
+													Margin.init, VAlign.center,
+													{
+														outerSize = vec2(fh); fh = 14; 
+														Text(symbolStr((r.item.opened)?("ChevronDown") :("ChevronRight"))); 
+													}
+												).pressed
+											) {
+												r.item.toggle; 
+												this.changed = now; 
 											}
 										}
-									); 
+										else
+										{ if(showBullet) { Spacer(fh*0.275f); Text("●"); Spacer(fh*0.275f); }}
+									}
+									
+									Spacer(fh*.25f); 
+									
+									if(onItem)	onItem(r.item); 
+									else	{
+										static if(__traits(compiles, { r.item.UI(); }))	r.item.UI(); 
+										else	Text(r.item.text); 
+									}
 								}
-							} 
-							
-							vrr.start 	= (ifloor(visibleBounds.top    * invRowHeight    )).max(0),
-							vrr.end 	= (iceil(visibleBounds.bottom * invRowHeight + 1)).clamp(0, rows.length.to!int); ; 
-							foreach(i; 	vrr.start .. vrr.end)
-							{
-								doit(i, rows[i]); /+must put inside a function, so the customDraw can capture its stack.+/
-								/+Todo: Do it with a better way that dr.addDrawCallback()+/
-							}
+							); 
 						}
-						
-						measureVisibleRows(doStretch: false); 
+					} 
+					
+					vrr.start 	= (ifloor(visibleBounds.top    * invRowHeight    )).max(0),
+					vrr.end 	= (iceil(visibleBounds.bottom * invRowHeight + 1)).clamp(0, rows.length.to!int); ; 
+					foreach(i; 	vrr.start .. vrr.end)
+					{
+						doit(i, rows[i]); /+must put inside a function, so the customDraw can capture its stack.+/
+						/+Todo: Do it with a better way that dr.addDrawCallback()+/
 					}
-				); 
+				}
+				measureVisibleListRows; 
 			}
 			return vrr; 
+		} 
+		
+		VisibleRowRange UI(string _M_=__MODULE__, size_t _L_=__LINE__)
+		(void delegate() onSetup/+must set outerSize in onSetup! Optionally can set fontHeight+/, void delegate(Item*) onItem=null)
+		{
+			VisibleRowRange vrr; with(im)
+			{
+				CustomContainer!(.Container, _M_, _L_)
+				(((this).名!q{id}), Theme.tool, { vrr = UI_content(onSetup, onItem); }); 
+			}return vrr; 
 		} 
 	} 
 	
@@ -8459,8 +8619,7 @@ struct im
 				
 				dropdownState.doAlign; 
 				
-				hScrollInfo.createBars(true); 
-				vScrollInfo.createBars(true); 
+				createAllScrollBars; 
 				
 				//from here, all positions are valid
 				
@@ -8578,7 +8737,7 @@ struct im
 							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
 							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
 						}
-						((0x3BE62EB16D5C4).檢 (ImStorageManager.stats)); 
+						((0x3CEB2EB16D5C4).檢 (ImStorageManager.stats)); 
 					}
 				}
 				
@@ -9305,6 +9464,16 @@ struct im
 		} 
 		
 		auto hScrollInfo = ScrollInfo('H'), vScrollInfo = ScrollInfo('V'); 
+		void createAllScrollBars() {
+			hScrollInfo.createAllScrollBars(true); 
+			vScrollInfo.createAllScrollBars(true); 
+		} void createScrollBars(Id id) {
+			hScrollInfo.createScrollBar(id); 
+			vScrollInfo.createScrollBar(id); 
+		} void createScrollBars(.Container cntr) {
+			hScrollInfo.createScrollBar(cntr); 
+			vScrollInfo.createScrollBar(cntr); 
+		} 
 		
 		static struct ScrollInfo
 		{
@@ -9314,7 +9483,8 @@ struct im
 			{
 				Id id; 
 				.Container container; //contains id
-				uint lastAccess; //to purge the old ones
+				uint 	tickUpdated, /+Used to purge the old ones+/
+					tickBarsCreated /+Ensures only creating bars once+/; 
 				
 				//current parameters for the scrollbar
 				float contentSize=0, pageSize=0; //only valid if container has the has[H/V]ScrollBar flag.
@@ -9347,8 +9517,10 @@ struct im
 				return 0; 
 			} 
 			
+			auto actTick() => application.tick; 
+			
 			//1. called from measure() when it decided the scrollbars needed
-			auto update(.Container container, float contentSize, float pageSize)
+			auto updateScrollInfo(.Container container, float contentSize, float pageSize)
 			in(container)
 			in(container.id!=Id.init)
 			{
@@ -9358,30 +9530,43 @@ struct im
 						info.id	= container.id,
 						info.contentSize	= contentSize,
 						info.pageSize	= pageSize,
-						info.lastAccess	= application.tick; 
+						info.tickUpdated	= actTick; 
 					})
 				); 
 			} 
-			
+			
 			/+
 				2. called after measure when the final local positions are known. 
 					It creates the bars if needed and registers them with hitTestManager
 			+/
-			void createBars(bool doPurge)
+			void createAllScrollBars(bool doPurge)
 			{
 				assert(orientation.among('H', 'V')); 
-				
+				if(doPurge) purgeOldScrollInfo; 
+				foreach(ref info; infos) createScrollBar(info); 
+			} 
+			
+			void purgeOldScrollInfo()
+			{
 				Id[] toRemove; 
 				foreach(id, ref info; infos)
+				if(info.tickUpdated < actTick) toRemove ~= id; 
+				foreach(id; toRemove) infos.remove(id); 
+			} 
+			
+			void createScrollBar(.Container container)
+			{ createScrollBar(container.id); } 
+			
+			void createScrollBar(Id id)
+			{ if(auto info = id in infos) createScrollBar(*info); } 
+			
+			void createScrollBar(ref ScrollInfoRec info)
+			{
+				if(info.tickBarsCreated.chkSet(actTick))
 				{
-					if(info.lastAccess<application.tick)
-					{
-						if(doPurge) toRemove ~= id; 
-						continue; 
-					}
 					const exists 	= (orientation=='H' && info.container.flags._hasHScrollBar)
 						|| (orientation=='V' && info.container.flags._hasVScrollBar); 
-					if(!exists) continue; 
+					if(!exists) return; 
 					
 					bool enabled; 
 					float normValue; 
@@ -9419,7 +9604,7 @@ struct im
 						((
 							{
 								//set the position of the slider.
-								const scrollThickness = DefaultScrollThickness; 
+								const scrollThickness = DefaultScrollBarThickness; 
 								with(info.container)
 								if(orientation=='H')
 								{
@@ -9442,9 +9627,6 @@ struct im
 						info.offset = normValue*activeRange; 
 					}
 				}
-				
-				//purge old ones
-				foreach(id; toRemove) infos.remove(id); 
 			} 
 		} 
 		
@@ -11310,7 +11492,7 @@ struct im
 			float nextSize = actSize; 
 			if(Splitter!(_M_, _L_)(nextSize, 0, splittedAreaState.fullSize, dockAlignment, ((extraId).名!q{id})))
 			{
-				const at = calcAnimationT(deltaTime/+1.0f/60+/, .7), sd = .01f; 
+				const at = calcAnimationT(deltaTime_sec, .7), sd = .01f; 
 				if(!nextSize.isnan) actSize.follow(nextSize, at, sd); 
 			}
 			
@@ -11387,7 +11569,17 @@ struct im
 					
 					static struct SplitterSecondaryHover_smooth { float value=0; } 
 					ref secondaryHover_smooth = imStorage!SplitterSecondaryHover_smooth(_id).value; 
-					secondaryHover_smooth = HitTestManager.hoverFollow(secondaryHover_smooth, secondaryHover); 
+					static float hoverFollow(in float act, in bool target)
+					{
+						/+Todo: make this dependent on deltaTime!+/
+						enum upSpeed = 0.5f, downSpeed = 0.25f; 
+						if(target)	{ return mix(act, 1, upSpeed); }
+						else	{
+							float res = mix(act, 0, downSpeed); 
+							if(res<0.02f) res = 0; return res; 
+						}
+					} 
+					secondaryHover_smooth = hoverFollow(secondaryHover_smooth, secondaryHover); 
 				}
 				
 				const 	hover 	= hit.hover || secondaryHover,
@@ -11741,7 +11933,7 @@ struct im
 				ruler.setup(tMin, tMax, t0, t1, targetView.mousePos.vec2, hit); 
 				ruler.perform(focused, textStyle, targetView.mousePos.vec2, hit, userModified, t0, t1); 
 				
-				rangeFollower.afterUpdate(userModified, t0, t1, calcAnimationT(deltaTime, .7)); 
+				rangeFollower.afterUpdate(userModified, t0, t1, calcAnimationT(deltaTime_sec, .7)); 
 				ruler.t0_draw = t0_smooth = rangeFollower.smooth[0],
 				ruler.t1_draw = t1_smooth = rangeFollower.smooth[1]; 
 			}
