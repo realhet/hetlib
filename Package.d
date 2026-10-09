@@ -3767,8 +3767,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				Todo: If it is moved next to "Multithread" region, it will cause a linker error.
 				I guess  because shared static this sucks ass.
+				/+260901: I removed one shared static this() from whatever module, moved the initialization into this and now it works...+/
+				^^^ must test this!
 			+/
-			/+260901: I removed one shared static this() from whatever module, moved the initialization into this and now it works...+/
+			
 		+/
 		
 		
@@ -9299,11 +9301,11 @@ version(/+$DIDE_REGION Containers+/all)
 				auto _間=init間; 
 				static bool res; res = false; 
 				enum N = 16<<16; 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x4538859F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x4540A59F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x4548659F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x4550359F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x4558959F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x453A759F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x4542959F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x454A559F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x4552259F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x455A859F156A1).檢((update間(_間)))); 
 				
 				/+
 					benchmarks:

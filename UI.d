@@ -8805,9 +8805,9 @@ struct im
 				
 				/+smoothHover will have a minimum of 1 frame delay. Update is at the end of +/
 				
-				void update(R)(R hits, float deltaTime_sec)
+				void update(R)(R ids, float deltaTime_sec)
 				{
-					auto ids = hits.map!"a.id".filter!"a"; 
+					//auto ids = hits.map!"a.id".filter!"a"; 
 					hover = assocArray(ids, true.repeat); 
 					
 					const 	upSpeed 	= calcAnimationT(deltaTime_sec, 0.5),
@@ -8887,17 +8887,10 @@ struct im
 				void nextFrame(float deltaTime_sec)
 				{
 					//update stuff based on the most recent frame
-					hoverGroup.update(hitStack, deltaTime_sec); 
+					hoverGroup.update(hitStack.map!"a.id".filter!"a", deltaTime_sec); 
 					mouseCaptureDetector.update(hitStack); 
 					
-					/+
-						((0x3CD33EB16D5C4).檢(stats)); 
-						((0x3CD5AEB16D5C4).檢(hoverGroup.hover)); 
-						const debugStr = hoverGroup.hover_smooth.byKeyValue.map!((a)=>(a.key.text~`	`~`🟢`.replicate(iceil(a.value*50)))).join('\n')~"THE_END"; 
-						((0x3CE1DEB16D5C4).檢 (debugStr.length)); 
-						((0x3CE4FEB16D5C4).檢 (debugStr)); 
-						((0x3CE7AEB16D5C4).檢 (hitStack.map!text.join('\n'))); 
-					+/
+					/+((0x3CD33EB16D5C4).檢(stats)); +/
 					
 					//latch onto the next frame
 					lastHitStack = hitStack; 
@@ -11487,7 +11480,7 @@ struct im
 				, args
 			); 
 			
-			enum extraId = Id("Splitter")
+			enum extraId = "Splitter"
 			/+So the splitter id will be not the same as the content's id.+/; 
 			float nextSize = actSize; 
 			if(Splitter!(_M_, _L_)(nextSize, 0, splittedAreaState.fullSize, dockAlignment, ((extraId).名!q{id})))

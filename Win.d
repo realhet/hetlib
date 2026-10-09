@@ -1426,6 +1426,7 @@ version(/+$DIDE_REGION Stuff saved from Draw2D+/all)
 		bounds2 inputTransform(in bounds2); 
 		vec2 inputTransform(in vec2); 
 		bounds2 inverseInputTransform(in bounds2); 
+		vec2 inverseInputTransform(in vec2); 
 		
 		ref bounds2 clipBounds(); 
 		void pushClipBounds(bounds2); 
