@@ -1961,7 +1961,7 @@ version(/+$DIDE_REGION+/all)
 	
 	
 	enum ShapeType
-	{led} 
+	{led, plain} 
 	
 	class Shape : Cell
 	{
@@ -2032,6 +2032,7 @@ version(/+$DIDE_REGION+/all)
 					}
 				}
 				break; 
+				case ShapeType.plain: { dr.color = this.color; dr.fillRect(innerBounds); }break; 
 			}
 		} 
 	} 
@@ -8737,7 +8738,7 @@ struct im
 							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
 							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
 						}
-						((0x3CEB2EB16D5C4).檢 (ImStorageManager.stats)); 
+						((0x3CF10EB16D5C4).檢 (ImStorageManager.stats)); 
 					}
 				}
 				
@@ -10463,7 +10464,19 @@ struct im
 		} 
 		
 		void HLine()
-		{ Row({ innerHeight = 1; background = mix(clWinBackground, clWinText, .25f); }); } 
+		{ Row({ innerHeight = 1; background = mix(clWinBackground, clWinText, .25f); }); } 
+		
+		void VLine(float thickness=1, RGB color = clGray)
+		{
+			/+261009: this is the new more efficient version+/
+			auto shp = new Shape; 
+			shp.color = color; 
+			shp.type = ShapeType.plain; 
+			shp.outerSize = vec2(thickness, fh); 
+			imAppend(shp); 
+		} 
+		
+		
 		void Panel(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
 		{ Panel!(.Column, _M_, _L_, Args)(args); } 
 		void PanelRow(string _M_=__MODULE__, size_t _L_=__LINE__, Args...)(in Args args)
