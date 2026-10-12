@@ -5037,8 +5037,9 @@ version(/+$DIDE_REGION+/all)
 			} 
 			
 			auto pages = getPageRowRanges; 
+			
 			if(pages.length>1)
-			drawPages(cast(Cell[][]) pages); 
+			drawPages((cast(Cell[][])(pages))); 
 			else drawPage(subCells); 
 		} 
 		
@@ -5046,11 +5047,12 @@ version(/+$DIDE_REGION+/all)
 		override Cell[] internal_hitTest_filteredSubCells(vec2 p)
 		{
 			auto pages = getPageRowRanges; 
+			
 			if(pages.length>1)
 			{
 				auto xStarts = pages.map!(p => p.front.outerPos.x).assumeSorted; 
 				size_t idx = (xStarts.length - xStarts.upperBound(p.x).length - 1); 
-				return idx<pages.length 	? sortedSubCellsAroundY(cast(Cell[]) pages[idx], p)
+				return idx<pages.length 	? sortedSubCellsAroundY((cast(Cell[])(pages[idx])), p)
 					: null; 
 			}
 			else return sortedSubCellsAroundY(subCells, p); 
@@ -5070,6 +5072,8 @@ version(/+$DIDE_REGION+/all)
 				+/
 				return null; 
 			} 
+			
+			
 			
 			Row[][] rearrangePages_byLastRows(alias isLastRow)(float pageGapWidth)
 			{
@@ -8738,7 +8742,7 @@ struct im
 							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
 							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
 						}
-						((0x3CF10EB16D5C4).檢 (ImStorageManager.stats)); 
+						((0x3CF2AEB16D5C4).檢 (ImStorageManager.stats)); 
 					}
 				}
 				
@@ -9946,7 +9950,7 @@ struct im
 			} 
 			
 			/+
-				270804: removed. It was only used in Chapter, this and also the stack artray must go.
+				260804: removed. It was only used in Chapter, this and also the stack artray must go.
 				In the future, stact will be replaced with the actual stack.
 				
 				private auto find(C:.Container)()
@@ -9958,11 +9962,22 @@ struct im
 				} 
 			+/
 			
-			public void imAppend(T)(T c)
+			public void imAppend(Cell c)
 			{
-				/+Only appends non-nulls.+/
-				if(thisContainer !is null)	thisContainer.append(c); 
-				else	{ if(c) rootCells ~= c; }
+				thisContainer.append(c); 
+				/+
+					if(thisContainer !is null)	
+					else	{ rootContainer.append(c); }
+				+/
+			} 
+			
+			public void imAppend(Cell[] c)
+			{
+				thisContainer.append(c); 
+				/+
+					if(thisContainer !is null)	thisContainer.append(c); 
+					else	{ rootContainer.append(c); }
+				+/
 			} 
 			
 			.Container removeLastContainer()
@@ -10468,8 +10483,7 @@ struct im
 		
 		void VLine(float thickness=1, RGB color = clGray)
 		{
-			/+261009: this is the new more efficient version+/
-			auto shp = new Shape; 
+			auto shp = new .Shape; 
 			shp.color = color; 
 			shp.type = ShapeType.plain; 
 			shp.outerSize = vec2(thickness, fh); 
