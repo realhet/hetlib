@@ -560,10 +560,10 @@ version(/+$DIDE_REGION+/all)
 				static if(is(ComponentType==ubyte))
 				{
 					//for ubyte: 1 means 255, UpperCase means 255^
-					enum swizzleDecode = ch=='1' ? "255" : cast(string)[lowerCh] ~ (isLower ? "" : "^255"); 
+					enum swizzleDecode = ch=='1' ? "255" : lowerCh ~ (isLower ? "" : "^255"); 
 				}
 				else
-				{ enum swizzleDecode = (isLower ? "" : "-") ~ cast(string)[lowerCh]; }
+				{ enum swizzleDecode = (isLower ? "" : "-") ~ lowerCh; }
 			} 
 					
 			const opDispatch(string def)()
@@ -3510,6 +3510,13 @@ version(/+$DIDE_REGION+/all)
 		
 		auto rotate90 (T)(in Vector!(T, 2) v)
 		{ return v.Yx; } 
+		
+		auto rotate45(T)(in Vector!(T, 2) v)
+		{
+			static if(is(T==double))	alias F = double; 
+			else	alias F = float; 
+			return (v + v.Yx) * F(sqrt(2.0)/2.0); 
+		} 
 		
 		auto rotate270(T)(in Vector!(T, 2) v)
 		{ return v.yX; } 
