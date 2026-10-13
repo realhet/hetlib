@@ -9025,7 +9025,7 @@ struct im
 				{
 					if(canFocus && enterFocusNow)
 					{
-						 //newly enter the focus
+						//newly enter the focus
 						onFocusLost(focusedState.id); 
 						
 						focusedState.reset; 
@@ -11085,8 +11085,8 @@ struct im
 								) {
 									{
 										act = normalizedValue; 
-										focusedState.reset; 
 										res.mustRefresh = true; 
+										focusNothing; 
 									}
 								}
 							}
@@ -11110,14 +11110,14 @@ struct im
 								res.editing = false; 
 								res.valid = validate(act); 
 								res.mustRefresh = true; 
-								focusedState.reset; 
+								focusNothing; 
 							}
 							if(Btn(symbolStr("Cancel")))
 							{
 								edited = act; 
 								res.editing = false; 
 								res.valid = validate(act); 
-								focusedState.reset; 
+								focusNothing; 
 							}
 						}
 					}

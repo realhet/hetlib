@@ -3786,14 +3786,14 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				
 				auto choosePresentMode(VkPresentModeKHR[] presentModes)
 				{
-					enum vsynch 	= (常!(bool)(1)),
+					enum vSynch 	= (常!(bool)(1)),
 					canTripleBuffer 	= (常!(bool)(1)); 
 					
 					/+
 						Todo: V-Sync On: FIFO_RELAXED, if not supported, then FIFO .
 						V-Sync Off: IMMEDIATE.
 					+/
-					static if(vsynch)
+					static if(vSynch)
 					{
 						static if(canTripleBuffer)
 						{
