@@ -47,8 +47,56 @@ version(/+$DIDE_REGION+/all)
 		CommonType, ReturnType, isPointer, isFunction, isDelegate, hasUDA, getUDAs, EnumMembers; 
 	import std.meta: AliasSeq, allSatisfy, anySatisfy, staticMap; 
 	
-	import std.exception	: enforce; 
-	import std.stdio	: write, writeln; 
+	import std.exception: enforce; 
+	import std.stdio: write, writeln; 
+	
+	size_t hash64(Args...)(auto ref Args args)
+	{
+		size_t h = 0; 
+		static foreach(i, A; Args)
+		static if(
+			isDynamicArray!A ||
+			isStaticArray!A
+		)	{
+			/+
+				bytesHash (used by dynamic arrays, and by static arrays of
+				bitwise-hashable elements) truncates the seed to uint. Double-hash
+				those to preserve the high 32 bits of h. Scalars, structs, AAs, 
+				classes, and delegates consume the full size_t seed directly.
+			+/
+			h = args[i].hashOf.hashOf(h); 
+		}
+		else	{ h = args[i].hashOf(h); }
+		return h; 
+	} 
+	
+	uint hash32(Args...)(auto ref Args args)
+	{
+		size_t h = hash64(args); 
+		return (cast(uint)(h ^ (h >> 32))); 
+	} 
+	
+	void test_hash64()
+	{
+		// hashOf tests
+		enforce(hashOf("Hello") == 0x12DA77C8);  //csak 32 bit és collision!!!! Rossz!!!!
+		enforce(hashOf("Hello", 0) == 0x12DA77C8);  //csak 32 bit és collision!!!! Rossz!!!!
+		enforce(hashOf("Hello", 1) == 0x4A7BD098);  //csak 32!!! Gagyi!!!
+		enforce(hashOf(1, "Hello".hashOf) == 0xCAE8B58DDB1FFFB1);  //ez az utolso kettô jó, de sokat kell irkalni.
+		enforce(hashOf("Hello".hashOf, 1) == 0x1784D8BDC16AB658);  //ez az utolso kettô jó, de sokat kell irkalni.
+		
+		// hash64 tests
+		enforce(hash64("Hello") == 0x1784D8BDE96AB658); 
+		enforce(hash64("Hello", 0) == 0xAC78AC7E1689A902); 
+		enforce(hash64("Hello", 1) == 0x846C2B4F5864920A); 
+		enforce(hash64(1, "Hello") == 0xFE20273724A199BF); //mindegyik jelentosen kulonbozik es 64bitet mind kitolti.
+		
+		// hash32 tests
+		enforce(hash32("Hello") == 0xFEEE6EE5); 
+		enforce(hash32("Hello", 0) == 0xBAF1057C); 
+		enforce(hash32("Hello", 1) == 0xDC08B945); 
+		enforce(hash32(1, "Hello") == 0xDA81BE88); //mindegyik jelentosen kulonbozik es 32bitet mind kitolti.
+	} 
 	
 	//quantities support
 	

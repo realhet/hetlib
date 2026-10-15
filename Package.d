@@ -225,9 +225,10 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			DateTime.selftest; 
 			unittest_decodeHumanDateTime; 
 			
+			het.math.test_hash64; 
 			het.math.unittest_main; //1ms
 			
-			auto _間=init間; initializeKeywordDictionaries; ((0x308859F156A1).檢((update間(_間)))); /+20ms (!!!)+//+Todo: this is bad that it's not inside parser!!!+/
+			auto _間=init間; initializeKeywordDictionaries; ((0x30A359F156A1).檢((update間(_間)))); /+20ms (!!!)+//+Todo: this is bad that it's not inside parser!!!+/
 			
 			const s1 = "hello", s2 = "Nobody inspects the spammish repetition"; 
 			enforce(xxh32(s1)==0xfb0077f9); 
@@ -2477,30 +2478,26 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		*/
 	}
 	
+	
 	///Used for get a hash based on the aggregated content type of a struct
 	///align and nested structs matter.
-	uint getStructHash(S)()
+	private ulong calcStructHash64(S)()
 	{
-		/+
-			Note: (aa/array/string).hashOf(seed) is CRAP! 
-			So I have to use unseeded hashOf() on those.
-		+/
-		
-		size_t h = "structHash".hashOf.hashOf(S.sizeof); 
+		size_t h = "StructHash".hash64(S.sizeof); 
 		static foreach(f; FieldNameTuple!S)
 		{
 			{
 				alias m = mixin("S.", f); 
 				alias T = typeof(m); 
-				h = f.hashOf.hashOf(h); 
-				h = m.sizeof.hashOf(h); 
-				h = m.offsetof.hashOf(h); 
-				h = T.stringof.hashOf.hashOf(h); 
-				static if(is(T==struct)) h = getStructHash!T.hashOf(h); 
+				h = h.hash64(f, m.sizeof, m.offsetof, T.stringof); 
+				static if(is(T==struct)) h = h.hash64(calcStructHash64!T()); 
 			}
 		}
-		return h & 0xFFFFFFFF; 
+		return h; 
 	} 
+	
+	enum StructHash64(T) 	= calcStructHash64!T(),
+	StructHash32(T) 	= calcStructHash64!T().hash32; 
 	
 	version(/+$DIDE_REGION+/all)
 	{
@@ -3458,15 +3455,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B45C59F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B41F59F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B52459F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B4E759F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B5CE59F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B64359F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B59159F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B60659F156A1})); 
 						+/
 					+/
 				+/
@@ -9304,11 +9301,11 @@ version(/+$DIDE_REGION Containers+/all)
 				auto _間=init間; 
 				static bool res; res = false; 
 				enum N = 16<<16; 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x453FC59F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x4547E59F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x454FA59F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x4557759F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x455FD59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x453BF59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x4544159F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x454BD59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x4553A59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x455C059F156A1).檢((update間(_間)))); 
 				
 				/+
 					benchmarks:
@@ -16296,7 +16293,7 @@ version(/+$DIDE_REGION debug+/all)
 						New stuff: DBG_BLOCK_READY, DBG_BLOCK_FINISHED, 
 						setBlob_wait(), getBlob_access(), getBlob_ack()
 					+/; 
-					enum uint CurrentStructHash = getStructHash!Data + DbgVersion; 
+					enum ulong CurrentStructHash = StructHash64!Data + DbgVersion; 
 					
 					/+
 						Note: Important note:	All fields must be initialized to ZERO or VOID.	
@@ -16311,7 +16308,7 @@ version(/+$DIDE_REGION debug+/all)
 						/+Link: https://forum.dlang.org/thread/rdk3m2$725$1@digitalmars.com+/
 					+/
 					
-					uint dbgDataStructHash; 
+					ulong dbgDataStructHash; 
 					uint ping; 
 					BreakTable breakTable; 
 					float[potiCount] poti = 0 /+Note: must be zero!!+/; 
