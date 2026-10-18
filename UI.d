@@ -12,7 +12,7 @@ version(/+$DIDE_REGION+/all)
 	import het.inputs: 	rawMousePos, 
 		/+for slider:+/slowMouse, mouseMoveRelX, mouseMoveRelY, mouseLock, mouseUnlock; 
 	
-	import het.parser: SyntaxKind, syntaxStyle; 
+	public import het.parser: SyntaxKind, syntaxStyle; //Must be public. Used by for Custom GUI Args processing mixins.
 	
 	import std.bitmanip: bitfields; 
 	import std.traits, std.meta; 
@@ -1622,6 +1622,10 @@ version(/+$DIDE_REGION+/all)
 			c.dump(indent+1); 
 			
 		} 
+		
+		///This event is called by SelectionManager
+		void opMove(vec2 delta)
+		{ outerPos += delta; } 
 		
 	} 
 	
@@ -5530,19 +5534,23 @@ version(/+$DIDE_REGION+/all)
 		} 
 	} 
 	
-	class SelectionManager(T : Cell)
+	class SelectionManager(T)
 	{
 		//Todo: Combine and refactor this with the one inside DIDE
 		
 		//T must have some bool properties:
 		static assert(
 			__traits(
-				compiles, {
+				compiles, 
+				{
 					T a; 
 					a.isSelected = true; 
 					a.oldSelected = true; 
+					bounds2 b = a.outerBounds; 
+					a.opMove(vec2(0)); 
 				}
-			), "Field requirements not met."
+			),
+			"Field requirements not met."
 		); 
 		
 		bounds2 getBounds(T item)
@@ -5572,7 +5580,13 @@ version(/+$DIDE_REGION+/all)
 		//notification functions: the manager must know when an item is deleted
 		void notifyRemove(T cell)
 		{
-			if(hoveredItem && hoveredItem is cell)
+			bool isSame()
+			{
+				static if(is(T==class) || isPointer!T)	return hoveredItem is cell; 
+				else	return hoveredItem == cell; 
+			} 
+			
+			if(hoveredItem && isSame)
 			hoveredItem = null; 
 		} 
 		void notifyRemove(T[] cells)
@@ -5582,11 +5596,11 @@ version(/+$DIDE_REGION+/all)
 		} 
 		void notifyRemoveAll()
 		{ hoveredItem = null; } 
-		
-		T[] delegate() onBringToFront; //Use bringSelectedItemsToFront() for default behavior
-		bool deselectBelow; 
 		
-		bool update(bool canStart, View2D view, T[] items, void delegate(T, vec2) afterMove = null)
+		bool update(
+			bool canStart, vec2 mousePos_, T[] items, T[] delegate() onBringToFront = null,
+			bool deselectBelow, void delegate(T, vec2) afterMove = null
+		)
 		{
 			//this is compatible with old stuff (261001)
 			UserInteraction userInteraction; 
@@ -5596,7 +5610,10 @@ version(/+$DIDE_REGION+/all)
 		
 		void update(
 			ref UserInteraction userInteraction, 
-			bool canStart, View2D view, T[] items, void delegate(T, vec2) afterMove = null
+			bool canStart, vec2 mousePos_, T[] items, 
+			T[] delegate() onBringToFront = null, //Use bringSelectedItemsToFront for default behavior
+			bool deselectBelow = false, 
+			void delegate(T, vec2) afterMove = null
 		)
 		{
 			if(userInteraction.handled) canStart = false; 
@@ -5618,7 +5635,7 @@ version(/+$DIDE_REGION+/all)
 			} 
 			
 			//acquire mouse positions
-			auto mouseAct = view.mousePos.vec2; 
+			auto mouseAct = mousePos_; 
 			auto mouseDelta = mouseAct-mouseLast; 
 			scope(exit) mouseLast = mouseAct; 
 			
@@ -5653,6 +5670,19 @@ version(/+$DIDE_REGION+/all)
 			if(getBounds(item).contains!"[)"(mouseAct))
 			hoveredItem = item; 
 			
+			((0x27290EB16D5C4).檢(LMB)); 
+			((0x272B3EB16D5C4).檢(LMB_pressed)); 
+			((0x272DEEB16D5C4).檢(canStart)); 
+			((0x27306EB16D5C4).檢(LMB_pressed && canStart)); 
+			((0x2733DEB16D5C4).檢(hoveredItem)); 
+			((0x27368EB16D5C4).檢(mouseAct)); 
+			((0x27390EB16D5C4).檢(mouseOp)); 
+			((0x273B7EB16D5C4).檢(selectOp)); 
+			((0x273DFEB16D5C4).檢(dragSource)); 
+			((0x27409EB16D5C4).檢(dragBounds)); 
+			((0x27433EB16D5C4).檢(anyMoved)); 
+			((0x2745BEB16D5C4).檢 (mixin(求map(q{i},q{items},q{getBounds(i).text})).join('\n'))); 
+			
 			if(LMB_pressed && canStart)
 			{
 				//Left Mouse pressed //
@@ -5662,11 +5692,19 @@ version(/+$DIDE_REGION+/all)
 					{
 						if(!hoveredItem.isSelected) selectHoveredOnly; 
 						mouseOp = MouseOp.move; 
-						if(deselectBelow) .deselectBelow(items, hoveredItem); 
+						
+						if(deselectBelow)
+						{
+							static if(__traits(compiles, Item.init.zOrder = 1))
+							{ .deselectBelow(items, hoveredItem); }
+							else
+							NOTIMPL("deselectBelow requires zIndex field."); 
+						}
+						
 						if(onBringToFront) items = onBringToFront(); 
 					}
 					if(modShift || modCtrl || modShiftCtrl)
-					hoveredItem.isSelected.toggle; 
+					hoveredItem.isSelected = !hoveredItem.isSelected; 
 				}
 				else
 				{
@@ -5701,26 +5739,18 @@ version(/+$DIDE_REGION+/all)
 				foreach(a; items)
 				if(a.isSelected)
 				{
-					a.outerPos += mouseDelta; 
+					a.opMove(mouseDelta); 
 					//This kind of move is losing precision quickly, but it survives zooming.
 					
 					if(afterMove) afterMove(a, mouseDelta); 
 					anyMoved = true; 
-					
-					
-					
-					version(/+$DIDE_REGION+/none) {
-						//removed: 260924
-						static if(__traits(compiles, { a.cachedDrawing.free; }))
-						a.cachedDrawing.free; 
-					}
 				}
 			}
 			
 			
 			if(mouseOp && !LMB)
 			{
-				 //left mouse released //
+				//left mouse released //
 				
 				//...
 				if(anyMoved.chkClear) userInteraction.modified = true; 
@@ -5735,7 +5765,7 @@ version(/+$DIDE_REGION+/all)
 	
 	T[] bringSelectedItemsToFront(T)(T[] items, bool selectAbove)
 	{
-		static assert(__traits(compiles, { items[0].isSelected.toggle; }), "Missing bool property: Item.isSelected"); 
+		static assert(__traits(compiles, { items[0].isSelected = true; }), "Missing bool property: Item.isSelected"); 
 		static assert(__traits(compiles, { items[0].zIndex = 0; }), "Missing int property: Item.zIndex"); 
 		
 		auto selectedItems() { return items.filter!"a.isSelected"; } 
@@ -5757,6 +5787,8 @@ version(/+$DIDE_REGION+/all)
 	
 	void deselectBelow(T)(T[] items, T actItem)
 	{
+		static assert(__traits(compiles, { items[0].zIndex = 0; }), "Missing int property: Item.zIndex"); 
+		
 		foreach(i, p; items) p.zIndex = cast(int) i; 
 		
 		void doit(T actItem)
@@ -5967,6 +5999,9 @@ version(/+$DIDE_REGION+/all)
 		bool showRoot = true; 
 		
 		float lastOuterWidth=0; 
+		
+		Item* getRowItem(size_t idx)
+		=> ((idx<rows.length)?(rows[idx].item):(null)); 
 		
 		Item* getParentItem(Item* child)
 		{
@@ -8220,9 +8255,13 @@ version(/+$DIDE_REGION+/all) {
 		
 		override void draw(Drawing dr)
 		{
+			if(flags._saveOuterBounds)
+			{ imstOuterBounds(id) = dr.inputTransform(outerBounds); }
+			
 			const t0 = t0_draw, t1 = t1_draw; 
 			
 			const b = innerBounds/+ + innerPos <- FUUUUUUUUUUUUUUCK!!!!+/; 
+			
 			const fh = b.height/5.625f, rh = fh*5/2; 
 			auto 	bTop 	= bounds2(b.left, b.top, b.right, b.top+rh),
 				bBottom 	= bounds2(b.left, b.bottom-rh, b.right, b.bottom); 
@@ -8461,6 +8500,8 @@ struct im
 				
 				.g_getDrawCallbackFunct = &getDrawCallback; 
 				
+				hitTestManager.beginFrame; 
+				
 				//update building/measuring/drawing state
 				inFrame = true; 
 				canDraw = false; 
@@ -8640,7 +8681,7 @@ struct im
 				//((0x339F2EB16D5C4).檢 (hitTestManager.hitStack.map!text.join('\n'))); 
 				
 				version(/+$DIDE_REGION Advance HitTest to the next frame. +/all)
-				{ hitTestManager.nextFrame(deltaTime_sec); }//-------------------------------------------------
+				{ hitTestManager.endFrame(deltaTime_sec); }//-------------------------------------------------
 				
 				//clicking away from popup closes the popup
 				if(
@@ -8742,7 +8783,7 @@ struct im
 							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
 							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
 						}
-						((0x3CF2AEB16D5C4).檢 (ImStorageManager.stats)); 
+						((0x3D474EB16D5C4).檢 (ImStorageManager.stats)); 
 					}
 				}
 				
@@ -8889,11 +8930,14 @@ struct im
 				
 				auto getLastHitStack() => lastHitStack/+Accessed from DIDE for debugging purposes+/; 
 				
-				void nextFrame(float deltaTime_sec)
+				void beginFrame()
+				{ mouseCaptureDetector.update(lastHitStack); } 
+				
+				void endFrame(float deltaTime_sec)
 				{
 					//update stuff based on the most recent frame
 					hoverGroup.update(hitStack.map!"a.id".filter!"a", deltaTime_sec); 
-					mouseCaptureDetector.update(hitStack); 
+					//mouseCaptureDetector.update(hitStack); 
 					
 					/+((0x3CD33EB16D5C4).檢(stats)); +/
 					

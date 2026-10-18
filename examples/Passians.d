@@ -575,12 +575,10 @@ class FrmMain: UIWindow
 		}
 		
 		{
-			selection.onBringToFront = (){
-				cards = bringSelectedItemsToFront(cards, true); 
-				return cards; 
-			}; 
-			selection.deselectBelow = true; 
-			selection.update(canEdit, viewWorld, cards); 
+			selection.update(
+				canEdit, viewWorld, cards, deselectBelow: true,
+				onBringToFront: (()=>(cards = bringSelectedItemsToFront(cards, true)))
+			); 
 			workspace.subCells = cast(Cell[]) cards; 
 			workspace.rearrange; 
 			im.imAppend(workspace); 
