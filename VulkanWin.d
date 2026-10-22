@@ -6128,7 +6128,14 @@ $(V_size+G_size)".text
 						This approach applied to more complex parametric curves: https://www.shadertoy.com/view/3tsXDB
 					*/
 					
-					/*Opt: optimize all the parameters, iteration, all the starting points of newtonian approximation*/
+					/*261022: Added twoSided option to cubicBezierDist()*/
+					
+					/*
+						Note: Don't touch settings!!! (or let them be customized optionally only for specific apps!)
+						
+						Good defaults: num=3, start=3, method=0, factor=1 
+						These worked over long time (until and beyond 261022): 
+					*/
 					
 					const int bezier_num_iterations=3; /*def:3*/
 					const int bezier_num_start_params=3; /*def:3*/
@@ -6139,7 +6146,7 @@ $(V_size+G_size)".text
 					//it decreases the step size when lowered.
 					//Lowering the factor and increasing iterations increases the area in which
 					//the iteration converges, but this is quite costly
-					const float bezier_factor=1; /*def:1*/
+					const float bezier_factor=1.; /*def:1*/
 					
 					float newton_iteration(vec3 coeffs, float x)
 					{
@@ -6196,17 +6203,18 @@ $(V_size+G_size)".text
 							if(method==2)	{ return newton_iteration(poly,t); /*equivalent to normal_iteration*/}
 							else if(method==3)	{ return halley_iteration(poly,t); /*equivalent to normal_iteration2*/}
 						}
-						return 0; 
+						return 0.0; 
 					} 
-					
-					float cubicBezierDist(vec2 uv, vec2 p0, vec2 p1, vec2 p2, vec2 p3)
+					
+					float cubicBezierDist(vec2 uv, vec2 p0, vec2 p1, vec2 p2, vec2 p3, bool twoSided)
 					{
 						vec2 a3 = (-p0 + 3. * p1 - 3. * p2 + p3); 
 						vec2 a2 = (3. * p0 - 6. * p1 + 3. * p2); 
 						vec2 a1 = (-3. * p0 + 3. * p1); 
 						vec2 a0 = p0 - uv; 
 						
-						float d0 = 1e38, t0=0.; 
+						float best_dist = 1e38, best_t = 0.; 
+						float t0=0.; 
 						for(int i=0;i<bezier_num_start_params;i++)
 						{
 							float t=t0; 
@@ -6214,106 +6222,38 @@ $(V_size+G_size)".text
 							{ t=cubic_bezier_normal_iteration(bezier_method, t,a0,a1,a2,a3); }
 							t=clamp(t,0.,1.); 
 							vec2 uv_to_p=((a3*t+a2)*t+a1)*t+a0; 
-							d0=min(d0,dot(uv_to_p,uv_to_p)); 
+							
+							float dist = dot(uv_to_p,uv_to_p); 
+							if(dist < best_dist)
+							{
+								best_dist = dist; //actually it is the square of dist!
+								best_t = t; 
+							}
 							
 							t0+=1./float(bezier_num_start_params-1); 
 						}
+						best_dist = sqrt(best_dist); 
 						
-						return sqrt(d0); 
+						if(twoSided)
+						{
+							// Closest point on curve:
+							vec2 P = ((a3 * best_t + a2) * best_t + a1) * best_t + a0; 
+							// Tangent
+							vec2 T = (3. * a3 * best_t + 2. * a2) * best_t + a1; 
+							// Vector from closest point to query: q - C = -(C)
+							// (since C = B(bestT) - uv, we have q - B(bestT) = -C)
+							vec2 V = -P; 
+							// 2D cross product gives the side
+							float cross_z = T.x * V.y - T.y * V.x; 
+							return cross_z > 0. ? -best_dist : best_dist; 
+						}
+						else
+						return best_dist; 
 					} 
+					
+					
 				}
 				,
-				/+
-					Todo: Upgrade for a 2 sided cubic bezier surface curve:
-					
-					1. extract the best t value
-					
-					  float bestDist2 = 1e38;
-					  float bestT     = 0.;
-					  ...
-					  // ... inside the loop:
-					  float d2 = dot(uv_to_p, uv_to_p);
-					  if (d2 < bestDist2)
-					  {
-					    bestDist2 = d2;
-					    bestT     = t;
-					  }
-					
-					2. Use bestT to calculate tangent
-					  // --- Sign computation at the winning t ---
-					  // Closest point on curve:
-					  vec2 C = ((a3 * bestT + a2) * bestT + a1) * bestT + a0; // = B(bestT) - uv
-					  // Tangent at bestT:
-					  vec2 T = (3. * a3 * bestT + 2. * a2) * bestT + a1;
-					  // Vector from closest point to query: q - C = -(C)
-					  // (since C = B(bestT) - uv, we have q - B(bestT) = -C)
-					  vec2 V = -C;
-					  // 2D cross product gives the side
-					  float cross_z = T.x * V.y - T.y * V.x;
-					  float dist = sqrt(bestDist2);
-					  return cross_z >= 0. ? dist : -dist; //this way the result can be negative too.
-					
-					3. protect against tangent is near to zero:
-					  float lenT2 = dot(T, T);
-					  float cross_z = (lenT2 > 1e-12) ? (T.x * V.y - T.y * V.x) : 0.;
-					
-					2 options for jigsaw puzzle: 
-					 * sliding window of 4 bezier params: 0.33..0.66 interval with a 
-					    started from single newtonian starting point.
-					* C1 connected beziers like in TTF fonts
-					
-					
-					//HERE IS THE WORKING CODE. It was tested in Jogsaw Puzzle.
-					
-					/+
-						Highlighted: float cubicBezierDist(vec2 uv, vec2 p0, vec2 p1, vec2 p2, vec2 p3, bool twoSided)
-						{
-							vec2 a3 = (-p0 + 3. * p1 - 3. * p2 + p3); 
-							vec2 a2 = (3. * p0 - 6. * p1 + 3. * p2); 
-							vec2 a1 = (-3. * p0 + 3. * p1); 
-							vec2 a0 = p0 - uv; 
-							
-							BezierResult best = BezierResult(1e38, 0.);
-							float t0=0.; 
-							for(int i=0;i<bezier_num_start_params;i++)
-							{
-								float t=t0; 
-								for(int j=0;j<bezier_num_iterations;j++)
-								{ t=cubic_bezier_normal_iteration(bezier_method, t,a0,a1,a2,a3); }
-								t=clamp(t,0.,1.); 
-								vec2 uv_to_p=((a3*t+a2)*t+a1)*t+a0; 
-								
-								float dist = dot(uv_to_p,uv_to_p);
-								if(dist < best.dist)
-								{
-									best.dist = dist; //actually it is the square of dist!
-									best.t = t;
-								}
-								
-								t0+=1./float(bezier_num_start_params-1); 
-							}
-							
-							best.dist = sqrt(best.dist);
-							
-							if(twoSided)
-							{
-								// Closest point on curve:
-								vec2 P = ((a3 * best.t + a2) * best.t + a1) * best.t + a0; // = B(bestT) - uv
-								// Tangent
-								vec2 T = (3. * a3 * best.t + 2. * a2) * best.t + a1;
-								// Vector from closest point to query: q - C = -(C)
-								// (since C = B(bestT) - uv, we have q - B(bestT) = -C)
-								vec2 V = -P;
-								// 2D cross product gives the side
-							    float cross_z = T.x * V.y - T.y * V.x;
-								return cross_z > 0. ? -best.dist : best.dist; //this way the result can be negative too.
-							}
-							else 
-								return best.dist; 
-						}
-					+/
-				+/
-				
 				cubic_exact =
 				q{
 					/*
@@ -8841,6 +8781,7 @@ $(V_size+G_size)".text
 					float opXor( float a, float b )
 					{ return max(min(a,b),-max(a,b)); } 
 					
+					//sigmoid
 					float smin( float a, float b, float k )
 					{
 						k *= log(2.0); 
@@ -9222,7 +9163,7 @@ $(V_size+G_size)".text
 						); 
 						const vec4 clipPos = UB.inv_mvp * ndcPos; 
 						const vec3 objPos = clipPos.xyz / clipPos.w; 
-						const float dst = cubicBezierDist(objPos.xy, fragFloats0.xy, fragFloats0.zw, fragFloats1.xy, fragFloats1.zw); 
+						const float dst = cubicBezierDist(objPos.xy, fragFloats0.xy, fragFloats0.zw, fragFloats1.xy, fragFloats1.zw, /*twoSided*/false); 
 						const float t = fract(texCoordXY.x); 
 						const float r = uintBitsToFloat(fragTexCoordZ); 
 						return dst<=r; 

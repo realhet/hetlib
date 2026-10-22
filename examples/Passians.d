@@ -576,7 +576,7 @@ class FrmMain: UIWindow
 		
 		{
 			selection.update(
-				canEdit, viewWorld, cards, deselectBelow: true,
+				canEdit, viewWorld.mousePos.vec2, cards, deselectBelow: true,
 				onBringToFront: (()=>(cards = bringSelectedItemsToFront(cards, true)))
 			); 
 			workspace.subCells = cast(Cell[]) cards; 
