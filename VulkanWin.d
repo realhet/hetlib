@@ -4592,9 +4592,12 @@ class VulkanWindow: Window, IGfxContentDestination
 		{
 			enum UniformFieldDeclarations = 
 			q{
-				mat4 mvp, inv_mvp; 
+				mat4 mvp, inv_mvp; /*Must comply with std430 align rules!!!!*/
+				
 				vec4 viewport; 
-				float iTime; int zero; float _dummy0, _dummy1; /*std430 align rules!!!!*/
+				
+				int zero; uint iFrame; float iTime, iPrevTime; 
+				
 				uint customShaderParams0; /*
 					<-fucking LAME!  Because
 					uint[16] has complicated alignlemt rules!
@@ -5402,6 +5405,14 @@ class VulkanWindow: Window, IGfxContentDestination
 			layout(binding = 0)
 			uniform UB_T {$(UniformFieldDeclarations)} UB; 
 			
+			//convenience macros
+			#define UB_iFrame       (UB.iFrame)
+			#define UB_iTime         (UB.iTime)
+			#define UB_iTimeDelta (clamp(UB.iTime - UB.iPrevTime, 0.001, 2.0))
+			#define UB_iFrameRate (1.0 / (UB_iTimeDelta))
+			#define UB_zero (UB.zero)
+			#define UB_one (UB.zero+1)
+			
 			//IB: Info buffer (texture directory)
 			layout(binding = 1) buffer IB_T { uint IB[]; } ; 
 			
@@ -5654,18 +5665,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2B93F82886ADB).檢(
+					((0x2BA8682886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2B9B182886ADB))))
+				if((互!((bool),(0),(0x2BAF882886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2BA4582886ADB).檢((互!((float/+w=12+/),(1.000),(0x2BA5C82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2BB8C82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2BBA382886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5678,8 +5689,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2BC3182886ADB).檢 (imVG)),
-					((0x2BC5782886ADB).檢 (imFPS)); 
+					((0x2BD7882886ADB).檢 (imVG)),
+					((0x2BD9E82886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -5738,8 +5749,11 @@ $(V_size+G_size)".text
 								{
 									mvp = mat4(mvp_); inv_mvp = mat4(inv_mvp_); 
 									viewport = vec4(0, 0, swapchain.extent.width, swapchain.extent.height); 
-									iTime = QPS_local.value(second); 
+									
 									zero = 0; 
+									iPrevTime 	= iTime, 
+									iTime 	= application.appTime.value(second),
+									iFrame 	= application.tick; 
 								}
 							}
 							
@@ -6955,6 +6969,7 @@ $(V_size+G_size)".text
 					//Todo: Try the new shader language and compiler: SLANG
 					
 					//common stuff
+					
 					#define nan (uintBitsToFloat(0x7fc00000u))
 					
 					#define ErrorColor vec4(1, 0, 1, 1)
@@ -7040,8 +7055,14 @@ $(V_size+G_size)".text
 					$(
 						(表([
 							[q{/+Note: Stage out+/},q{/+Note: Stage in+/},q{/+Note: Location 0+/},q{/+Note: Location 1+/},q{/+Note: Location 2+/},q{/+Note: Location 3+/},q{/+Note: Location 4+/},q{/+Note: Location 5+/},q{/+Note: Location 6+/}],
-							[q{},q{vert},q{uint vertGSBitOfs}],
-							[q{vert},q{geom},q{uint geomGSBitOfs}],
+							[q{},q{vert},q{
+								highp 
+								uint vertGSBitOfs
+							}],
+							[q{vert},q{geom},q{
+								highp 
+								uint geomGSBitOfs
+							}],
 							[q{geom},q{frag},q{
 								smooth mediump
 								vec4 fragColor
@@ -7049,22 +7070,25 @@ $(V_size+G_size)".text
 								smooth mediump
 								vec4 fragBkColor
 							},q{
-								smooth
+								smooth highp
 								vec2 fragTexCoordXY
 							},q{
-								flat
+								flat highp
 								uint fragTexHandleAndMode
 							},q{
-								flat
+								flat highp
 								uint fragTexCoordZ
 							},q{
-								flat
+								flat highp
 								vec4 fragFloats0
 							},q{
-								flat
+								flat highp
 								vec4 fragFloats1
 							}],
-							[q{frag},q{},q{vec4 outColor}],
+							[q{frag},q{},q{
+								mediump 
+								vec4 outColor
+							}],
 						]))
 						.GEN_ShaderLayoutDeclarations
 					)
@@ -7499,7 +7523,7 @@ $(V_size+G_size)".text
 						const float[N] t = {0, 0.01, 0.33333, 0.5, 0.66666, 0.99, 1}; 
 						
 						vec2[N] points, sides; 
-						for(int i=UB.zero; i<N; i++)
+						for(int i=UB_zero; i<N; i++)
 						{
 							points[i] = cubicBezierPoint2D(P0, P1, P2, P3, t[i]); 
 							sides[i] = cubicBezierNormal2D(P0, P1, P2, P3, t[i]) * mix(r0, r1, t[i]); 
@@ -7507,7 +7531,7 @@ $(V_size+G_size)".text
 						
 						const float maxRayLen = calcManhattanLength(P0, P1, P2, P3)*4; 
 						seg2 rayRightFwd, rayRightBack, rayLeftFwd, rayLeftBack; 
-						for(int i=UB.zero; i<N-2; i++)
+						for(int i=UB_zero; i<N-2; i++)
 						{
 							int k = N-1-i; 
 							tesselateCubicBezierTentacle_updateRay(rayRightFwd, i, points[i] + sides[i], true, maxRayLen); 
@@ -8140,7 +8164,7 @@ $(V_size+G_size)".text
 										const int N = ((isQuadratic)?($(bezierTesselationSettings.quadraticSegments)) :($(bezierTesselationSettings.cubicSegments))); 
 										if(Mode_PerPixel)
 										{
-											for(int i=0+UB.zero; i<N; i++)
+											for(int i=0+UB_zero; i<N; i++)
 											{
 												vec2 R0,R1,R2,R3; 
 												if(splitBezier_ration(i, N, Q0,Q1,Q2,Q3, R0,R1,R2,R3))
@@ -8157,7 +8181,7 @@ $(V_size+G_size)".text
 										else
 										{
 											const float invN = 1.0/N; 
-											for(int i=1+UB.zero; i<N; i++)
+											for(int i=1+UB_zero; i<N; i++)
 											emitCubicBezierAt(i*invN, Q0, Q1, Q2, Q3, r, r); 
 										}
 									}
@@ -8245,7 +8269,7 @@ $(V_size+G_size)".text
 					{
 						setFragMode(FragMode_fullyFilled); 
 						setFragTexHandle(0); 
-						for(int i=UB.zero; i<3; i++)
+						for(int i=UB_zero; i<3; i++)
 						{
 							fragTexCoordXY = vec2(
 								(((i&1)!=0)?(1.0):(0.0)),
@@ -8523,7 +8547,7 @@ $(V_size+G_size)".text
 					
 					vec4 readSample(in uint texIdx, in vec3 v, in bool prescaleXY, bool prescaleZ)
 					{
-						//if((INLINE_PREVENTION & UB.zero)!=0) return vec4(0); 
+						//if((INLINE_PREVENTION & UB_zero)!=0) return vec4(0); 
 						
 						if(texIdx==0) return vec4(1,1,1,1)/*no texture means full white*/; 
 						
