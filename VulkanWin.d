@@ -7011,7 +7011,7 @@ $(V_size+G_size)".text
 					vec2 lineIntersection(vec2 p1, vec2 p2, vec2 p3, vec2 p4)
 					{
 						float denom = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x); 
-						if(abs(denom) < 1e-30)
+						if(abs(denom) < 1e-30f)
 						{
 							return (p2+p3)/2; // Fallback to first point if lines are parallel
 						}
@@ -7484,7 +7484,7 @@ $(V_size+G_size)".text
 							U 	= S1.p[0] - S1.p[1]; 
 						float det = crossZ(T, U); 
 						
-						if(abs(det)<1e-30) return false;  //Todo: this is lame
+						if(abs(det)<1e-30f) return false;  //Todo: this is lame
 						
 						float detA = crossZ(S, U); 
 						

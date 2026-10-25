@@ -1460,7 +1460,7 @@ version(/+$DIDE_REGION Geometry+/all)
 			U 	= S1.p[0] - S1.p[1]; 
 		auto det = crossZ(T, U); 
 		
-		if(abs(det)<1e-30) return false;  //Todo: this is lame
+		if(abs(det)<1e-30f) return false;  //Todo: this is lame
 		
 		auto detA = crossZ(S, U); 
 		
@@ -1483,7 +1483,7 @@ version(/+$DIDE_REGION Geometry+/all)
 			U 	= S1.p[0] - S1.p[1]; 
 		auto det = crossZ(T, U); 
 		
-		if(abs(det)<1e-30) return false;  //Todo: this is lame
+		if(abs(det)<1e-30f) return false;  //Todo: this is lame
 		
 		auto detA = crossZ(S, U); 
 		
@@ -1928,6 +1928,36 @@ version(/+$DIDE_REGION Geometry+/all)
 		if(r.empty) return extrapolateCurve(C, B, A); 
 		const D = r.front; 
 		return extrapolateCurve(D, C, B, A); 
+	} 
+	
+	///returns if there was any point
+	bool visitPolygonEdges(alias fun, R)(R points)
+	{
+		if(points.empty) return false; 
+		auto first = (cast()(points.front)), prev = first; points.popFront; 
+		if(!points.empty)
+		{
+			foreach(cur; points) { fun(prev, cur); prev = cur; }
+			fun(prev, first); 
+		}
+		return true; 
+	} 
+	
+	vec2 calcCentroid(R)(R points)
+	{
+		vec2 p0 = points.frontOr; 
+		float area2 = 0; vec2 acc; 
+		if(
+			points.visitPolygonEdges!
+			((prev, cur) {
+				const cr = crossZ(prev, cur); 
+				area2 += cr; 
+				acc += (prev + cur) * cr; 
+			})
+			&& (magnitude(area2)) > 1e-30f
+		)
+		return acc * ((1)/(3 * area2)); 
+		return p0; 
 	} 
 	
 	T[2] linearBezierWeights(T)(T t)
