@@ -5596,6 +5596,8 @@ version(/+$DIDE_REGION+/all)
 		} 
 		void notifyRemoveAll()
 		{ hoveredItem = null; } 
+		
+		DeltaQuantizer mouseDeltaQuantizer_x; 
 		
 		bool update(
 			bool canStart, vec2 mousePos_, T[] items, T[] delegate() onBringToFront = null,
@@ -5613,15 +5615,22 @@ version(/+$DIDE_REGION+/all)
 			bool canStart, vec2 mousePos_, T[] items, 
 			T[] delegate() onBringToFront = null, //Use bringSelectedItemsToFront for default behavior
 			bool deselectBelow = false, 
-			void delegate(T, vec2) afterMove = null
+			void delegate(T, vec2) afterItemMoved = null,
+			void delegate() onSelectNone = null, /+In case when items contain only a screenful of items+/
+			float movementQuantizationUnit_x = 0, /+If nonZero, it will quantize the movement deltas.+/
+			void delegate(vec2 delta) onMoveSelected = null /+The default move operation can be replaced by this+/
 		)
 		{
 			if(userInteraction.handled) canStart = false; 
 			
 			void selectNone()
 			{
-				foreach(a; items)
-				a.isSelected = false; 
+				if(onSelectNone)
+				onSelectNone(); 
+				else {
+					foreach(a; items)
+					a.isSelected = false; 
+				}
 			} 	void selectOnly(T item)
 			{
 				selectNone; if(item)
@@ -5670,22 +5679,25 @@ version(/+$DIDE_REGION+/all)
 			if(getBounds(item).contains!"[)"(mouseAct))
 			hoveredItem = item; 
 			
-			((0x27290EB16D5C4).檢(LMB)); 
-			((0x272B3EB16D5C4).檢(LMB_pressed)); 
-			((0x272DEEB16D5C4).檢(canStart)); 
-			((0x27306EB16D5C4).檢(LMB_pressed && canStart)); 
-			((0x2733DEB16D5C4).檢(hoveredItem)); 
-			((0x27368EB16D5C4).檢(mouseAct)); 
-			((0x27390EB16D5C4).檢(mouseOp)); 
-			((0x273B7EB16D5C4).檢(selectOp)); 
-			((0x273DFEB16D5C4).檢(dragSource)); 
-			((0x27409EB16D5C4).檢(dragBounds)); 
-			((0x27433EB16D5C4).檢(anyMoved)); 
-			((0x2745BEB16D5C4).檢 (mixin(求map(q{i},q{items},q{getBounds(i).text})).join('\n'))); 
+			((0x27432EB16D5C4).檢(LMB)); 
+			((0x27455EB16D5C4).檢(LMB_pressed)); 
+			((0x27480EB16D5C4).檢(canStart)); 
+			((0x274A8EB16D5C4).檢(LMB_pressed && canStart)); 
+			((0x274DFEB16D5C4).檢(hoveredItem)); 
+			((0x2750AEB16D5C4).檢(mouseAct)); 
+			((0x27532EB16D5C4).檢(mouseOp)); 
+			((0x27559EB16D5C4).檢(selectOp)); 
+			((0x27581EB16D5C4).檢(dragSource)); 
+			((0x275ABEB16D5C4).檢(dragBounds)); 
+			((0x275D5EB16D5C4).檢(anyMoved)); 
+			((0x275FDEB16D5C4).檢 (mixin(求map(q{i},q{items},q{getBounds(i).text})).join('\n'))); 
 			
 			if(LMB_pressed && canStart)
 			{
 				//Left Mouse pressed //
+				
+				if(movementQuantizationUnit_x) mouseDeltaQuantizer_x.reset; 
+				
 				if(hoveredItem)
 				{
 					if(modNone)
@@ -5710,6 +5722,10 @@ version(/+$DIDE_REGION+/all)
 				{
 					mouseOp = MouseOp.rectSelect; 
 					saveOldSelected; 
+					if(
+						onSelectNone && 
+						selectOp == SelectOp.clearAdd
+					) onSelectNone(); 
 				}
 			}
 			
@@ -5734,16 +5750,34 @@ version(/+$DIDE_REGION+/all)
 				}
 			}
 			
-			if(mouseOp == MouseOp.move && mouseDelta)
+			version(/+$DIDE_REGION Do optional mouse movement quantization+/all)
 			{
-				foreach(a; items)
-				if(a.isSelected)
+				int mouseDeltaQuantized_x; 
+				if(movementQuantizationUnit_x)
+				mouseDeltaQuantized_x = mouseDeltaQuantizer_x.update(mouseDelta.x, movementQuantizationUnit_x); 
+			}
+			if(mouseOp == MouseOp.move)
+			{
+				vec2 delta = mouseDelta; 
+				if(movementQuantizationUnit_x) delta.x = mouseDeltaQuantized_x; 
+				if(delta)
 				{
-					a.opMove(mouseDelta); 
-					//This kind of move is losing precision quickly, but it survives zooming.
-					
-					if(afterMove) afterMove(a, mouseDelta); 
-					anyMoved = true; 
+					if(onMoveSelected)
+					{ onMoveSelected(delta); }
+					else
+					{
+						//default move operation: calls item.opMove(delta)
+						foreach(a; items)
+						if(a.isSelected)
+						{
+							
+							a.opMove(delta); 
+							//This kind of move is losing precision quickly, but it survives zooming.
+							
+							if(afterItemMoved) afterItemMoved(a, delta); 
+							anyMoved = true; 
+						}
+					}
 				}
 			}
 			
@@ -8783,7 +8817,7 @@ struct im
 							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
 							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
 						}
-						((0x3D474EB16D5C4).檢 (ImStorageManager.stats)); 
+						((0x3D8E2EB16D5C4).檢 (ImStorageManager.stats)); 
 					}
 				}
 				

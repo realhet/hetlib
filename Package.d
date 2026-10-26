@@ -6712,6 +6712,31 @@ version(/+$DIDE_REGION Numeric+/all)
 			} 
 					
 		} 
+		
+		struct DeltaQuantizer
+		{
+			float lastPos=0, subStep=0;  // subStep in units, range (-0.5, 0.5]
+			float unit=1; 
+			
+			void reset()
+			{
+				subStep = 0; //it resets the quantization to the center
+				//usefull just when the mouse is pressed
+			} 
+			
+			int update(float deltaPos, float newUnit)
+			{
+				if(newUnit != unit)
+				{
+					subStep *= unit / newUnit;  // rescale phase to new lattice
+					unit = newUnit; 
+				}
+				subStep += deltaPos / unit; 
+				int steps = iround(subStep); 
+				subStep -= steps; 
+				return steps; 
+			} 
+		} 
 		
 		struct DigitalSignal
 		{
@@ -9306,11 +9331,11 @@ version(/+$DIDE_REGION Containers+/all)
 				auto _間=init間; 
 				static bool res; res = false; 
 				enum N = 16<<16; 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x4541659F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x4549859F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x4551459F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x4559159F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x4561759F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x4565859F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x456DA59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x4575659F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x457D359F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x4585959F156A1).檢((update間(_間)))); 
 				
 				/+
 					benchmarks:
