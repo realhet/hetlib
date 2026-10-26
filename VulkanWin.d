@@ -8545,6 +8545,16 @@ $(V_size+G_size)".text
 						return size; 
 					} 
 					
+					/**
+						note: readSample is a very convinient way to access a texture, even a 3D texture, but becaise it reads 3 extra dwords from textureInfo, 
+						it eats up a lot of performance.
+						No matter that the 3 extra dwords are the same and cached, the read and wait operation also takes a lot of time.
+						
+						Possible ways for optimization:
+						Dissect the readSample function to address calculation and sampling phases.
+						For soft-multisampling, calculate the address only once.  
+						For global textures, pass the heapChunkIdx manually, so even that one read could be omitted.
+					*/
 					vec4 readSample(in uint texIdx, in vec3 v, in bool prescaleXY, bool prescaleZ)
 					{
 						//if((INLINE_PREVENTION & UB_zero)!=0) return vec4(0); 
