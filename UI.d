@@ -184,6 +184,7 @@ version(/+$DIDE_REGION+/all)
 	struct UserInteraction
 	{
 		bool handled; //true when any operation is active. It temporarily blocks other operations.
+		bool modifying; //set when something is being modidied: while the mouse is pressed and keep dragging.
 		bool modified; //set when the user successfully modified the underlying data
 	} 
 	
@@ -5568,7 +5569,9 @@ version(/+$DIDE_REGION+/all)
 		
 		vec2 dragSource; 
 		bounds2 dragBounds; 
-		bool anyMoved; 
+		bool anyMoved; //through the whole gesture
+		
+		DeltaQuantizer mouseDeltaQuantizer_x; 
 		
 		bounds2 selectionBounds()
 		{
@@ -5597,7 +5600,16 @@ version(/+$DIDE_REGION+/all)
 		void notifyRemoveAll()
 		{ hoveredItem = null; } 
 		
-		DeltaQuantizer mouseDeltaQuantizer_x; 
+		
+		
+		void reset()
+		{
+			hoveredItem = T.init; 
+			anyMoved = false; 
+			mouseDeltaQuantizer_x.reset; 
+			mouseOp = MouseOp.init; 
+			selectOp = SelectOp.init; 
+		} 
 		
 		bool update(
 			bool canStart, vec2 mousePos_, T[] items, T[] delegate() onBringToFront = null,
@@ -5618,7 +5630,10 @@ version(/+$DIDE_REGION+/all)
 			void delegate(T, vec2) afterItemMoved = null,
 			void delegate() onSelectNone = null, /+In case when items contain only a screenful of items+/
 			float movementQuantizationUnit_x = 0, /+If nonZero, it will quantize the movement deltas.+/
-			void delegate(vec2 delta) onMoveSelected = null /+The default move operation can be replaced by this+/
+			bool delegate(vec2 delta) onMoveSelected = null /+
+				The default move operation can be replaced by this
+				returns: true if anything has changed
+			+/
 		)
 		{
 			if(userInteraction.handled) canStart = false; 
@@ -5678,20 +5693,7 @@ version(/+$DIDE_REGION+/all)
 			foreach(item; items)
 			if(getBounds(item).contains!"[)"(mouseAct))
 			hoveredItem = item; 
-			
-			((0x27432EB16D5C4).檢(LMB)); 
-			((0x27455EB16D5C4).檢(LMB_pressed)); 
-			((0x27480EB16D5C4).檢(canStart)); 
-			((0x274A8EB16D5C4).檢(LMB_pressed && canStart)); 
-			((0x274DFEB16D5C4).檢(hoveredItem)); 
-			((0x2750AEB16D5C4).檢(mouseAct)); 
-			((0x27532EB16D5C4).檢(mouseOp)); 
-			((0x27559EB16D5C4).檢(selectOp)); 
-			((0x27581EB16D5C4).檢(dragSource)); 
-			((0x275ABEB16D5C4).檢(dragBounds)); 
-			((0x275D5EB16D5C4).檢(anyMoved)); 
-			((0x275FDEB16D5C4).檢 (mixin(求map(q{i},q{items},q{getBounds(i).text})).join('\n'))); 
-			
+			
 			if(LMB_pressed && canStart)
 			{
 				//Left Mouse pressed //
@@ -5729,6 +5731,17 @@ version(/+$DIDE_REGION+/all)
 				}
 			}
 			
+			if(mouseOp && !LMB)
+			{
+				//left mouse released //
+				
+				//...
+				if(anyMoved.chkClear) userInteraction.modified = true; 
+				/+Todo: track movement+/
+				
+				mouseOp = MouseOp.idle; 
+			}
+			
 			{
 				//update ongoing things //
 				if(mouseOp == MouseOp.rectSelect && inputChanged)
@@ -5758,12 +5771,14 @@ version(/+$DIDE_REGION+/all)
 			}
 			if(mouseOp == MouseOp.move)
 			{
+				
 				vec2 delta = mouseDelta; 
 				if(movementQuantizationUnit_x) delta.x = mouseDeltaQuantized_x; 
 				if(delta)
 				{
+					bool anyMovedNow; 
 					if(onMoveSelected)
-					{ onMoveSelected(delta); }
+					{ anyMovedNow |= onMoveSelected(delta); }
 					else
 					{
 						//default move operation: calls item.opMove(delta)
@@ -5775,22 +5790,12 @@ version(/+$DIDE_REGION+/all)
 							//This kind of move is losing precision quickly, but it survives zooming.
 							
 							if(afterItemMoved) afterItemMoved(a, delta); 
-							anyMoved = true; 
+							anyMovedNow = true; 
 						}
 					}
+					if(anyMovedNow)
+					userInteraction.modifying = anyMoved = true; 
 				}
-			}
-			
-			
-			if(mouseOp && !LMB)
-			{
-				//left mouse released //
-				
-				//...
-				if(anyMoved.chkClear) userInteraction.modified = true; 
-				/+Todo: track movement+/
-				
-				mouseOp = MouseOp.idle; 
 			}
 			
 			userInteraction.handled |= mouseOp!=MouseOp.idle; 
@@ -5836,7 +5841,157 @@ version(/+$DIDE_REGION+/all)
 		} 
 		
 		doit(actItem); 
-	} 
+	} 
+	
+	struct PointAdjuster(Handles/+a Tuple of one or more handle types+/)
+	{
+		Handles.Types 	nearestHandles /+the closest to the mouse+/, 
+			adjustedHandles/+being adjusted+/; 
+		
+		DeltaQuantizer mouseDeltaQuantizer_x; 
+		bool anyMoved; //through the whole gesture
+		
+		static foreach(i, fn; fieldOrTypeNames!Handles)
+		mixin(iq{
+			alias nearest$(fn) 	= nearestHandles[$(i)],
+			adjusted$(fn) 	= adjustedHandles[$(i)]; 
+		}.text); 
+		
+		void reset()
+		{ this = typeof(this).init; } 
+		
+		private
+		{
+			static sizediff_t getHandleIdxFor(T)()
+			{
+				static foreach(i, H; Handles.Types)
+				{
+					static if(__traits(compiles, { H h; T.init.findNearest(h, vec2(0), 0.0f); }))
+					return i; 
+				}
+				return -1; 
+			} 
+			
+			void _apply(string fun, Args...)()
+			{ static foreach(a; Args) mixin(fun); } 
+			
+			bool _any(string fun, Args...)()
+			{ static foreach(a; Args) if(mixin(fun)) return true; return false; } 
+		} 
+		
+		void resetNearest()
+		{ _apply!(q{a.reset; }, nearestHandles); } 	void resetAdjusted()
+		{ _apply!(q{a.reset; }, adjustedHandles); } 
+		bool anyNearest()
+		=> _any!(q{a.valid}, nearestHandles); 	bool anyAdjusted()
+		=> _any!(q{a.valid}, adjustedHandles); 
+		
+		private auto getNearestDistances()
+		{
+			float[nearestHandles.length] distances; 
+			foreach(i, handle; nearestHandles) distances[i] = handle.dist; 
+			return distances; 
+		} 
+		
+		void findNearest(Args...)(in vec2 mousePos, in float maxDist, Args args)
+		{
+			//1. clear all distances
+			resetNearest; 
+			
+			//2. call findNearest() functions for all ranges and items found in Args.
+			static foreach(argIdx, arg; args)
+			static if(isInputRange!(Args[argIdx]))
+			{
+				{
+					enum hIdx = getHandleIdxFor!(typeof(arg.front)); 
+					static assert(hIdx>=0); 
+					foreach(item; arg)
+					item.findNearest(nearestHandles[hIdx], mousePos, maxDist); 
+				}
+			}
+			else
+			{
+				{
+					alias A = typeof(arg); 
+					static assert(is(A==class) || isPointer!A, "Single value Arg must be a reference."); 
+					enum hIdx = getHandleIdxFor!(typeof(arg)); 
+					static assert(hIdx>=0); 
+					arg.findNearest(nearestHandles[hIdx], mousePos, maxDist); 
+				}
+			}
+			
+			//2. select only the nearest one
+			const nearestIdx = getNearestDistances[].minIndex; 
+			static foreach(i, handle; nearestHandles) if(i!=nearestIdx) handle.reset; 
+		} 
+		
+		/+
+			Begin drag if allowed, end drag when the ongoing operation is no longer enabled,
+			and apply mouse delta to the adjusted handles.
+			Returns true while a drag is in progress (equivalent to old `adjustingPoint`).
+		+/
+		void handleAdjustPoints(
+			ref UserInteraction userInteraction, bool canStart, bool canContinue, vec2 mouseDelta,
+			float movementQuantizationUnit_x = 0, /+If nonZero, it will quantize the movement deltas.+/
+		)
+		{
+			if(userInteraction.handled) canStart = false; 
+			
+			if(!anyAdjusted && anyNearest && canStart)
+			{
+				if(movementQuantizationUnit_x) mouseDeltaQuantizer_x.reset; 
+				adjustedHandles = nearestHandles; 
+			}
+			
+			if(anyAdjusted && !canContinue)
+			{
+				resetAdjusted; 
+				if(anyMoved.chkClear) userInteraction.modified = true; 
+			}
+			
+			version(/+$DIDE_REGION Do optional mouse movement quantization+/all)
+			{
+				int mouseDeltaQuantized_x; 
+				if(movementQuantizationUnit_x)
+				mouseDeltaQuantized_x = mouseDeltaQuantizer_x.update(mouseDelta.x, movementQuantizationUnit_x); 
+			}
+			
+			if(anyAdjusted)
+			{
+				vec2 delta = mouseDelta; 
+				if(movementQuantizationUnit_x) delta.x = mouseDeltaQuantized_x; 
+				if(delta)
+				{
+					bool anyMovedNow; 
+					foreach(a; adjustedHandles)
+					if(a.valid)
+					{
+						a.adjust(delta); /+Todo: call it opMove and request a bool result from that+/
+						anyMovedNow = true; 
+					}
+					if(anyMovedNow)
+					userInteraction.modifying = anyMoved = true; 
+				}
+				userInteraction.handled = true; 
+			}
+		} 
+		
+		void draw(IDrawing dr, lazy bool showNearest)
+		{
+			foreach(idx, adjusted; adjustedHandles)
+			{
+				{
+					alias nearest = nearestHandles[idx]; 
+					if(adjusted.valid)	adjusted.draw(dr, Yes.adjusted); 
+					else if(
+						nearest.valid && 
+						showNearest
+					)	nearest.draw(dr, No.adjusted); 
+				}
+			}
+		} 
+	} 
+	
 	static class VirtualListBase
 	{
 		bool stretchRows = true; /+
@@ -8817,7 +8972,7 @@ struct im
 							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
 							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
 						}
-						((0x3D8E2EB16D5C4).檢 (ImStorageManager.stats)); 
+						((0x3E97DEB16D5C4).檢 (ImStorageManager.stats)); 
 					}
 				}
 				
@@ -11608,6 +11763,13 @@ struct im
 				Id draggedSplitterId; 
 				Id draggedSplitterId_secondary; 
 			} 
+		} 
+		
+		bool anySplitterDragging()
+		{
+			static foreach(s; AliasSeq!(splitterState_horz, splitterState_vert))
+			if(s.draggedSplitterId || s.draggedSplitterId_secondary) return true; 
+			return false; 
 		} 
 		
 		///Splitter is a thin stripe shaped container used to resize other containers.
