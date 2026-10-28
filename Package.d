@@ -1907,12 +1907,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 		return format!"%s(%s)"(T.stringof, parts.join(", ")); 
 	} 
 	
-	void clearFields_init(T)(T obj)
-	if(isAggregateType!T)
+	void resetAllFieldsToInit(T)(T obj)
+	if(is(T==class))
 	{ foreach(f; FieldNameTuple!T) mixin("obj.$ = T.$.init;".replace("$", f)); } 
 	
-	//Note: at stream, there is a clearFields_default version
-	//Todo: bad naming:  initFields and initStoredField would be better.
+	void resetAllFieldsToInit(T)(ref T obj)
+	if(is(T==struct))
+	{ foreach(f; FieldNameTuple!T) mixin("obj.$ = T.$.init;".replace("$", f)); } 
+	
+	//Note: there is a resetStoredFieldsToDefaults() too
 	
 	//Meta helpers ///////////////////////////
 	
@@ -3460,15 +3463,15 @@ version(/+$DIDE_REGION Global System stuff+/all)
 			/+
 				TestPad:
 				/+
-					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B47659F156A1})); 
+					Code: mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B4BA59F156A1})); 
 					/+
 						Changes after the fix:
 						/+
 							Code: //Invalid:
-							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B53E59F156A1})); 
+							auto x = mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val},q{0x1B58259F156A1})); 
 							//Grouping by comma expressions also broken:
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B5E859F156A1})),
-							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B65D59F156A1})); 
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val1},q{0x1B62C59F156A1})),
+							mixin(同!(q{float/+w=6 h=1 min=0 max=12 sameBk=1 rulerSides=3 rulerDiv0=11+/},q{val2},q{0x1B6A159F156A1})); 
 						+/
 					+/
 				+/
@@ -9331,11 +9334,11 @@ version(/+$DIDE_REGION Containers+/all)
 				auto _間=init間; 
 				static bool res; res = false; 
 				enum N = 16<<16; 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x4565859F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x456DA59F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x4575659F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x457D359F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x4585959F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x4569C59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x4571E59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x4579A59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x4581759F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x4589D59F156A1).檢((update間(_間)))); 
 				
 				/+
 					benchmarks:
@@ -18554,16 +18557,14 @@ Source field: 	$("baseDeco") 	Source field: 	$(a)"
 		assert(mat2(1,2,3,4).toJson(false) == [[1,2],[3,4]].toJson(true)); 
 	} 
 	
-	//! clearFields /////////////////////////////////////////
-	
-	void clearFields_defaults(Type)(auto ref Type data)
+	void resetStoredFieldsToDefaults(Type)(auto ref Type data)
 	if(is(Type==class) || __traits(isRef, data)) //only let classes not to be references  (auto ref template parameter)
 	{
 		static if(is(Type==class)) if(data is null) return; //ignore empty null instances
 		
 		static string savedData = "\0"; //Todo: use binaryJson
 		if(savedData=="\0") {
-			static Type temp; 
+			Type temp; 
 			static if(is(Type==class)) temp = new Type; 
 			savedData = temp.toJson; 
 			

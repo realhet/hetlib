@@ -38,6 +38,59 @@ version(/+$DIDE_REGION+/all)
 		/+Link: https://nikitablack.github.io/post/how_to_use_vulkan_timestamp_queries/ +/
 	+/
 	
+	/+
+		Todo: Somehow get access to the machine code and disasm.  261027
+		
+		VK_AMD_shader_info 
+		
+		VK_SHADER_INFO_TYPE_STATISTICS_AMD → VGPRs, SGPRs, scratch bytes, LDS bytes, waves/SIMD — 
+			exactly the occupancy numbers you want, no disassembly parsing
+		
+		VK_SHADER_INFO_TYPE_DISASSEMBLY_AMD → the full GCN ISA text, straight from the driver's compiler
+		
+		VK_SHADER_INFO_TYPE_BINARY_AMD → the raw code object if you want to feed it to your own disassembler
+		
+		/+
+			Code: VkShaderStatisticsInfoAMD stats; 
+			size_t sz = sizeof(stats); 
+			vkGetShaderInfoAMD(
+				device, pipeline, VK_SHADER_STAGE_FRAGMENT_BIT,
+				VK_SHADER_INFO_TYPE_STATISTICS_AMD, &sz, &stats
+			); 
+		+/
+		
+		RGA offline does support gfx803 — you just need the right version
+		RGA support narrowed over the years, but:
+		
+		RGA 1.x fully supports gfx803
+		
+		RGA 2.0–2.4 support gfx803 (support for GCN was dropped in later 2.x)
+		
+		It's a standalone .exe that compiles your SPIR-V → GCN ISA without touching the GPU or the driver. So "officially not 
+		supported by modern tools" is technically true (modern RGA targets RDNA) but the older RGA is still the right tool and it's 
+		still on GPUOpen's download archive. Grab an older 2.x, point it at -s gfx803, and you get:
+		
+		text
+		VGPRs: 248 | SGPRs: 32 | Scratch: 0 | Waves/SIMD: 1
+		plus --isa for the disassembly and --cfg for live ranges. Zero setup beyond unzipping.
+		
+		For the assembler itch: llvm-mc and CLRadeonExtender
+		If you wrote a GCN1 assembler for fun, these two will feel like coming home:
+		
+		llvm-mc — the LLVM MC layer has a full AMDGPU assembler/disassembler. From a command line:
+		
+		sh
+		llvm-mc -triple=amdgcn -mcpu=fiji -show-encoding -show-inst
+		type v_fma_f32 v0, v1, v2, v3 and get the encoding back. Round-trip to disassembly with --disassemble. It's the same 
+		backend the driver uses, so anything you prototype assembles exactly as the real compiler would.
+		
+		CLRadeonExtender — a full GCN assembler/disassembler/linker, open source, works on Windows, supports gfx803 
+		through gfx900. It's the closest thing to "the assembler I wish I'd written" — handles the ELF/code-object wrapping too, 
+		not just instruction encoding. If you ever want to hand-write a shader kernel and actually run it, this is the tool that 
+		makes the loop fast.
+	+/
+	
+	
 	enum LOG_WAITIDLE = false; 
 	
 	//Extensions used by hetlib.
@@ -5911,9 +5964,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							uploadBuffers; /+
 								Opt: upload imgSrc only -> 1 command buffer 
 								with a barrier bewteen copy and execute
-							+/	((0x337584F76D066).檢(0x326B29B0E4249)); 
-							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x337BE4F76D066).檢(0x3271A9B0E4249)); 
-							downloadBuffers; /+Opt: Download imgMask only+/	((0x338214F76D066).檢(0x3277F9B0E4249)); 
+							+/	((0x340B74F76D066).檢(0x326B29B0E4249)); 
+							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x3411D4F76D066).檢(0x3271A9B0E4249)); 
+							downloadBuffers; /+Opt: Download imgMask only+/	((0x341804F76D066).檢(0x3277F9B0E4249)); 
 						} 
 					}
 				} 

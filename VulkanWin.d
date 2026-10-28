@@ -5418,6 +5418,7 @@ class VulkanWindow: Window, IGfxContentDestination
 			
 			//TB: Texture buffer
 			layout(binding = 2) buffer TB_T { uint TB[]; } ; 
+			layout(binding = 2) buffer TB2_T { uvec2 TB2[]; } ; 
 			
 			//GB: Geometry buffer (additional variable lengt vertex data)
 			layout(binding = 3) buffer GB_T { uint GB[]; } ; 
@@ -5665,18 +5666,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2BA8682886ADB).檢(
+					((0x2BABF82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2BAF882886ADB))))
+				if((互!((bool),(0),(0x2BB3182886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2BB8C82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2BBA382886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2BBC582886ADB).檢((互!((float/+w=12+/),(1.000),(0x2BBDC82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5689,8 +5690,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2BD7882886ADB).檢 (imVG)),
-					((0x2BD9E82886ADB).檢 (imFPS)); 
+					((0x2BDB182886ADB).檢 (imVG)),
+					((0x2BDD782886ADB).檢 (imFPS)); 
 				}
 			}
 			
