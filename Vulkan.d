@@ -99,6 +99,7 @@ version(/+$DIDE_REGION+/all)
 	version = DVulkan_VK_KHR_surface; 
 	version = DVulkan_VK_KHR_win32_surface; 
 	version = DVulkan_VK_KHR_swapchain; 
+	version = DVulkan_VK_AMD_shader_info; 
 	
 	version(DVulkanAllExtensions)
 	{
@@ -121,6 +122,8 @@ version(/+$DIDE_REGION+/all)
 		version = DVulkan_VK_AMD_extension_5; 
 		version = DVulkan_VK_AMD_extension_6; 
 		version = DVulkan_VK_EXT_debug_marker; 
+		
+		version = DVulkan_VK_AMD_shader_info; //het
 	}struct VkBitFlags(E, Flag!"unsafe" unsafe=No.unsafe)
 	{
 		BitFlags!(E, unsafe) _bitflags; 
@@ -2691,6 +2694,40 @@ version(/+$DIDE_REGION+/all)
 		enum VK_EXT_DEBUG_MARKER_SPEC_VERSION = 3; 
 		enum VK_EXT_DEBUG_MARKER_EXTENSION_NAME = "VK_EXT_debug_marker"; 
 	}
+	//het
+	version(DVulkan_VK_AMD_shader_info)
+	{
+		enum VK_AMD_SHADER_INFO_SPEC_VERSION = 1; 
+		enum VK_AMD_SHADER_INFO_EXTENSION_NAME = "VK_AMD_shader_info"; 
+		
+		alias VkShaderInfoTypeAMD = VK_SHADER_INFO_TYPE_; 
+		enum VK_SHADER_INFO_TYPE_
+		{
+			STATISTICS_AMD = 0,
+			BINARY_AMD = 1,
+			DISASSEMBLY_AMD = 2,
+		} 
+		
+		struct VkShaderResourceUsageAMD
+		{
+			uint32_t numUsedVgprs; 
+			uint32_t numUsedSgprs; 
+			uint32_t ldsSizePerLocalWorkGroup; 
+			size_t ldsUsageSizeInBytes; 
+			size_t scratchMemUsageInBytes; 
+		} 
+		
+		struct VkShaderStatisticsInfoAMD
+		{
+			VkShaderStageFlags shaderStageMask; 
+			VkShaderResourceUsageAMD resourceUsage; 
+			uint32_t numPhysicalVgprs; 
+			uint32_t numPhysicalSgprs; 
+			uint32_t numAvailableVgprs; 
+			uint32_t numAvailableSgprs; 
+			uint32_t[3] computeWorkGroupSize; 
+		} 
+	}
 	
 }extern(System) @nogc nothrow
 {
@@ -2745,7 +2782,10 @@ version(/+$DIDE_REGION+/all)
 		/// This loads all Vulkan functions that take a VkDevice, VkQueue, or VkCommandBuffer as their first argument.
 		/// The functions may only be used with the passed-in device, and should be free of dispatching overhead.
 		/// Sets `device` to the passed-in device.
-		void loadDeviceFunctions(VkDevice device)
+		void loadDeviceFunctions(
+			VkDevice device,
+			bool[string] existingOptionalDeviceExtensions /+if a function has a string UDA, it will checked against this set when loading.+/
+		)
 		{
 			assert(this.vkGetDeviceProcAddr, "loadInstanceFunctions called without vkGetDeviceProcAddr set"); 
 			
@@ -2757,6 +2797,13 @@ version(/+$DIDE_REGION+/all)
 			this.device = device; 
 			foreach(string name; funcsToLoad)
 			{
+				enum extensionName = getUDA!(__traits(getMember, this, name), string); 
+				static if(extensionName!="")
+				{
+					print(name, " is a part of extension ", extensionName, existingOptionalDeviceExtensions.get(extensionName)); 
+					
+				}
+				
 				__traits(getMember, this, name) = cast(typeof(__traits(getMember, VulkanFunctions, name)))
 					vkGetDeviceProcAddr(device, name); 
 			}
@@ -3052,6 +3099,80 @@ version(/+$DIDE_REGION+/all)
 			PFN_vkCmdEndRenderPass vkCmdEndRenderPass; 
 			alias PFN_vkCmdExecuteCommands = void function(VkCommandBuffer commandBuffer,uint32_t commandBufferCount,const(VkCommandBuffer)* pCommandBuffers); 
 			PFN_vkCmdExecuteCommands vkCmdExecuteCommands; 
+			
+			/+
+				Note: The following higher level helper functions are working with dynamic arrays 
+				and having error handling.
+			+/
+			
+			auto getPhysicalDeviceProperties(VkPhysicalDevice device)
+			{
+				VkPhysicalDeviceProperties props; 
+				vkGetPhysicalDeviceProperties(device, &props); 
+				return props; 
+			} 
+			
+			auto enumeratePhysicalDeviceQueueFamilyProperties(VkPhysicalDevice device)
+			{
+				// Check queue families
+				uint cnt; 
+				vkGetPhysicalDeviceQueueFamilyProperties(device, &cnt, null); 
+				auto props = new VkQueueFamilyProperties[cnt]; 
+				if(props.length)
+				vkGetPhysicalDeviceQueueFamilyProperties(device, &cnt, props.ptr); 
+				return props; 
+			} 
+			
+			auto enumerateInstanceExtensionProperties(string layerName)
+			{
+				uint extensionCount; 
+				vkEnumerateInstanceExtensionProperties(layerName.toPChar, &extensionCount, null).vkEnforce; 
+				
+				auto data = new VkExtensionProperties[extensionCount]; 
+				if(extensionCount)
+				vkEnumerateInstanceExtensionProperties(layerName.toPChar, &extensionCount, data.ptr).vkEnforce; 
+				return data; 
+			} 
+			
+			auto enumerateDeviceExtensionProperties(VkPhysicalDevice physicalDevice, string layerName = "")
+			{
+				uint extensionCount; 
+				vkEnumerateDeviceExtensionProperties(physicalDevice, layerName.toPChar, &extensionCount, null).vkEnforce; 
+				
+				auto data = new VkExtensionProperties[extensionCount]; 
+				if(extensionCount)
+				vkEnumerateDeviceExtensionProperties(physicalDevice, layerName.toPChar, &extensionCount, data.ptr).vkEnforce; 
+				return data; 
+			} 
+			
+			auto enumerateInstanceLayerProperties()
+			{
+				uint numLayerProps; 
+				vkEnumerateInstanceLayerProperties(&numLayerProps, null).vkEnforce; 
+				auto layerProps = new VkLayerProperties[numLayerProps]; 
+				vkEnumerateInstanceLayerProperties(&numLayerProps, layerProps.ptr).vkEnforce; 
+				return layerProps; 
+			} 
+			
+			auto enumerateDeviceLayerProperties(VkPhysicalDevice device)
+			{
+				uint numLayerProps; 
+				vkEnumerateDeviceLayerProperties(device, &numLayerProps, null).vkEnforce; 
+				auto layerProps = new VkLayerProperties[numLayerProps]; 
+				vkEnumerateDeviceLayerProperties(device, &numLayerProps, layerProps.ptr).vkEnforce; 
+				return layerProps; 
+			} 
+			
+			auto enumeratePhysicalDevices()
+			{
+				uint numDevices; 
+				vkEnumeratePhysicalDevices(instance, &numDevices, null).vkEnforce; 
+				
+				auto devices = new VkPhysicalDevice[numDevices]; 
+				vkEnumeratePhysicalDevices(instance, &numDevices, devices.ptr).vkEnforce; 
+				
+				return devices; 
+			} 
 		}
 		version(DVulkan_VK_KHR_surface)
 		{
@@ -3065,6 +3186,41 @@ version(/+$DIDE_REGION+/all)
 			PFN_vkGetPhysicalDeviceSurfaceFormatsKHR vkGetPhysicalDeviceSurfaceFormatsKHR; 
 			alias PFN_vkGetPhysicalDeviceSurfacePresentModesKHR = VkResult function(VkPhysicalDevice physicalDevice,VkSurfaceKHR surface,uint32_t* pPresentModeCount,VkPresentModeKHR* pPresentModes); 
 			PFN_vkGetPhysicalDeviceSurfacePresentModesKHR vkGetPhysicalDeviceSurfacePresentModesKHR; 
+			
+			VkSurfaceCapabilitiesKHR getPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
+			{
+				VkSurfaceCapabilitiesKHR surfaceCapabilities; 
+				vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities)
+					.vkEnforce("failed to acquire presentation surface capabilities"); 
+				return surfaceCapabilities; 
+			} 
+			
+			VkSurfaceFormatKHR[] getPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
+			{
+				uint formatCount; 
+				vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, null)
+					.vkEnforce("failed to get number of supported surface formats"); 
+				
+				auto surfaceFormats = new VkSurfaceFormatKHR[formatCount]; 
+				vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, surfaceFormats.ptr)
+					.vkEnforce("failed to get supported surface formats"); 
+				
+				return surfaceFormats; 
+			} 
+			
+			VkPresentModeKHR[] getPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
+			{
+				uint presentModeCount; 
+				vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, null)
+					.vkEnforce("failed to get number of supported presentation modes"); 
+				enforce(presentModeCount, "failed to get number of supported presentation modes (0)"); 
+				
+				auto presentModes = new VkPresentModeKHR[presentModeCount]; 
+				vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, presentModes.ptr)
+					.vkEnforce("failed to get supported presentation modes"); 
+				
+				return presentModes; 
+			} 
 		}
 		
 		//het
@@ -3086,7 +3242,21 @@ version(/+$DIDE_REGION+/all)
 			PFN_vkAcquireNextImageKHR vkAcquireNextImageKHR; 
 			alias PFN_vkQueuePresentKHR = VkResult function(VkQueue queue,const(VkPresentInfoKHR)* pPresentInfo); 
 			PFN_vkQueuePresentKHR vkQueuePresentKHR; 
-		}
+			
+			VkImage[] getSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapChain)
+			{
+				uint actualImageCount; 
+				vkGetSwapchainImagesKHR(device, swapChain, &actualImageCount, null)
+					.vkEnforce("failed to acquire number of swap chain images"); 
+				enforce(actualImageCount, "failed to acquire number of swap chain images (0)"); 
+				
+				auto swapChainImages = new VkImage[actualImageCount]; 
+				vkGetSwapchainImagesKHR(device, swapChain, &actualImageCount, swapChainImages.ptr)
+					.vkEnforce("failed to acquire swap chain images"); 
+				
+				return swapChainImages; 
+			} 
+		}
 		version(DVulkan_VK_KHR_display)
 		{
 			alias PFN_vkGetPhysicalDeviceDisplayPropertiesKHR = VkResult function(VkPhysicalDevice physicalDevice,uint32_t* pPropertyCount,VkDisplayPropertiesKHR* pProperties); 
@@ -3131,117 +3301,37 @@ version(/+$DIDE_REGION+/all)
 			alias PFN_vkCmdDebugMarkerInsertEXT = void function(VkCommandBuffer commandBuffer,VkDebugMarkerMarkerInfoEXT* pMarkerInfo); 
 			PFN_vkCmdDebugMarkerInsertEXT vkCmdDebugMarkerInsertEXT; 
 		}
-		/+
-			Note: The following higher level helper functions are working with dynamic arrays 
-			and having error handling.
-		+/
+		//het
+		version(DVulkan_VK_AMD_shader_info)
+		{
+			@VK_AMD_SHADER_INFO_EXTENSION_NAME
+			{
+				alias PFN_vkGetShaderInfoAMD = VkResult function(VkDevice device,VkPipeline pipeline,VkShaderStageFlagBits shaderStage,VkShaderInfoTypeAMD infoType,size_t* pInfoSize,void* pInfo); 
+				PFN_vkGetShaderInfoAMD vkGetShaderInfoAMD; 
+				
+				ubyte[] getShaderInfoAMD(VkDevice device, VkPipeline pipeline, VkShaderStageFlagBits shaderStage, VkShaderInfoTypeAMD infoType)
+				{
+					if(vkGetShaderInfoAMD is null) return null; 
+					
+					size_t size; 
+					vkGetShaderInfoAMD(device, pipeline, shaderStage, infoType, &size, null)
+					.vkEnforce("vkGetShaderInfoAMD() get size failed"); 
+					
+					auto buf = uninitializedArray!(ubyte[])(size); 
+					if(size) {
+						vkGetShaderInfoAMD(device, pipeline, shaderStage, infoType, &size, buf.ptr)
+						.vkEnforce("vkGetShaderInfoAMD() get data failed"); 
+						buf = buf[0 .. size]; // clamp to what the driver actually wrote
+					}
+					return buf; 
+				} 
+			} 
+		}
 		
-		auto enumeratePhysicalDevices()
-		{
-			uint numDevices; 
-			vkEnumeratePhysicalDevices(instance, &numDevices, null).vkEnforce; 
-			
-			auto devices = new VkPhysicalDevice[numDevices]; 
-			vkEnumeratePhysicalDevices(instance, &numDevices, devices.ptr).vkEnforce; 
-			
-			return devices; 
-		} 
-		
-		auto getPhysicalDeviceProperties(VkPhysicalDevice device)
-		{
-			VkPhysicalDeviceProperties props; 
-			vkGetPhysicalDeviceProperties(device, &props); 
-			return props; 
-		} 
 		
-		auto enumeratePhysicalDeviceQueueFamilyProperties(VkPhysicalDevice device)
-		{
-			// Check queue families
-			uint cnt; 
-			vkGetPhysicalDeviceQueueFamilyProperties(device, &cnt, null); 
-			auto props = new VkQueueFamilyProperties[cnt]; 
-			if(props.length)
-			vkGetPhysicalDeviceQueueFamilyProperties(device, &cnt, props.ptr); 
-			return props; 
-		} 
 		
-		auto enumerateInstanceExtensionProperties(string layerName)
-		{
-			uint extensionCount; 
-			vkEnumerateInstanceExtensionProperties(layerName.toPChar, &extensionCount, null).vkEnforce; 
-			
-			auto data = new VkExtensionProperties[extensionCount]; 
-			if(extensionCount)
-			vkEnumerateInstanceExtensionProperties(layerName.toPChar, &extensionCount, data.ptr).vkEnforce; 
-			return data; 
-		} 
 		
-		auto enumerateInstanceLayerProperties()
-		{
-			uint numLayerProps; 
-			vkEnumerateInstanceLayerProperties(&numLayerProps, null).vkEnforce; 
-			auto layerProps = new VkLayerProperties[numLayerProps]; 
-			vkEnumerateInstanceLayerProperties(&numLayerProps, layerProps.ptr).vkEnforce; 
-			return layerProps; 
-		} 
 		
-		auto enumerateDeviceLayerProperties(VkPhysicalDevice device)
-		{
-			uint numLayerProps; 
-			vkEnumerateDeviceLayerProperties(device, &numLayerProps, null).vkEnforce; 
-			auto layerProps = new VkLayerProperties[numLayerProps]; 
-			vkEnumerateDeviceLayerProperties(device, &numLayerProps, layerProps.ptr).vkEnforce; 
-			return layerProps; 
-		} 
-		
-		VkSurfaceCapabilitiesKHR getPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
-		{
-			VkSurfaceCapabilitiesKHR surfaceCapabilities; 
-			vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &surfaceCapabilities)
-				.vkEnforce("failed to acquire presentation surface capabilities"); 
-			return surfaceCapabilities; 
-		} 
-		
-		VkSurfaceFormatKHR[] getPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
-		{
-			uint formatCount; 
-			vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, null)
-				.vkEnforce("failed to get number of supported surface formats"); 
-			
-			auto surfaceFormats = new VkSurfaceFormatKHR[formatCount]; 
-			vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, surfaceFormats.ptr)
-				.vkEnforce("failed to get supported surface formats"); 
-			
-			return surfaceFormats; 
-		} 
-		
-		VkPresentModeKHR[] getPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface)
-		{
-			uint presentModeCount; 
-			vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, null)
-				.vkEnforce("failed to get number of supported presentation modes"); 
-			enforce(presentModeCount, "failed to get number of supported presentation modes (0)"); 
-			
-			auto presentModes = new VkPresentModeKHR[presentModeCount]; 
-			vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &presentModeCount, presentModes.ptr)
-				.vkEnforce("failed to get supported presentation modes"); 
-			
-			return presentModes; 
-		} 
-		
-		VkImage[] getSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapChain)
-		{
-			uint actualImageCount; 
-			vkGetSwapchainImagesKHR(device, swapChain, &actualImageCount, null)
-				.vkEnforce("failed to acquire number of swap chain images"); 
-			enforce(actualImageCount, "failed to acquire number of swap chain images (0)"); 
-			
-			auto swapChainImages = new VkImage[actualImageCount]; 
-			vkGetSwapchainImagesKHR(device, swapChain, &actualImageCount, swapChainImages.ptr)
-				.vkEnforce("failed to acquire swap chain images"); 
-			
-			return swapChainImages; 
-		} 
 	} 
 } 
 version(/+$DIDE_REGION Vulkan classes+/all)
@@ -3313,7 +3403,10 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		
 		class VulkanExtensions
 		{
-			mixin SmartParent!q{const string layerName=""};  //note, this is a Root parent.
+			mixin SmartParent!q{
+				VulkanPhysicalDevice physicalDevice=null /+Note: <-It's not a parent reference! +/, 
+				const string layerName=""
+			}; 
 			
 			VulkanExtension[] items; alias items this; 
 			VulkanExtension[string] byName; 
@@ -3321,8 +3414,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			void _construct()
 			{
 				if(vulkanInstalled)
-				items = 	vkInitializationFunctions.enumerateInstanceExtensionProperties(layerName)
+				items = 	((physicalDevice) ?(physicalDevice.instance.enumerateDeviceExtensionProperties(physicalDevice.handle, layerName)) :(vkInitializationFunctions.enumerateInstanceExtensionProperties(layerName)))
 					.map!(a=>new VulkanExtension(this, a)).array; 
+				
 				byName = assocArray(items.map!"a.name", items); 
 			} 
 			
@@ -3331,11 +3425,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			
 			override string toString() const
 			{
-				return 	(
-					layerName=="" 	? "Instance Extensions" 
-						: "Layer Extensions "~layerName.quoted
-				)	~ ":\n"
-					~ items.map!(a=>"  "~a.text~"\n").join; 
+				return ((physicalDevice)?("Device: "~physicalDevice.name.quoted):("Instance")) ~ " extensions " ~
+				((layerName!="")?(" Layer: "~layerName.quoted):("")) ~ ":\n" ~
+				items.map!(a=>"  "~a.text~"\n").join; 
 			} 
 			
 			auto opBinary(string op : "in")(string b)
@@ -3349,6 +3441,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 		{
 			mixin SmartChild!q{
 				@PARENT VulkanLayers 	owner, 
+				VulkanPhysicalDevice physicalDevice,
 				VkLayerProperties 	properties
 			}; 
 			
@@ -3370,19 +3463,14 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			@property extensions()
 			{
 				if(!_extensions)
-				{ _extensions = new VulkanExtensions(name); }
+				{ _extensions = new VulkanExtensions(physicalDevice, name); }
 				return _extensions; 
 			} 
 		} 
 		
 		class VulkanLayers
 		{
-			mixin SmartParent!q{
-				VulkanPhysicalDevice physicalDevice=null /+
-					Note: It's not a parent reference! 
-					It can be null too.
-				+/
-			}; 
+			mixin SmartParent!q{VulkanPhysicalDevice physicalDevice=null /+Note: It's not a parent reference! +/}; 
 			
 			VulkanLayer[] items; alias items this; 
 			VulkanLayer[string] byName; 
@@ -3395,7 +3483,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					? physicalDevice.instance.enumerateDeviceLayerProperties(physicalDevice.handle) 
 					: vkInitializationFunctions.enumerateInstanceLayerProperties
 				)
-					.map!(a=>new VulkanLayer(this, a)).array; 
+					.map!(a=>new VulkanLayer(this, physicalDevice, a)).array; 
 				byName = assocArray(items.map!"a.name", items); 
 			} 
 			void _destruct() {} 
@@ -3531,6 +3619,14 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				if(!_layers)
 				{ _layers = new VulkanLayers(this); }
 				return _layers; 
+			} 
+			
+			private VulkanExtensions _extensions; 
+			@property extensions()
+			{
+				if(!_extensions)
+				_extensions = new VulkanExtensions(this); 
+				return _extensions; 
 			} 
 			
 			private VulkanMemoryProperties _memoryProperties; 
@@ -4021,6 +4117,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			VkDevice handle; 
 			VulkanFunctions functions; alias functions this; 
 			
+			bool[string] existingOptionalDeviceExtensions; 
+			
 			@property queues() { return queueItems.map!"a.queue"; } 
 			
 			static struct QueueItem
@@ -4048,12 +4146,33 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 			{
 				void waitIdle()
 				{ vkDeviceWaitIdle(handle).vkEnforce; } 
-			}
+			}
 			
 			void _construct()
 			{
 				//remove empty extensions. ("" is a valid input), remove duplicates.
 				requiredExtensions = requiredExtensions.filter!"a.length".array.sort.uniq.array; 
+				
+				foreach(ref extensionName; requiredExtensions)
+				{
+					/+
+						Optional extensions are marked with a ? at the end.
+						These extensions will be queried before device creation.
+						If they exist on this device, they will be included in the 
+						optionalExtensions[] assoc array.
+					+/
+					if(extensionName.endsWith('?'))
+					{
+						extensionName.popBack; //remove `?`
+						
+						if(extensionName in physicalDevice.extensions.byName)
+						existingOptionalDeviceExtensions[extensionName] = true; 
+						else extensionName = ""; 
+					}
+				}
+				requiredExtensions = requiredExtensions.filter!"a.length".array; 
+				
+				print!requiredExtensions; print(existingOptionalDeviceExtensions); 
 				
 				//choose a single physicalDevice
 				enforce(queueItems.length, "Empty VulkanQueue[]"); 
@@ -4105,7 +4224,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				
 				//got the device, now load its optional function table.
 				functions = physicalDevice.instance.functions; 
-				loadDeviceFunctions(handle); 
+				loadDeviceFunctions(handle, existingOptionalDeviceExtensions); 
 				
 				{
 					//retrieve the queue handles
@@ -5141,6 +5260,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				const(ubyte)[] 	binary
 			}; 
 			
+			auto opIndex() => allShaderModules[]; 
+			
 			void _construct()
 			{ reload; }  void _destruct()
 			{ clearShaderModules; } 
@@ -5444,6 +5565,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					if(auto physicalDevice = vk.physicalDevices.get(deviceIndex))
 					{
 						physicalDevice.queueFamilies.print; 
+						physicalDevice.extensions.print; 
 						physicalDevice.layers.print; 
 						physicalDevice.layers.map!"a.extensions".each!print; 
 						physicalDevice.memoryProperties.print; 
@@ -5964,9 +6086,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							uploadBuffers; /+
 								Opt: upload imgSrc only -> 1 command buffer 
 								with a barrier bewteen copy and execute
-							+/	((0x340B74F76D066).檢(0x326B29B0E4249)); 
-							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x3411D4F76D066).檢(0x3271A9B0E4249)); 
-							downloadBuffers; /+Opt: Download imgMask only+/	((0x341804F76D066).檢(0x3277F9B0E4249)); 
+							+/	((0x351C14F76D066).檢(0x326B29B0E4249)); 
+							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x352274F76D066).檢(0x3271A9B0E4249)); 
+							downloadBuffers; /+Opt: Download imgMask only+/	((0x3528A4F76D066).檢(0x3277F9B0E4249)); 
 						} 
 					}
 				} 

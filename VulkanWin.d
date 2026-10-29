@@ -5493,6 +5493,23 @@ class VulkanWindow: Window, IGfxContentDestination
 				
 				pipelineLayout, renderPass, 0, null, -1
 			); 
+			
+			
+			{
+				auto pipeline = graphicsPipeline; 
+				print("Shader stats"); 
+				
+				string[] s; 
+				
+				s ~= ((*(cast(VkShaderStatisticsInfoAMD*)(vk.getShaderInfoAMD(device.handle, pipeline.handle, mixin(舉!((VK_SHADER_STAGE_),q{VERTEX_BIT})), mixin(舉!((VK_SHADER_INFO_TYPE_),q{STATISTICS_AMD})))))).toJson); 
+				s ~= ((*(cast(VkShaderStatisticsInfoAMD*)(vk.getShaderInfoAMD(device.handle, pipeline.handle, mixin(舉!((VK_SHADER_STAGE_),q{GEOMETRY_BIT})), mixin(舉!((VK_SHADER_INFO_TYPE_),q{STATISTICS_AMD})))))).toJson); 
+				s ~= ((*(cast(VkShaderStatisticsInfoAMD*)(vk.getShaderInfoAMD(device.handle, pipeline.handle, mixin(舉!((VK_SHADER_STAGE_),q{FRAGMENT_BIT})), mixin(舉!((VK_SHADER_INFO_TYPE_),q{STATISTICS_AMD})))))).toJson); 
+				s ~= (vk.getShaderInfoAMD(device.handle, pipeline.handle, mixin(舉!((VK_SHADER_STAGE_),q{VERTEX_BIT})), mixin(舉!((VK_SHADER_INFO_TYPE_),q{DISASSEMBLY_AMD}))).toStr); 
+				s ~= (vk.getShaderInfoAMD(device.handle, pipeline.handle, mixin(舉!((VK_SHADER_STAGE_),q{GEOMETRY_BIT})), mixin(舉!((VK_SHADER_INFO_TYPE_),q{DISASSEMBLY_AMD}))).toStr); 
+				s ~= (vk.getShaderInfoAMD(device.handle, pipeline.handle, mixin(舉!((VK_SHADER_STAGE_),q{FRAGMENT_BIT})), mixin(舉!((VK_SHADER_INFO_TYPE_),q{DISASSEMBLY_AMD}))).toStr); 
+				
+				((0x2AACD82886ADB).檢 (s.join)); 
+			}
 		} 
 		
 		void recreateDescriptors()
@@ -5598,7 +5615,15 @@ class VulkanWindow: Window, IGfxContentDestination
 			physicalDevice	= vk.physicalDevices.front,
 			surface	= vk.surfaces(hwnd),
 			queueFamily	= surface.requireGraphicsPresenterQueueFamily(physicalDevice),
-			device	= createVulkanDevice("VK_KHR_swapchain", queueFamily, &queue),
+			device	= createVulkanDevice(
+				"VK_KHR_swapchain", "VK_AMD_shader_info?"
+				/+
+					Todo: Implement optional extension handling.
+					VK_AMD_shader_info should only work at my machine,
+					and it must be ignored on other vendors!
+				+/
+				, queueFamily, &queue
+			),
 			commandPool	= queue.createCommandPool,
 			imageAvailableSemaphore	= new VulkanSemaphore(device),
 			renderingFinishedSemaphore 	= new VulkanSemaphore(device); 
@@ -5627,7 +5652,7 @@ class VulkanWindow: Window, IGfxContentDestination
 				enforce(!g_texturePool); 	g_texturePool = new TexturePool(this); 
 			}
 			
-			if(0) VulkanInstance.dumpBasicStuff; 
+			if((常!(bool)(1))) VulkanInstance.dumpBasicStuff; 
 		} 
 		
 		override void onFinalizeGLWindow()
@@ -5666,18 +5691,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2BABF82886ADB).檢(
+					((0x2C0DE82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2BB3182886ADB))))
+				if((互!((bool),(0),(0x2C15082886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2BBC582886ADB).檢((互!((float/+w=12+/),(1.000),(0x2BBDC82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2C1E482886ADB).檢((互!((float/+w=12+/),(1.000),(0x2C1FB82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5690,8 +5715,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2BDB182886ADB).檢 (imVG)),
-					((0x2BDD782886ADB).檢 (imFPS)); 
+					((0x2C3D082886ADB).檢 (imVG)),
+					((0x2C3F682886ADB).檢 (imFPS)); 
 				}
 			}
 			
@@ -7106,8 +7131,8 @@ $(V_size+G_size)".text
 					
 					void main()
 					{
-						geomGSBitOfs 	= vertGSBitOfs 
-						/*geomVertexID	= gl_VertexIndex*/; 
+						geomGSBitOfs = vertGSBitOfs; 
+						//geomVertexID = gl_VertexIndex
 					} 
 					
 					@geom: 
