@@ -2181,7 +2181,12 @@ version(/+$DIDE_REGION+/all) {
 					/+20251026: TextOut bug fixed, now 113 seems OK again.+/
 					
 					113
-					/+20260610: text fails again...+/; 
+					/+20260610: text fails again...+/
+					
+					/+
+						Todo: Understand how Geometry shader and Copy shader works 
+						by examining gcn disassembly! 261030 
+					+/; 
 					__gshared int desiredMaxVertexCount = ShaderMaxVertexCount; 
 					
 					static @property int maxVertexCount()
@@ -3523,7 +3528,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1BB8C82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1BC1582886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -4222,6 +4227,10 @@ class VulkanWindow: Window, IGfxContentDestination
 						very last item is sometimes deterministically lost.
 						
 						Fiddling with MaxVertexLimit changes this behavior.
+					+/
+					/+
+						Todo: Understand how Geometry shader and Copy shader works 
+						by examining gcn disassembly! 261030 
 					+/
 				} 
 				
@@ -5508,7 +5517,7 @@ class VulkanWindow: Window, IGfxContentDestination
 				s ~= (vk.getShaderInfoAMD(device.handle, pipeline.handle, mixin(舉!((VK_SHADER_STAGE_),q{GEOMETRY_BIT})), mixin(舉!((VK_SHADER_INFO_TYPE_),q{DISASSEMBLY_AMD}))).toStr); 
 				s ~= (vk.getShaderInfoAMD(device.handle, pipeline.handle, mixin(舉!((VK_SHADER_STAGE_),q{FRAGMENT_BIT})), mixin(舉!((VK_SHADER_INFO_TYPE_),q{DISASSEMBLY_AMD}))).toStr); 
 				
-				((0x2AACD82886ADB).檢 (s.join)); 
+				((0x2ABD882886ADB).檢 (s.join)); 
 			}
 		} 
 		
@@ -5691,18 +5700,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2C0DE82886ADB).檢(
+					((0x2C1E982886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2C15082886ADB))))
+				if((互!((bool),(0),(0x2C25B82886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2C1E482886ADB).檢((互!((float/+w=12+/),(1.000),(0x2C1FB82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2C2EF82886ADB).檢((互!((float/+w=12+/),(1.000),(0x2C30682886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5715,8 +5724,8 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2C3D082886ADB).檢 (imVG)),
-					((0x2C3F682886ADB).檢 (imFPS)); 
+					((0x2C4DB82886ADB).檢 (imVG)),
+					((0x2C50182886ADB).檢 (imFPS)); 
 				}
 			}
 			
