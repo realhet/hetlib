@@ -10358,6 +10358,13 @@ struct im
 					+/
 				+/
 				
+				/+
+					Todo: If I find a way to reliably disable inlining of UI builder functions that use setIncomingId,
+					then the Id could come from ReturnAddress (the function return address from the stack.).
+					I've seen the idea in a youtube video: Anton Mikhailov - Hashless ImGui.
+					It is a truly unique id of the callsite (except if it was inlined.). 261030
+				+/
+				
 				public void setIncomingId(string srcModule, size_t srcLine)()
 				{
 					static if(Debug_incomingId) enforce(!_incomingId, "_incomingId already set."); 
