@@ -2424,11 +2424,24 @@ version(/+$DIDE_REGION+/all)
 			alias T = Unqual!(InnerElementType!R); 
 			Unqual!T filler = getDefaultArg!T(def); //Unqual needed for padRight
 			static if(Dim == 2)
-			auto arr = join(range.take(size.y).map!(a => a.padRight(filler, size.x).array)); 
+			T[] arr = cast(T[])join(range.take(size.y).map!(a => a.padRight(filler, size.x).array)); 
 			else
-			auto arr = range.array; 
-			arr = arr.padRight(filler, size[].product).array; //Opt: this is fucking unoptimal!
-			return Image!(T, 2)(size, cast()cast(T[])arr); 
+			{
+				static if(isDynamicArray!R)
+				T[] arr = cast(T[])range /+fastest way+/; 
+				else
+				T[] arr = cast(T[])range.array; 
+			}
+			
+			const len = size_t(size.x) * size.y; 
+			if(arr.length>len)	{ arr.length = len; /+truncate+/}
+			else if(arr.length<len)	{
+				const oldLen = arr.length; 
+				arr.length = len; 
+				arr[oldLen..$] = filler; /+fill+/
+			}
+			
+			return Image!(T, 2)(size, arr); 
 		}
 		else
 		static assert(0, "invalid args"); 

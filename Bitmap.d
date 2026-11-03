@@ -133,7 +133,6 @@ version(/+$DIDE_REGION+/all)
 	//Load a bitmap immediately with optional error handling. No caching, no thumbnail/transformations.
 	auto newBitmap(File file, ErrorHandling errorHandling, Flag!"fx" fx = No.fx)
 	{
-		
 		const hasFx = !file.driveIs("font") & file.hasQueryString; 
 		
 		if(hasFx && !fx) WARN("newBitmap fileName has fx but fx flag is not set. "~file.text); 
@@ -693,7 +692,7 @@ E771F57E7F6B3CA8EE953E0AFC42E8045624838704B6A840CFC040F0034096321A087E55C1A06059
 					{ return orig.applyEffects(transformedFile); }
 				}
 				catch(Exception e) WARN(e.simpleMsg); 
-				return orig.dup; 
+				return orig/+.dup+/; /+261103 I removed the dup here. Effects should dup, not this!!!+/
 			} 
 			
 			//set filename and copy the modified time
@@ -880,7 +879,7 @@ E771F57E7F6B3CA8EE953E0AFC42E8045624838704B6A840CFC040F0034096321A087E55C1A06059
 	
 	Bitmap bitmapQuery(BitmapQueryCommand cmd, File file, ErrorHandling errorHandling, Bitmap bmpIn=null)
 	{
-		static if((常!(bool)(0))) { auto _間=init間; scope(exit) ((0x839DB8E2CB5D).檢((update間(_間)))); }
+		static if((常!(bool)(0))) { auto _間=init間; scope(exit) ((0x83DFB8E2CB5D).檢((update間(_間)))); }
 		/+
 			Bug: Ha WM_MOVE van, akkor ez 50x lassabb!!!
 			Tesztelés: DIDE -> File Outline panel tele kis file/folder ikonokkal.
@@ -2779,7 +2778,11 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				
 				auto src_line_buf	= new ubyte[src_linesize + src_pad]; 
 				auto bgra_line_buf	= (paletted) ? null : new ubyte[hdr.width * 4]; 
-				auto result	= new ubyte[hdr.width * abs(hdr.height) * cast(int) tgt_chans]; 
+				
+				auto result	= uninitializedArray!(ubyte[])(size_t(hdr.width) * abs(hdr.height) * cast(int) tgt_chans); 
+				//het: >2GB support  261103 
+				
+				//Opt: This flips RGB to BGR. Raw read is 2.5sec, with this flip it is 3.3
 				
 				foreach(_; 0 .. abs(hdr.height))
 				{
@@ -2842,14 +2845,16 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 			//Writes RGB or RGBA data.
 			void write_bmp(Writer stream, long w, long h, in ubyte[] data, long tgt_chans = 0)
 			{
-				if(w < 1 || h < 1 || 0x7fff < w || 0x7fff < h)
+				enum extraSizeScale = size_t(256); //het 261103: Set this to 1 for original imageFormats behavior.
+				
+				if(w < 1 || h < 1 || 0x7fff*extraSizeScale < w || 0x7fff*extraSizeScale < h)
 				throw new ImageIOException("invalid dimensions"); 
 				size_t src_chans = data.length / cast(size_t) w / cast(size_t) h; 
 				if(src_chans < 1 || 4 < src_chans)
 				throw new ImageIOException("invalid channel count"); 
 				if(tgt_chans != 0 && tgt_chans != 3 && tgt_chans != 4)
 				throw new ImageIOException("unsupported format for writing"); 
-				if(src_chans * w * h != data.length)
+				if(size_t(src_chans) * w * h != data.length)
 				throw new ImageIOException("mismatching dimensions and length"); 
 				
 				if(tgt_chans == 0)
@@ -2860,7 +2865,7 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				const size_t pad = 3 - ((tgt_linesize-1) & 3); 
 				const size_t idat_offset = 14 + dib_size; 	//bmp file header + dib header
 				const size_t filesize = idat_offset + cast(size_t) h *	(tgt_linesize + pad); 
-				if(filesize > 0xffff_ffff)
+				if(filesize > 0xffff_ffff * extraSizeScale^^2)
 				{ throw new ImageIOException("image too large"); }
 				
 				ubyte[14+dib_size] hdr; 
@@ -3324,8 +3329,9 @@ version(/+$DIDE_REGION Imageformats, turboJpeg, libWebp+/all)
 				auto pline = new ubyte[dc.w * filter_step + 1]; //+1 for filter type byte
 				auto cline8 = (dc.req_bpc == 8 && dc.bpc != 8) ? new ubyte[dc.w * dc.src_chans] : null; 
 				auto cline16 = (dc.req_bpc == 16)	? new ushort[dc.w * dc.src_chans] : null; 
-				ubyte[]	result8	= (dc.req_bpc == 8)  ? new ubyte[dc.w * dc.h * dc.tgt_chans] : null; 
-				ushort[]	result16	= (dc.req_bpc == 16) ? new ushort[dc.w * dc.h * dc.tgt_chans] : null; 
+				ubyte[]	result8	= (dc.req_bpc == 8)  ? new ubyte[size_t(dc.w) * dc.h * dc.tgt_chans] : null; 
+				ushort[]	result16	= (dc.req_bpc == 16) ? new ushort[size_t(dc.w) * dc.h * dc.tgt_chans] : null; 
+				//het 261103 unlocked >2GB
 				
 				const LineConv!ubyte convert8	= get_converter!ubyte(dc.src_chans, dc.tgt_chans); 
 				const LineConv!ushort convert16	= get_converter!ushort(dc.src_chans, dc.tgt_chans); 
@@ -5643,7 +5649,7 @@ version(/+$DIDE_REGION+/all)
 				height.format!`Invalid bitmap height: "%s"`
 			); 
 			enforce(
-				width*height*channels*chSize == data.length,
+				size_t(width)*height*channels*chSize == data.length,
 				format!"Inconsistent bitmap size: %s{w} * %s{h} * %s{ch} * %s != %s{bytes}"
 				(width, height, channels, chSize, data.length)
 			); 
@@ -5831,6 +5837,13 @@ version(/+$DIDE_REGION+/all)
 	__gshared serializeImage_defaultFormat = "png"; 
 	//png is the best because it knows 1..4 components and it's moderately compressed.
 	
+	private enum CalcChannelsPitch_VerifyDataLength = 
+	q{
+		const uint 	channels 	= (data.length/(size_t(width)*height)).to!uint,
+			pitch 	= width*channels; 
+		enforce(data.length = size_t(pitch)*height, "invalid image data"); 
+	}; 
+	
 	private static ubyte[] write_webp_to_mem(int width, int height, ubyte[] data, int quality)
 	{
 		//Reasonable quality=95,  best=100,  worst=0,  lossless=101 and up
@@ -5839,8 +5852,8 @@ version(/+$DIDE_REGION+/all)
 		ubyte* output; 
 		size_t size; 
 		const lossy = quality<=100; //101 and up means lossless
-		const channels = data.length.to!int/(width*height); 
-		enforce(data.length = width*height*channels, "invalid image data"); 
+		
+		mixin(CalcChannelsPitch_VerifyDataLength); 
 		
 		switch(channels)
 		{
@@ -5865,9 +5878,8 @@ version(/+$DIDE_REGION+/all)
 	{
 		enforce(quality<=100, "TJPARAM_LOSSLESS not supported yet."); 
 		
-		const 	channels 	= data.length.to!int/(width*height),
-			pitch 	= width*channels; 
-		enforce(data.length = pitch*height, "invalid image data"); 
+		mixin(CalcChannelsPitch_VerifyDataLength); 
+		
 		const pixelFormat = channels.predSwitch(1, TJPF_GRAY, 3, TJPF_RGB); //Todo: alpha
 		const subsamp = TJSAMP_420; //Todo: subsamp-ot kihozni
 		
@@ -5898,7 +5910,10 @@ version(/+$DIDE_REGION+/all)
 		auto getQuality()
 		{
 			return ("quality" in fmt) 	? fmt["quality"].to!int.clamp(0, 101)
-				: 95 /+Default quality for jpeg and webp+/; 
+				: 95 /+
+				DON'T CHANGE!!!! 95 is the best!
+				Default quality for jpeg and webp 
+			+/; 
 		} 
 		
 		//Todo: validate parameters for each formats
@@ -6085,12 +6100,12 @@ version(/+$DIDE_REGION+/all)
 			
 			void doImageFormats()
 			{
-				 //imageFormats package
-				auto img = read_image_from_mem(stream); 
+				//imageFormats package
+				auto _間=init間; auto img = read_image_from_mem(stream); 
 				exit: switch(info.chn)
 				{
 					static foreach(i, T; AliasSeq!(ubyte, RG, RGB, RGBA))
-					{ case i+1: bmp.set(image2D(img.w, img.h, cast(T[])img.pixels)); break exit; }
+					{ case i+1: { bmp.set(image2D(img.w, img.h, cast(T[])img.pixels)); }break exit; }
 					default: raise("imgformat: fatal error: channels out of range"); 
 				}
 			} 
@@ -6119,7 +6134,9 @@ version(/+$DIDE_REGION+/all)
 						//turbojpeg/classic release/debug performance: 43, 47, 335, 1941
 						auto 	pixelFormat 	= info.chn.predSwitch(3, TJPF_RGB, 1, TJPF_GRAY),
 							pitch	= tjPixelSize[pixelFormat]*info.width,
-							data	= uninitializedArray!(ubyte[])(info.height*pitch); 
+							data	= uninitializedArray!(ubyte[])(size_t(info.height)*pitch); 
+						//het: >2GB support  261103   too bad WebP is locked at 16K*16K size...
+						
 						try {
 							tjChk(
 								tjDecoder, 

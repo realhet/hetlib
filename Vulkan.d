@@ -6938,7 +6938,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 						{ res.ptr = allocator.alloc(size); }
 						else
 						{
-							ERR("Out of GPU mem"); 
+							ERR(i"Out of GPU mem ($(requiredBufferSize.shortSizeText!1024)iB)".text); 
 							/+Todo: garbage collect+/
 						}
 					}
