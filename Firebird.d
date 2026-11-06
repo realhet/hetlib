@@ -992,6 +992,13 @@ version(/+$DIDE_REGION+/all) {
 	import het, het.parser: CodeLocation; 
 	
 	/+
+		Install 64bit server on Windows:
+		USE THIS version -> Firebird-2.5.4.26856_0_x64.exe  March 30, 2015
+		/+Link: https://www.firebirdsql.org/en/firebird-2-5-4/#Win64+/
+		- 261103: I don't remember why, but it should be not the latest one!!! 
+			(This is the latest: Firebird-2.5.9.27139_0_x64.exe  June 24, 2019)
+		
+		
 		Docs:
 		
 		Firebird 2.5 Language reference:
@@ -2313,8 +2320,8 @@ version(/+$DIDE_REGION+/all) {
 				
 				static if((常!(bool)(0)))
 				{
-					auto _間=init間; auto s = database_info(db_handle); ((0xEBAE6FCAA195).檢((update間(_間)))); 
-					((0xEBE06FCAA195).檢 (s)); 
+					auto _間=init間; auto s = database_info(db_handle); ((0xECF56FCAA195).檢((update間(_間)))); 
+					((0xED276FCAA195).檢 (s)); 
 				}
 				
 				return db_handle; 

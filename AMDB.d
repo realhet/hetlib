@@ -926,6 +926,11 @@ version(/+$DIDE_REGION+/all) {
 			struct Stream
 			{
 				Appender!(ubyte[]) stream; 
+				/+
+					Todo: 261106 Important!!! This must be a VIRTUAL allocation!
+					Check the Goose language benchmarks! This technique is very effective!
+					AMDB needs 10 of these constantly growing `stacks`.
+				+/
 				
 				void reset()
 				{

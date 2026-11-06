@@ -9181,6 +9181,59 @@ $(V_size+G_size)".text
 						return vec4(n, depth); 
 					} 
 					
+					vec3 default_phongShade(vec3 n)
+					{
+						// Lighting
+						vec3 lightDir = normalize(vec3(vec2(-.6, -.9), 1.0)); 
+						
+						// Ambient
+						float ambientStrength = .2; 
+						float ambient = ambientStrength; 
+						
+						// Diffuse
+						float diffuseStrength = 0.9; 
+						float diffuse = diffuseStrength * max(dot(n, lightDir), 0.0); 
+						
+						// Specular
+						//lightDir = normalize(vec3(rotZ(UB.iTime*4.)*vec2(-.6, -.9), 1.0)); 
+						float specStrength = 0.5; 
+						float shininess = 20.0; 
+						vec3 specColor = vec3(1.0, 1.0, 1.0); 
+						
+						
+						vec3 viewDir = vec3(0.0, 0.0, 1.0); 
+						vec3 halfDir = normalize(lightDir + viewDir); 
+						float specular = specStrength * pow(max(dot(n, halfDir), 0.0), shininess); 
+						
+						// Combine
+						vec3 finalColor = (ambient + diffuse)*fragColor.rgb + specular * specColor; 
+						return finalColor; 
+					} vec3 default_phongShade_compensated(vec3 n)
+					{
+						vec3 lightDir = normalize(vec3(vec2(-.6, -.9)*0.66, 1.0)); 
+						vec3 viewDir  = vec3(0., 0., 1.); 
+						vec3 halfDir  = normalize(lightDir + viewDir); 
+						
+						float ambientStrength = .2; 
+						float diffuseStrength  = 0.9; 
+						float specStrength    = 0.5; 
+						float shininess       = 20.0; 
+						vec3  specColor     = vec3(1.0); 
+						
+						float viewNdotL = dot(viewDir, lightDir); 
+						float viewNdotH = dot(viewDir, halfDir); 
+						float viewSpec  = pow(viewNdotH, shininess); 
+						float viewLum   = ambientStrength + diffuseStrength * viewNdotL; 
+						
+						float ndl  = max(dot(n, lightDir), 0.0); 
+						float ndh  = max(dot(n, halfDir), 0.0); 
+						float lum  = (ambientStrength + diffuseStrength * ndl) / viewLum; 
+						float spec = specStrength * max(pow(ndh, shininess) - viewSpec, 0.0); 
+						
+						vec3 finalColor = lum * fragColor.rgb + spec * specColor; 
+						return finalColor; 
+					} 
+					
 					vec4 doShapeRect()
 					{
 						const vec2 size = fragFloats0.xy; 
@@ -9213,38 +9266,14 @@ $(V_size+G_size)".text
 							bevelType, bevelParam, 
 							chamfer, aspect, param0, param1, param2
 						); 
-						const vec3 n = nd.xyz; 
+						const vec3 n = nd.xyz; 
 						
 						// If normal is zero (outside), return black
 						if(n == vec3(0))
 						{ return vec4(0); }
 						else
 						{
-							// Lighting
-							vec3 lightDir = normalize(vec3(vec2(-.6, -.9), 1.0)); 
-							
-							// Ambient
-							float ambientStrength = .2; 
-							float ambient = ambientStrength; 
-							
-							// Diffuse
-							float diffuseStrength = 0.9; 
-							float diffuse = diffuseStrength * max(dot(n, lightDir), 0.0); 
-							
-							// Specular
-							//lightDir = normalize(vec3(rotZ(UB.iTime*4.)*vec2(-.6, -.9), 1.0)); 
-							float specStrength = 0.5; 
-							float shininess = 20.0; 
-							vec3 specColor = vec3(1.0, 1.0, 1.0); 
-							
-							
-							vec3 viewDir = vec3(0.0, 0.0, 1.0); 
-							vec3 halfDir = normalize(lightDir + viewDir); 
-							float specular = specStrength * pow(max(dot(n, halfDir), 0.0), shininess); 
-							
-							// Combine
-							vec3 finalColor = (ambient + diffuse)*fragColor.rgb + specular * specColor; 
-							
+							vec3 finalColor = default_phongShade_compensated(n); 
 							return vec4(finalColor, fragColor.a); 
 						}
 					} 
