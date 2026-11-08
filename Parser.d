@@ -3520,9 +3520,8 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 		bool isUserModule() const
 		{ return !isStdModule && !isCoreModule && !isEtcModule && !isLdcModule; } 
 		
-		File resolveFile(Path mainPath, string baseFileName, bool mustExists) const //returns "" if not found. Must handle outside.
+		File resolveFile(Path mainPath, string baseFileName, bool mustExist) const //returns "" if not found. Must handle outside.
 		{
-			 //Todo: use FileName, FilePath
 			const fn = name.fileName; 
 			string[] paths	= (
 				 isStdModule	? [DPaths.stdPath] 
@@ -3533,6 +3532,7 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 			)
 				~ DPaths.importPaths; 
 			string s; 
+			
 			foreach(p; paths)
 			{
 				s = includeTrailingPathDelimiter(p)~fn; 
@@ -3545,7 +3545,7 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 			
 			
 			const err = "Module not found: "~fn~"  referenced from: "~baseFileName; 
-			if(mustExists)	raise(err); 
+			if(mustExist)	raise(err); 
 			else	WARN(err); 
 			
 			return File.init; 
@@ -3812,12 +3812,14 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 				seek(idx); 
 				if(acceptKw(kwimport))
 				{
-					nextModule: 
-					res.length++; 
-					auto decl = &res.back; 
-					
 					//[alias =] module[full]name
 					auto sl = expectIdentifierList(opdot); 
+					
+					//Ignore string imports
+					if(sl.frontOr.strip=="(") continue; 
+					
+					nextModule: res.length++; auto decl = &res.back; 
+					
 					if(acceptOp(opassign))
 					{
 						 //alias
@@ -4297,7 +4299,7 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x20528899FD657).檢(0x1D64BFDEAC48D)); 
+			((0x20550899FD657).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 

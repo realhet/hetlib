@@ -5302,10 +5302,10 @@ version(/+$DIDE_REGION Numeric+/all)
 			size_t pos, size; 
 			bool truncated; //The block is not on boundary, because it was unable to seek back
 			
-			auto read(bool mustExists=true) const
-			{ return file.read	(mustExists, pos, size); } 
-			auto readStr(bool mustExists=true) const
-			{ return file.readStr(mustExists, pos, size); } 
+			auto read(bool mustExist=true) const
+			{ return file.read	(mustExist, pos, size); } 
+			auto readStr(bool mustExist=true) const
+			{ return file.readStr(mustExist, pos, size); } 
 		} 
 		
 		auto byLineBlock(File file, size_t maxBlockSize=DefaultLineBlockSize)
@@ -9337,11 +9337,11 @@ version(/+$DIDE_REGION Containers+/all)
 				auto _間=init間; 
 				static bool res; res = false; 
 				enum N = 16<<16; 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x456ED59F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x4576F59F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x457EB59F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x4586859F156A1).檢((update間(_間)))); 
-				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x458EE59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearUnsorted; 	((0x456E959F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_linearSorted; 	((0x4576B59F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_binary; 	((0x457E759F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmask; 	((0x4586459F156A1).檢((update間(_間)))); 
+				foreach(i; 0..N) res ^= (cast(wchar)(i)).isUnicodeStandardLetter_bitmaskHardWired; 	((0x458EA59F156A1).檢((update間(_間)))); 
 				
 				/+
 					benchmarks:
@@ -11612,7 +11612,7 @@ version(/+$DIDE_REGION Colors+/all)
 			clAll	= clDelphi ~ clEga ~ clPet ~ clC64 ~ clWow ~ clVim ~ clRainbow ~ clSol ~ clAxis ~ clSticky; 
 		
 		
-		RGB colorByName(string name, bool mustExists=false)
+		RGB colorByName(string name, bool mustExist=false)
 		{
 			
 			__gshared static RGB[string] map; 
@@ -11631,7 +11631,7 @@ version(/+$DIDE_REGION Colors+/all)
 			auto a = name.decapitalize in map; 
 			if(a is null)
 			{
-				enforce(!mustExists, `Unknown color name "%s"`.format(name)); 
+				enforce(!mustExist, `Unknown color name "%s"`.format(name)); 
 				return clFuchsia; 
 			}
 			return *a; 
@@ -11639,11 +11639,11 @@ version(/+$DIDE_REGION Colors+/all)
 		
 		//toRGB //////////////////////////////////
 		
-		RGB toRGB(string s, bool mustExists=false)
+		RGB toRGB(string s, bool mustExist=false)
 		{
 			s = s.strip; 
 			if(s.empty) {
-				if(mustExists)	enforce(false, `Empty RGB literal.`); 
+				if(mustExist)	enforce(false, `Empty RGB literal.`); 
 				else	return clFuchsia; 
 			}
 			
@@ -11657,7 +11657,7 @@ version(/+$DIDE_REGION Colors+/all)
 			
 			//Todo: support colrnName + alpha too
 			
-			return colorByName(s, mustExists); 
+			return colorByName(s, mustExist); 
 		} 
 		
 		unittest {
@@ -11882,7 +11882,7 @@ version(/+$DIDE_REGION Colors+/all)
 						Because there will be the current path in front of that.
 			+/
 			//-> if(f.fullName.isWild(`*\?*:*`)) f.fullName = wild[1].split('\\').back~':'~wild[2];
-			//Todo: make options for this:  mustExists, noValidate
+			//Todo: make options for this:  mustExist, noValidate
 			
 			if(!isOpen	) ofn.Flags |= OFN_NOREADONLYRETURN; 
 			
@@ -14958,7 +14958,7 @@ version(/+$DIDE_REGION Date Time handling+/all)
 			} 
 			
 			ubyte[] read(
-				bool mustExists = true, ulong offset = 0, size_t len = size_t.max,
+				bool mustExist = true, ulong offset = 0, size_t len = size_t.max,
 				string srcFile=__FILE__, int srcLine=__LINE__
 			)const
 			{
@@ -14966,11 +14966,11 @@ version(/+$DIDE_REGION Date Time handling+/all)
 				ubyte[] data; 
 				
 				if(!exists) {
-					if(mustExists) raise(format!`Can't read file: "%s"`(fullName), srcFile, srcLine); 
+					if(mustExist) raise(format!`Can't read file: "%s"`(fullName), srcFile, srcLine); 
 					return data; 
 				}
 				
-				if(!mustExists && !exists) return data; 
+				if(!mustExist && !exists) return data; 
 				try
 				{
 					if(this.isVirtual)
@@ -14993,7 +14993,7 @@ version(/+$DIDE_REGION Date Time handling+/all)
 				}
 				catch(Exception)
 				{
-					enforce(!mustExists, format!`Can't read file: "%s"`(fullName), srcFile, srcLine); 
+					enforce(!mustExist, format!`Can't read file: "%s"`(fullName), srcFile, srcLine); 
 					//Todo: egysegesiteni a file hibauzeneteket
 				}
 				
@@ -15002,41 +15002,41 @@ version(/+$DIDE_REGION Date Time handling+/all)
 			} 
 			
 			string readStr(
-				bool mustExists = true,
+				bool mustExist = true,
 				ulong offset = 0, size_t len = size_t.max
 			) const
 			{
-				auto s = cast(string)(read(mustExists, offset, len)); 
+				auto s = cast(string)(read(mustExist, offset, len)); 
 				return s; 
 			} 
 			
 			string readText(
-				bool mustExists = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
+				bool mustExist = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
 				ulong offset = 0, size_t len = size_t.max
 			) const
-			{ return readStr(mustExists, offset, len).textToUTF8(defaultEncoding)/+own converter. Handles BOM+/; } 
+			{ return readStr(mustExist, offset, len).textToUTF8(defaultEncoding)/+own converter. Handles BOM+/; } 
 			
 			string[] readLines(
-				bool mustExists = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
+				bool mustExist = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
 				ulong offset = 0, size_t len = size_t.max
 			) const
-			{ return readText(mustExists, defaultEncoding, offset, len).splitLines; } 
+			{ return readText(mustExist, defaultEncoding, offset, len).splitLines; } 
 			
 			//utf32 versions
 			dstring readText32(
-				bool mustExists = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
+				bool mustExist = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
 				ulong offset = 0, size_t len = size_t.max
 			) const
 			{
-				auto s = readStr(mustExists, offset, len); 
+				auto s = readStr(mustExist, offset, len); 
 				return textToUTF32(s, defaultEncoding); //own converter. Handles BOM
 			} 
 			
 			dstring[] readLines32(
-				bool mustExists = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
+				bool mustExist = true, TextEncoding defaultEncoding = TextEncoding.UTF8,
 				ulong offset = 0, size_t len = size_t.max
 			) const
-			{ return readText32(mustExists, defaultEncoding, offset, len).splitLines; } 
+			{ return readText32(mustExist, defaultEncoding, offset, len).splitLines; } 
 		}version(/+$DIDE_REGION+/all) {
 			private void write_internal(const void[] data, bool rewriteAll, ulong offset, Flag!"preserveTimes" preserveTimes)const
 			{
@@ -15228,12 +15228,12 @@ version(/+$DIDE_REGION Date Time handling+/all)
 		void saveTo(T)(const T data, const string fileName)if(!isDynamicArray!T)
 		{ [data].saveTo(File(fileName)); } 
 		
-		void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if(is(T == char))
-		{ data = fileName.readStr(mustExists); } 
-		void loadFrom(T)(ref T[]data, const File fileName, bool mustExists=true)if(!is(T == char))
-		{ data = cast(T[])fileName.read(mustExists); } 
-		void loadFrom(T)(ref T data, const File fileName, bool mustExists=true)if(!isDynamicArray!T)
-		{ data = (cast(T[])fileName.read(mustExists))[0]; } 
+		void loadFrom(T)(ref T[]data, const File fileName, bool mustExist=true)if(is(T == char))
+		{ data = fileName.readStr(mustExist); } 
+		void loadFrom(T)(ref T[]data, const File fileName, bool mustExist=true)if(!is(T == char))
+		{ data = cast(T[])fileName.read(mustExist); } 
+		void loadFrom(T)(ref T data, const File fileName, bool mustExist=true)if(!isDynamicArray!T)
+		{ data = (cast(T[])fileName.read(mustExist))[0]; } 
 		
 		File appFile()
 		{ static __gshared File s; if(s.isNull) s = File(thisExePath); return s; } 
@@ -16166,6 +16166,18 @@ version(/+$DIDE_REGION debug+/all)
 		void CRIT(string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args)
 		{ DBG!(50, file, line, funct)(args); } 
 		
+		T LOG_ifThrown(E : Exception = Exception, string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T)
+		(lazy T val, lazy T def = T.init)
+		{ try return val; catch(E e) { LOG!(file, line, funct)(typeid(e).name.split('.').back~": "~e.simpleMsg); return def; }} 
+		
+		T WARN_ifThrown(E : Exception = Exception, string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T)
+		(lazy T val, lazy T def = T.init)
+		{ try return val; catch(E e) { WARN!(file, line, funct)(typeid(e).name.split('.').back~": "~e.simpleMsg); return def; }} 
+		
+		T ERR_ifThrown(E : Exception = Exception, string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T)
+		(lazy T val, lazy T def = T.init)
+		{ try return val; catch(E e) { ERR!(file, line, funct)(typeid(e).name.split('.').back~": "~e.simpleMsg); return def; }} 
+		
 		void NOTIMPL(string file = __FILE__, int line = __LINE__, string funct = __FUNCTION__, T...)(T args)
 		{
 			synchronized
@@ -18707,14 +18719,14 @@ Source field: 	$("baseDeco") 	Source field: 	$(a)"
 			bool empty()
 			{ return properties.empty; } 
 			
-			auto access(T=void, bool mustExists=true)(string name)
+			auto access(T=void, bool mustExist=true)(string name)
 			{
 				static if(is(T==void))	alias PT = Property; 
 				else static if(is(T : Property))	alias PT = T; 
 				else	mixin("alias PT = ", T.stringof.capitalize ~ "Property;"); 
 				
 				auto p = cast(PT)findProperty(properties, name); 
-				static if(mustExists) enforce(p !is null, format!`%s not found: "%s"`(PT.stringof, name)); 
+				static if(mustExist) enforce(p !is null, format!`%s not found: "%s"`(PT.stringof, name)); 
 				return p; 
 			} 
 			
@@ -18831,14 +18843,14 @@ Source field: 	$("baseDeco") 	Source field: 	$(a)"
 			
 			bool empty() { return props.empty; } 
 			
-			auto access(T=void, bool mustExists=true)(string name)
+			auto access(T=void, bool mustExist=true)(string name)
 			{
 				static if(is(T==void))	alias PT = Property; 
 				else static if(is(T : Property))	alias PT = T; 
 				else	mixin("alias PT = ", T.stringof.capitalize ~ "Property;"); 
 				
 				auto p = cast(PT)findProperty(props, name); 
-				static if(mustExists) enforce(p !is null, format!`%s not found: "%s"`(PT.stringof, name)); 
+				static if(mustExist) enforce(p !is null, format!`%s not found: "%s"`(PT.stringof, name)); 
 				return p; 
 			} 
 			
