@@ -8,7 +8,13 @@ version(/+$DIDE_REGION+/all)
 	
 	import core.stdc.string : memset; 
 	
-	enum logDeallocationStats = (常!(bool)(1)); 
+	enum logDeallocationStats 	= (常!(bool)(0)),
+	EnableGpuInfoDump 	= (常!(bool)(0))
+	/+
+		More debug switches:
+		 - StagedVulkanBuffer.DebugLevel
+		 - createGraphicsPipeline() bottom part
+	+/; 
 	
 	enum GSP_DefaultFontHeight = 18; 
 	
@@ -3528,7 +3534,7 @@ Use SvgParser to prepare absolute SVG command stream!"
 				
 				Style(clWindow); 
 				Text(
-					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1BC1582886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
+					M(bnd.topLeft), (((互!((float/+w=3 min=-10 max=10+/),(0.000),(0x1BCAF82886ADB)))).名!q{cr.x+}), "╔═", { Btn("■"); }, 
 					chain(" ", title, " ").text.center(bnd.width-12, '═'), "1═",
 					{ Btn("↕"); }, "═╗"
 				); 
@@ -4681,7 +4687,10 @@ class VulkanWindow: Window, IGfxContentDestination
 				this()
 				{
 					buffer = new VulkanAppenderBuffer
-						(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{VERTEX_BUFFER_BIT})), bufferSizeConfigs.VBConfig); 
+						(
+						device, queue, commandPool, 
+						mixin(幟!((VK_BUFFER_USAGE_),q{VERTEX_BUFFER_BIT})), bufferSizeConfigs.VBConfig, "Vertex Buffer"
+					); 
 					/+Todo: Do the whole drawing thing it in multiple parts when max was reached+/
 				} 
 				
@@ -4725,7 +4734,10 @@ class VulkanWindow: Window, IGfxContentDestination
 				this()
 				{
 					buffer = new VulkanAppenderBuffer
-						(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), bufferSizeConfigs.GBConfig); 
+						(
+						device, queue, commandPool, 
+						mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), bufferSizeConfigs.GBConfig, "Geometry Buffer"
+					); 
 				} 
 				
 				~this()
@@ -4848,7 +4860,7 @@ class VulkanWindow: Window, IGfxContentDestination
 					buffer = new VulkanArrayBuffer!TexInfo
 						(
 						device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), 
-						bufferSizeConfigs.IBConfig
+						bufferSizeConfigs.IBConfig, "Texture Info Buffer"
 					); 
 					
 					//create the very first handle
@@ -4933,7 +4945,7 @@ class VulkanWindow: Window, IGfxContentDestination
 				this()
 				{
 					buffer = new HeapBuffer
-						(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), mixin(舉!((bufferSizeConfigs),q{TBConfig}))); 	
+						(device, queue, commandPool, mixin(幟!((VK_BUFFER_USAGE_),q{STORAGE_BUFFER_BIT})), mixin(舉!((bufferSizeConfigs),q{TBConfig})), "Texture Data Buffer"); 	
 					
 					/+
 						buffer.heapInit; 	((0x318E82886ADB).檢((update間(_間)))); 
@@ -5521,7 +5533,7 @@ class VulkanWindow: Window, IGfxContentDestination
 				s ~= (vk.getShaderInfoAMD(device.handle, pipeline.handle, mixin(舉!((VK_SHADER_STAGE_),q{GEOMETRY_BIT})), mixin(舉!((VK_SHADER_INFO_TYPE_),q{DISASSEMBLY_AMD}))).toStr); 
 				s ~= (vk.getShaderInfoAMD(device.handle, pipeline.handle, mixin(舉!((VK_SHADER_STAGE_),q{FRAGMENT_BIT})), mixin(舉!((VK_SHADER_INFO_TYPE_),q{DISASSEMBLY_AMD}))).toStr); 
 				
-				((0x2AC6282886ADB).檢 (s.join)); 
+				((0x2AD7C82886ADB).檢 (s.join)); 
 			}
 		} 
 		
@@ -5666,7 +5678,7 @@ class VulkanWindow: Window, IGfxContentDestination
 				enforce(!g_texturePool); 	g_texturePool = new TexturePool(this); 
 			}
 			
-			if((常!(bool)(0))) VulkanInstance.dumpBasicStuff; 
+			if(EnableGpuInfoDump) VulkanInstance.dumpBasicStuff; 
 		} 
 		
 		override void onFinalizeGLWindow()
@@ -5705,18 +5717,18 @@ class VulkanWindow: Window, IGfxContentDestination
 			{
 				with(lastFrameStats)
 				{
-					((0x2C29282886ADB).檢(
+					((0x2C3AE82886ADB).檢(
 						i"$(V_cnt)
 $(V_size)
 $(G_size)
 $(V_size+G_size)".text
 					)); 
 				}
-				if((互!((bool),(0),(0x2C30482886ADB))))
+				if((互!((bool),(0),(0x2C42082886ADB))))
 				{
 					const ma = GfxAssembler.ShaderMaxVertexCount; 
 					GfxAssembler.desiredMaxVertexCount = 
-					((0x2C39882886ADB).檢((互!((float/+w=12+/),(1.000),(0x2C3AF82886ADB))).iremap(0, 1, 4, ma))); 
+					((0x2C4B482886ADB).檢((互!((float/+w=12+/),(1.000),(0x2C4CB82886ADB))).iremap(0, 1, 4, ma))); 
 					static imVG = image2D(128, 128, ubyte(0)); 
 					imVG.safeSet(
 						GfxAssembler.desiredMaxVertexCount, 
@@ -5729,10 +5741,12 @@ $(V_size+G_size)".text
 						imFPS.height-1 - (second/deltaTime).get.iround, 255
 					); 
 					
-					((0x2C58482886ADB).檢 (imVG)),
-					((0x2C5AA82886ADB).檢 (imFPS)); 
+					((0x2C6A082886ADB).檢 (imVG)),
+					((0x2C6C682886ADB).檢 (imFPS)); 
 				}
 			}
+			
+			static buglog(string s) {/+print("BUGLOG: ", s); +/} 
 			
 			VulkanCommandBuffer commandBuffer; 
 			VulkanMemoryBuffer 	vertexMemoryBuffer; 
@@ -5767,11 +5781,14 @@ $(V_size+G_size)".text
 							//remove textures right BEFORE drawing anything.
 							foreach(th; Texture.destroyedResidentTexHandles) { TB.remove(th); }
 							
-							VB.reset; GB.reset; 
+							VB.reset; buglog("VB.reset done"); 
+							GB.reset; buglog("GB.reset done"); 
 							
-							imDrawFrame; 
+							imDrawFrame; buglog("drawFrame done"); 
 							t3=QPS; 
-							VB.upload; GB.upload; 
+							//Bug: Itt szarik be NVidian a 2. frame alatt, a VB.uploadon belul keletkezik a hiba, az mar nem fut le!
+							VB.upload; buglog("VB.upload done"); 
+							GB.upload; buglog("GB.upload done"); 
 							t4=QPS; 
 							{
 								const double fovY_deg = 60; 
@@ -5787,6 +5804,7 @@ $(V_size+G_size)".text
 								const mvp_ = projMatrix * viewMatrix, inv_mvp_ = mvp_.inverse; 
 								with(UB.access)
 								{
+									buglog("UB.access done"); 
 									mvp = mat4(mvp_); inv_mvp = mat4(inv_mvp_); 
 									viewport = vec4(0, 0, swapchain.extent.width, swapchain.extent.height); 
 									
@@ -5797,22 +5815,22 @@ $(V_size+G_size)".text
 								}
 							}
 							
-							IB.updateFreeHandles; //reclaim freed up handles from previous frame
-							IB.buffer.upload; 
-							TB.buffer.upload; 
+							IB.updateFreeHandles; 	buglog("IB.updateFreeHandles done"); //reclaim freed up handles from previous frame
+							IB.buffer.upload; 	buglog("IB.buffer.upload done"); 
+							TB.buffer.upload; 	buglog("TB.buffer.upload done"); 
 						}
 						catch(Exception e) { ERR("Scene exception: ", e.simpleMsg); }
 						device.waitIdle/+Wait for everything+/; /+Opt: STALL  only wait if something's changed+/
 						t5=QPS; 
-						recreateDescriptors; //because buffers could grow, descriptors can change.
+						recreateDescriptors; buglog("recreateDescriptors done"); //because buffers could grow, descriptors can change.
 						commandBuffer = createCommandBuffer	(
 							swapchain.imageIndex, 
 							VB.uploadedVertexCount, VB.deviceMemoryBuffer
-						); 
+						); buglog("createCommandBuffer done"); 
 						queue.submit	(
 							imageAvailableSemaphore, mixin(舉!((VK_PIPELINE_STAGE_),q{TOP_OF_PIPE_BIT})),
 							commandBuffer, renderingFinishedSemaphore
-						); 
+						); buglog("submit done"); 
 					},
 					&onWindowSizeChanged
 				); 
@@ -5820,8 +5838,8 @@ $(V_size+G_size)".text
 			catch(Exception e)
 			{ ERR(e.simpleMsg); }
 			
-			commandBuffer.free; 
-			vertexMemoryBuffer.free; 
+			commandBuffer.free; 	buglog("commandBuffer.free done"); 
+			vertexMemoryBuffer.free; buglog("vertexMemoryBuffer.free done"); 
 			//Opt: These reallocations in every frame are bad.
 			
 			//invalidate; no need.+/; 
@@ -5833,7 +5851,55 @@ $(V_size+G_size)".text
 			timeLine.addEvent(TimeLine.Event.Type.uploadIT   , t4, t5); //orange: upload IB+TB
 			timeLine.addEvent(TimeLine.Event.Type.queue     , t5, t6); //aqua: queue
 			timeLine.addGcTime; //fuchsia
-			timeLine.restrictSize(174); 
+			timeLine.restrictSize(174); 
+			
+			/+
+				Todo: Make it work on NVidia!!!
+				
+				Device: "NVIDIA GeForce GTX 1050 Ti" extensions  Layer: "VK_LAYER_NV_optimus":
+				
+				Device: "NVIDIA GeForce GTX 1050 Ti" extensions  Layer: "VK_LAYER_NV_present":
+				
+				const(VkMemoryType)(VK_MEMORY_PROPERTY_(0), 1)
+				const(VkMemoryType)(VK_MEMORY_PROPERTY_(0), 1)
+				const(VkMemoryType)(VK_MEMORY_PROPERTY_(0), 1)
+				const(VkMemoryType)(VK_MEMORY_PROPERTY_(0), 1)
+				const(VkMemoryType)(VK_MEMORY_PROPERTY_(0), 1)
+				const(VkMemoryType)(VK_MEMORY_PROPERTY_(0), 1)
+				const(VkMemoryType)(VK_MEMORY_PROPERTY_(0), 1)
+				const(VkMemoryType)(VK_MEMORY_PROPERTY_(DEVICE_LOCAL_BIT), 0)
+				const(VkMemoryType)(VK_MEMORY_PROPERTY_(HOST_VISIBLE_BIT | HOST_COHERENT_BIT), 1)
+				const(VkMemoryType)(VK_MEMORY_PROPERTY_(HOST_VISIBLE_BIT | HOST_COHERENT_BIT | HOST_CACHED_BIT), 1)
+				const(VkMemoryType)(VK_MEMORY_PROPERTY_(DEVICE_LOCAL_BIT | HOST_VISIBLE_BIT | HOST_COHERENT_BIT), 2)
+				const(VkMemoryHeap)(4198498304, VK_MEMORY_HEAP_(DEVICE_LOCAL_BIT))
+				const(VkMemoryHeap)(6409392128, VK_MEMORY_HEAP_(0))
+				const(VkMemoryHeap)(224395264, VK_MEMORY_HEAP_(DEVICE_LOCAL_BIT))
+				
+				BUGLOG:  VB.reset done
+				BUGLOG:  GB.reset done
+				BUGLOG:  drawFrame done
+				BUGLOG:  VB.upload done
+				BUGLOG:  GB.upload done
+				BUGLOG:  UB.access done
+				BUGLOG:  IB.updateFreeHandles done
+				BUGLOG:  IB.buffer.upload done
+				BUGLOG:  TB.buffer.upload done
+				BUGLOG:  recreateDescriptors done
+				BUGLOG:  createCommandBuffer done
+				BUGLOG:  submit done
+				BUGLOG:  commandBuffer.free done
+				BUGLOG:  vertexMemoryBuffer.free done
+				BUGLOG:  VB.reset done
+				BUGLOG:  GB.reset done
+				BUGLOG:  drawFrame done
+				ERR_: T1.3095 [T]: C4: c:\d\libs\het\vulkanwin.d(5815): @VulkanWindow.doUpdate.__lambda_L5771_C6:  Scene exception:  VK_ERROR_DEVICE_LOST
+				ERR_: T1.3107 [T]: C5: c:\d\libs\het\vulkanwin.d(5832): @VulkanWindow.doUpdate:  VK_ERROR_DEVICE_LOST
+				BUGLOG:  commandBuffer.free done
+				BUGLOG:  vertexMemoryBuffer.free done
+				ERR_: T4.3186 [T]: C4: c:\d\libs\het\vulkanwin.d(5832): @VulkanWindow.doUpdate:  VK_TIMEOUT: vkAcquireNextImageKHR failed.
+				BUGLOG:  commandBuffer.free done
+				BUGLOG:  vertexMemoryBuffer.free done
+			+/
 		} 
 	}
 	version(/+$DIDE_REGION+/all) {
@@ -9320,7 +9386,7 @@ $(V_size+G_size)".text
 						
 						//outColor = mix(outColor, vec4(1,0,1,1), .25); 
 					} 
-					  
+					 
 					//⚠$(CustomShaderCode) must be at the very bottom, without newLine after it.
 					$(CustomShaderCode)
 				})); 

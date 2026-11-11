@@ -4234,12 +4234,13 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 															//transition
 															state = dstState; 
 															if(
-																tokenStr!="" || src!=""
+																true || (tokenStr!="" || src!="")
 																/+
 																	261110: This is there to omit the 
 																	very last transition to unstructured.
 																	It happens in math.d for example,
 																	but adds no extra information at all.
+																	Update!!! 261111 I'm having linker errors!!!!
 																+/
 															)
 															yield(ScanResult(ScanOp.trans, tokenStr)); 
@@ -4308,7 +4309,7 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x206A0899FD657).檢(0x1D64BFDEAC48D)); 
+			((0x206EA899FD657).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 
@@ -4509,7 +4510,7 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 			+/
 		}); 
 	} 
-	
+	
 	/+
 		struct StructureScanner_VLang
 		{

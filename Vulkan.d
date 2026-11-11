@@ -2747,11 +2747,6 @@ version(/+$DIDE_REGION+/all)
 			foreach(string name; funcsToLoad)
 			{
 				enum extensionName = getUDA!(__traits(getMember, this, name), string); 
-				static if(extensionName!="")
-				{
-					print(name, " is a part of extension ", extensionName, existingOptionalDeviceExtensions.get(extensionName)); 
-					
-				}
 				
 				__traits(getMember, this, name) = cast(typeof(__traits(getMember, VulkanFunctions, name)))
 					vkGetDeviceProcAddr(device, name); 
@@ -4120,8 +4115,6 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					}
 				}
 				requiredExtensions = requiredExtensions.filter!"a.length".array; 
-				
-				print!requiredExtensions; print(existingOptionalDeviceExtensions); 
 				
 				//choose a single physicalDevice
 				enforce(queueItems.length, "Empty VulkanQueue[]"); 
@@ -6035,9 +6028,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							uploadBuffers; /+
 								Opt: upload imgSrc only -> 1 command buffer 
 								with a barrier bewteen copy and execute
-							+/	((0x348694F76D066).檢(0x326B29B0E4249)); 
-							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x348CF4F76D066).檢(0x3271A9B0E4249)); 
-							downloadBuffers; /+Opt: Download imgMask only+/	((0x349324F76D066).檢(0x3277F9B0E4249)); 
+							+/	((0x3476F4F76D066).檢(0x326B29B0E4249)); 
+							dispatch((((N).alignUp(groupSize))/(groupSize))); 	((0x347D54F76D066).檢(0x3271A9B0E4249)); 
+							downloadBuffers; /+Opt: Download imgMask only+/	((0x348384F76D066).檢(0x3277F9B0E4249)); 
 						} 
 					}
 				} 
@@ -6446,11 +6439,14 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				VulkanQueue	queue,
 				VulkanCommandPool	commandPool,
 				VkBufferUsageFlagBits	usage,
-				VulkanBufferSizeConfig	bufferSizeConfig
+				VulkanBufferSizeConfig	bufferSizeConfig,
+				string 	friendlyName
 			}; 
 			
 			enum poolGranularity 	= 0x1000 /+The pool size will be aligned by this.+/,
 			uploadGranularity 	=  0x100 /+Modification tracking will upload this large block.+/; 
+			
+			enum DebugLevel = 0 /+0: off, 1: simple 2: verbose+/; 
 			
 			static protected
 			{
@@ -6463,7 +6459,10 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					bool valid() => bufferSizeBytes && hostMemoryBuffer && deviceMemoryBuffer && !!hostPtr; 
 				} 
 				
-				auto allocateBufferPair(VulkanDevice device, VkBufferUsageFlagBits usage, size_t desiredSizeBytes)
+				auto allocateBufferPair(
+					VulkanDevice device, VkBufferUsageFlagBits usage, size_t desiredSizeBytes, 
+					string friendlyName
+				)
 				{
 					BufferPair res; 
 					with(res)
@@ -6473,6 +6472,14 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							I only use coherent memory, I don't flush/invalidate.
 							On Radeon it's OK.
 						+/
+						
+						static if(DebugLevel>1)
+						print(
+							i"------------------------------------------------
+Going to reallocate buffer pair: \33\15$(friendlyName.quoted)\33\7
+allocateBufferPair usage:$(usage) size:$(desiredSizeBytes)".text
+						); 
+						
 						bufferSizeBytes = desiredSizeBytes; 
 						hostMemoryBuffer = device.createMemoryBuffer
 							(
@@ -6484,6 +6491,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 								TRANSFER_DST_BIT
 							}))
 						); 
+						static if(DebugLevel>1) print("HOST_VISIBLE_BIT | HOST_COHERENT_BIT allocation success"); 
 						deviceMemoryBuffer = device.createMemoryBuffer
 							(
 							bufferSizeBytes, mixin(幟!((VK_MEMORY_PROPERTY_),q{DEVICE_LOCAL_BIT})), mixin(幟!((VK_BUFFER_USAGE_),q{
@@ -6491,13 +6499,21 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 								TRANSFER_DST_BIT | usage
 							}))
 						); 
+						static if(DebugLevel>1) print("DEVICE_LOCAL_BIT allocation success"); 
 						hostPtr = hostMemoryBuffer.map; 
+						
+						static if(DebugLevel>1) print("hostMemoryBuffer.map:", hostPtr); 
 					}
 					catch(Exception e)
 					{
+						static if(DebugLevel>1) print("allocateBufferPair: FAIL"); 
 						hostMemoryBuffer.free; deviceMemoryBuffer.free; 
+						static if(DebugLevel>1) print("buffers freed, this is the exception as a WARN:"); 
 						WARN(e.simpleMsg); return BufferPair.init/+out of mem, nothing's changed+/; 
 					}
+					
+					static if(DebugLevel>1) print("allocateBufferPair: FINISHED ---------------------- res.valid:", res.valid); 
+					
 					return res; 
 				} 
 				
@@ -6520,6 +6536,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 					const copySizeBytes = min(src.bufferSizeBytes, dst.bufferSizeBytes); 
 					if(copySizeBytes>0)
 					{
+						static if(DebugLevel>1) print("copyBufferPair", src, dst, copySizeBytes); 
 						auto cb = new VulkanCommandBuffer(commandPool); scope(exit) cb.free; 
 						cb.record(
 							mixin(舉!((VK_COMMAND_BUFFER_USAGE_),q{ONE_TIME_SUBMIT_BIT})), 
@@ -6530,8 +6547,9 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 								(src.deviceMemoryBuffer, dst.deviceMemoryBuffer, copySizeBytes); 
 							}
 						); 
-						queue.submit(cb); 
-						queue.waitIdle; /+Opt: STALL+/
+						queue.submit(cb); static if(DebugLevel>1) print("copyBufferPair submit done"); 
+						
+						queue.waitIdle; static if(DebugLevel>1) print("copyBufferPair waitidle done"); /+Opt: STALL+/
 					}
 				} 
 			} 
@@ -6593,8 +6611,10 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 						
 						if(!beforeResize(newBufferSizeBytes)) return false/+beforeResize() declined+/; 
 						
-						auto newBufferPair = allocateBufferPair(device, usage, newBufferSizeBytes); 
-						if(!newBufferPair.valid) return false/+out of mem, nothing's changed+/; 
+						auto newBufferPair = allocateBufferPair(device, usage, newBufferSizeBytes, friendlyName); 
+						if(!newBufferPair.valid)
+						{ return false/+out of mem, nothing's changed+/; }
+						
 						
 						if(keepContents) {
 							copyBufferPair(bufferPair, newBufferPair, commandPool, queue); 
@@ -6606,7 +6626,7 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 							+/
 						}
 						
-						static if((常!(bool)(0)))
+						static if(DebugLevel>0)
 						print(
 							"GPU realloc (\33\16", siFormat("%6.1f ms", DT),"\33\7): \33\13", 
 							bufferSizeBytes, "-\33\12>", newBufferPair.bufferSizeBytes, "\33\7"
@@ -6614,10 +6634,10 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 						
 						const oldBufferSizeBytes = bufferSizeBytes; 
 						
-						freeBufferPair(bufferPair); 
-						bufferPair = newBufferPair; 
-						
-						afterResize(oldBufferSizeBytes); 
+						freeBufferPair(bufferPair); 	static if(DebugLevel>1) print("freeBufferPair SUCCESS"); 
+						bufferPair = newBufferPair; 	static if(DebugLevel>1) print("newBufferPair SUCCESS", bufferPair); 
+							
+						afterResize(oldBufferSizeBytes); 	static if(DebugLevel>1) print("afterResize SUCCESS"); 
 						
 						return true/+success+/; 
 					}
@@ -6641,7 +6661,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				VulkanQueue	queue,
 				VulkanCommandPool	commandPool,
 				VkBufferUsageFlagBits	usage,
-				VulkanBufferSizeConfig	bufferSizeConfig
+				VulkanBufferSizeConfig	bufferSizeConfig,
+				string 	friendlyName
 			)
 			{
 				super(__traits(parameters)); 
@@ -6750,7 +6771,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				VulkanQueue	queue,
 				VulkanCommandPool	commandPool,
 				VkBufferUsageFlagBits	usage,
-				VulkanBufferSizeConfig	bufferSizeConfig
+				VulkanBufferSizeConfig	bufferSizeConfig,
+				string	friendlyName
 			)
 			{ super(__traits(parameters)); } 
 			
@@ -6901,7 +6923,8 @@ version(/+$DIDE_REGION Vulkan classes+/all)
 				VulkanQueue	queue,
 				VulkanCommandPool	commandPool,
 				VkBufferUsageFlagBits	usage,
-				VulkanBufferSizeConfig	bufferSizeConfig
+				VulkanBufferSizeConfig	bufferSizeConfig,
+				string 	friendlyName
 			)
 			{
 				super(__traits(parameters)); 
