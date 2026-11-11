@@ -4233,6 +4233,15 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 														{
 															//transition
 															state = dstState; 
+															if(
+																tokenStr!="" || src!=""
+																/+
+																	261110: This is there to omit the 
+																	very last transition to unstructured.
+																	It happens in math.d for example,
+																	but adds no extra information at all.
+																+/
+															)
 															yield(ScanResult(ScanOp.trans, tokenStr)); 
 														}
 													}else
@@ -4299,7 +4308,7 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x20550899FD657).檢(0x1D64BFDEAC48D)); 
+			((0x206A0899FD657).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 
@@ -4500,6 +4509,68 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 			+/
 		}); 
 	} 
+	
+	/+
+		struct StructureScanner_VLang
+		{
+			mixin((
+				(表([
+					[q{/+Note: Enter+/},q{/+Note: State+/},q{/+Note: Transitions+/},q{/+Note: Leave+/},q{/+Note: EOF handling+/}],
+					[q{"{"},q{structuredBlock},q{Error("] )") ~ EntryTransitions},q{"}"},q{StructuredEOF}],
+					[q{"("},q{structuredList},q{Error("] }") ~ EntryTransitions},q{")"},q{StructuredEOF}],
+					[q{"["},q{structuredIndex},q{Error(") }") ~ EntryTransitions},q{"]"},q{StructuredEOF}],
+					[q{"//"},q{slashComment},q{Pop(NewLineTokens)},q{},q{Pop(EOFTokens)}],
+					[q{"/*"},q{vComment},q{Push("/*", vComment)},q{"*/"},q{EOF}],
+					[q{"r'"},q{rChar},q{},q{`'`},q{EOF}],
+					[q{"c'"},q{ccChar},q{Ignore(`\\ \'`)},q{CWD(`'`)},q{EOF}],
+					[q{"js'"},q{jsChar},q{Ignore(`\\ \'`)},q{CWD(`'`)},q{EOF}],
+					[q{"'"},q{vChar},q{Ignore(`\\ \'`)},q{CWD(`'`)},q{EOF}],
+					[q{`r"`},q{rString},q{},q{CWD(`"`)},q{EOF}],
+					[q{`c"`},q{ccString},q{Ignore(`\\ \"`)},q{CWD(`"`)},q{EOF}],
+					[q{`js"`},q{jsString},q{Ignore(`\\ \"`)},q{CWD(`"`)},q{EOF}],
+					[q{`"`},q{vString},q{Push("${", vInterpolationBlock) ~ Ignore(`\\ \" \$`)},q{CWD(`"`)},q{EOF}],
+					[q{"${"},q{vInterpolationBlock},q{Error("] )") ~ EntryTransitions},q{"}"},q{StructuredEOF}],
+					[q{},q{unstructured},q{Trans("", unstructured)},q{},q{}],
+				]))
+			).GEN!q{
+				GEN_StructureScanner
+				(
+					q{
+						enum NewLineTokens 	= "\r\n \r \n \u2028 \u2029",
+						EOFTokens 	= "\0" /+"\x1A" not supported because pcmpstri limit.+/
+						,EOF 	= Trans(EOFTokens, State.unstructured),
+						StructuredEOF 	= Trans(EOFTokens /+~ " __EOF__"+/, State.unstructured)
+							/+Todo: __EOF__ is only valid when it is a complete keyword.+/; 
+						
+						string CWD(string s)
+						{
+							//append all string literal character size specifiers to a token
+							return s.split(" ").map!((a)=>([a~"c", a~"w", a~"d", a])).join.join(" "); 
+						} 
+					}
+				)
+				
+				/+
+			Enter	A single /+Code: string+/ literal or nothing.  The are used to generate 
+				EntryTransitions. These tokens can start scopes from structural blocks.
+			State	The /+Code: identifier+/ of the enum member.
+			Transitions 	An expression of type /+Code: Transition[]+/
+					Error(sym)	If symbol is found, the scanning stops and an error raised.
+					Ignore(sym)	Step over these symbols, do nothing.
+					Trans(sym, state)	If symbol found, it will transition to the new state.
+					Push(sym, state)	If symbol found, enters a new nested scope.
+					Pop(sym)	If symbol found, exists the current scope.
+					sym	Can be a single symbol or multiple symbols 
+					separated by space.
+						If the symbol is an empty string, it means the 
+						whole remaining text.
+						Examples: /+Code: "+" "+= +"+/ //the order is important.
+			Leave	An expression of a symbol string.  It's generates a Pop() transition.
+			EOF handling 	An expression of type /+Code: Transition[]+/.
+		+/
+			}); 
+		} 
+	+/
 	
 	bool isValidDLang(string src)
 	{ return DLangScanner(src).all!"a.valid"; } 
