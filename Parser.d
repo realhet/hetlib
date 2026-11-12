@@ -3810,19 +3810,18 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 			{
 				
 				seek(idx); 
-				if(acceptKw(kwimport))
+				if(acceptKw(kwimport) && sym.isIdentifier/+Ignore string imports.+/)
 				{
+					nextModule: 
+					res.length++; 
+					auto decl = &res.back; 
+					
 					//[alias =] module[full]name
 					auto sl = expectIdentifierList(opdot); 
 					
-					//Ignore string imports
-					if(sl.frontOr.strip=="(") continue; 
-					
-					nextModule: res.length++; auto decl = &res.back; 
-					
 					if(acceptOp(opassign))
 					{
-						 //alias
+						//alias
 						if(sl.length>1)
 						error(`Alias cannot contain multiple identifiers.`); 
 						decl.alias_ = sl[0]; 
@@ -3832,11 +3831,11 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 					
 					if(acceptOp(opcomma))
 					{
-						 //has more modules
+						//has more modules
 						goto nextModule; 
 					}else if(acceptOp(opcolon))
 					{
-						 //current module has bindings
+						//current module has bindings
 						nextBind: 
 						decl.binds.length++; 
 						auto bind = &decl.binds.back; 
@@ -3844,7 +3843,7 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 						auto s = expectIdentifier; 
 						if(acceptOp(opassign))
 						{
-							 //bind alias
+							//bind alias
 							bind.alias_ = s; 
 							bind.name = expectIdentifier; 
 						}else
@@ -3852,16 +3851,26 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 						
 						if(acceptOp(opcomma))
 						{
-							 //has more binds
+							//has more binds
 							goto nextBind; 
 						}
 					}
 					expectOp(opsemiColon); 
 				}
-				
 			}
 			
 			return res; 
+			
+			/+
+				Todo: unittest would save my time...
+				/+Highlighted: import a;+/
+				/+Highlighted: import a, b, c;+/ ← the regression
+				/+Highlighted: import x = a.b, y = c;+/  ← alias + multi
+				/+Highlighted: import a : f, g;+/ and /+Highlighted: import a : x = f;+/
+				/+Highlighted: import "str", a;+/ ← string guard
+				/+Highlighted: import a, somemodule.deep.name: bind;+/
+				/+Code: import (s);+/
+			+/
 		} 
 		
 		
@@ -4309,7 +4318,7 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x206EA899FD657).檢(0x1D64BFDEAC48D)); 
+			((0x2087E899FD657).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 
