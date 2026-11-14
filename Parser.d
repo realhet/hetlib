@@ -4236,6 +4236,7 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 			error_underflow, 	//stack was empty when a pop or trans occured
 			error_stopped1,
 			error_stopped2,
+			error_qString,
 			error_unclosed,
 		} 
 		
@@ -4308,13 +4309,34 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 					else	State[] stack = [State.init]; 
 					
 					ref State state()	
-					{ return stack.back; } 
-					int stackLen()	
+					{ return stack.back; } int stackLen()	
 					{ return cast(int)stack.length; } 
+					version(/+$DIDE_REGION Delimited string literals+/all)
+					{
+						string getQStringId()
+						{
+							//backTrack on `src` which was already advenced forward.
+							enum MaxLen = 128; 
+							auto s = (src.ptr-MaxLen)[0..MaxLen]; 
+							return s.retro.byDchar.until('"').array.retro.strip.text; 
+						} string fetchQString(string id)
+						{
+							const postfix = '\n'~id~'"'; 
+							if(const foundLen = src.find(postfix).length)
+							{
+								const content = src[0..$-foundLen]; 
+								src = src[content.length+postfix.length .. $]; //advance
+								return content.withoutEnding('\r'); 
+							}return ""; 
+						} 
+						string fetchCWD() {
+							string cwd; if(src.length && src[0].among('c', 'w', 'd'))
+							{ cwd = src[0].text; src = src[1 .. $]; /+advance+/}return cwd; 
+						} 
+					}
 					
 					while(src.length)
 					{
-						
 						swState: 
 						final switch(state)
 						{
@@ -4328,7 +4350,7 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 									static if(log)
 									{
 										print("------------------------------------"); 
-										print("SRC:", EgaColor.yellow(src.quoted)); 
+										print("SRC:", EgaColor.yellow(src.take(30).text.quoted)); 
 										print("State:", state, "Stack:", stack.retro); 
 										print("Looking for:", transitions.map!"a.token"); 
 									}
@@ -4364,6 +4386,8 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 												if(contents.length)
 												yield(ScanResult(ScanOp.content, contents)); 
 												
+												//Todo: This is getting ridiculously big. It is inlined in every case. Must extract and refactor.
+												
 												//update stack
 												if(isPush)
 												{
@@ -4386,14 +4410,39 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 														}else
 														{
 															//transition
-															state = dstState; 
-															const meaninglessTransition =
-																(
-																tokenStr=="" /+If there was no token+/
-																&& src=="" /+and we're at EOF+/
-															); 
-															if(!meaninglessTransition)
-															yield(ScanResult(ScanOp.trans, tokenStr)); 
+															if(
+																tokenStr=="" && src=="" 
+																&& dstState.text=="unstructured"
+															)
+															{
+																state = dstState; 
+																/+This is a meaningless transition at the very end.+/
+																/+Todo: Find the cause of this.+/
+															}
+															else if(
+																tokenStr.among("\n", "\r\n")
+																&& state.text	=="qStringBegin"
+																&& dstState.text	=="qStringMain"
+															)
+															{
+																state = dstState; 
+																const 	qId 	= getQStringId, 
+																	content 	= fetchQString(qId); 
+																yield(ScanResult(ScanOp.content, content)); 
+																stack.popBack; const cwd = fetchCWD; 
+																yield(ScanResult(ScanOp.pop, qId~`"`~cwd)); 
+																/+
+																	No error handling, 
+																	a bad Delimited String Literal trashes it anyways
+																+/
+															}
+															else
+															{
+																state = dstState; 
+																//These are unhandled transitions.
+																WARN(ScanResult(ScanOp.trans, tokenStr), state.text); 
+																yield(ScanResult(ScanOp.trans, tokenStr)); 
+															}
 														}
 													}else
 													{
@@ -4459,7 +4508,7 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x21882899FD657).檢(0x1D64BFDEAC48D)); 
+			((0x22010899FD657).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 
@@ -4585,10 +4634,10 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 		mixin((
 			(表([
 				[q{/+Note: Enter+/},q{/+Note: State+/},q{/+Note: Transitions+/},q{/+Note: Leave+/},q{/+Note: EOF handling+/}],
-				[q{"{"},q{structuredBlock},q{Error("] )") ~ EntryTransitions},q{"}"},q{StructuredEOF}],
-				[q{"("},q{structuredList},q{Error("] }") ~ EntryTransitions},q{")"},q{StructuredEOF}],
-				[q{"["},q{structuredIndex},q{Error(") }") ~ EntryTransitions},q{"]"},q{StructuredEOF}],
-				[q{"q{"},q{structuredString},q{Error("] )") ~ EntryTransitions},q{CWD(`}`)},q{StructuredEOF}],
+				[q{"{"},q{structuredBlock},q{Error("] )") ~ EntryTransitions},q{"}"},q{EOF}],
+				[q{"("},q{structuredList},q{Error("] }") ~ EntryTransitions},q{")"},q{EOF}],
+				[q{"["},q{structuredIndex},q{Error(") }") ~ EntryTransitions},q{"]"},q{EOF}],
+				[q{"q{"},q{structuredString},q{Error("] )") ~ EntryTransitions},q{CWD(`}`)},q{EOF}],
 				[],
 				[q{"//"},q{slashComment},q{Pop(NewLineTokens)},q{},q{Pop(EOFTokens)}],
 				[q{"/*"},q{cComment},q{},q{"*/"},q{EOF}],
@@ -4610,27 +4659,26 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 				[q{`q"<`},q{qStringAngle},q{Push("<", qStringAngleInner)},q{CWD(`>"`)},q{EOF}],
 				[q{},q{qStringAngleInner},q{Push("<", qStringAngleInner)},q{`>`},q{EOF}],
 				[],
-				[q{`q"`},q{qStringBegin},q{Trans(NewLineTokens, qStringMain) },q{},q{EOF}],
-				[q{},q{qStringMain},q{/+Todo: quoted identifier str+/ },q{},q{EOF}],
+				[q{`q"`},q{qStringBegin},q{Trans(NewLineTokens, qStringMain)},q{},q{EOF}],
+				[q{},q{qStringMain},q{/+Delimited String Literals are handled inside scan()+/},q{},q{EOF}],
 				[],
 				[q{`x"`},q{hexString},q{},q{CWD(`"`)},q{EOF}],
 				[],
 				[q{`i"`},q{interpolatedCString},q{Push("$(", interpolationBlock) ~ Ignore(`\\ \" \$`)},q{CWD(`"`)},q{EOF}],
 				[q{"i`"},q{interpolatedDString},q{Push("$(", interpolationBlock)},q{CWD("`")},q{EOF}],
-				[q{"iq{"},q{interpolatedStructuredString},q{Error("] )") ~ EntryTransitions},q{CWD(`}`)},q{StructuredEOF}],
-				[q{"$("},q{interpolationBlock},q{Error("] }") ~ EntryTransitions},q{")"},q{StructuredEOF}],
+				[q{"iq{"},q{interpolatedStructuredString},q{Error("] )") ~ EntryTransitions},q{CWD(`}`)},q{EOF}],
+				[q{"$("},q{interpolationBlock},q{Error("] }") ~ EntryTransitions},q{")"},q{EOF}],
 				[],
 				[q{},q{unstructured},q{Trans("", unstructured)},q{},q{}],
 			]))
-		).GEN!q{
+		) .GEN!q{
 			GEN_StructureScanner
 			(
 				q{
 					enum NewLineTokens 	= "\r\n \r \n \u2028 \u2029",
-					EOFTokens 	= "\0" /+"\x1A" not supported because pcmpstri limit.+/
-					,EOF 	= Trans(EOFTokens, State.unstructured),
-					StructuredEOF 	= Trans(EOFTokens /+~ " __EOF__"+/, State.unstructured)
-						/+Todo: __EOF__ is only valid when it is a complete keyword.+/; 
+					EOFTokens 	= "\0" /+"\x1A" not supported because pcmpstri limit.+/,
+					EOF 	= Trans(EOFTokens, State.unstructured)
+					/+Note: This is NOT the place to implement __EOF__ handling.+/; 
 					
 					string CWD(string s)
 					{
@@ -4660,68 +4708,6 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 			+/
 		}); 
 	} 
-	
-	/+
-		struct StructureScanner_VLang
-		{
-			mixin((
-				(表([
-					[q{/+Note: Enter+/},q{/+Note: State+/},q{/+Note: Transitions+/},q{/+Note: Leave+/},q{/+Note: EOF handling+/}],
-					[q{"{"},q{structuredBlock},q{Error("] )") ~ EntryTransitions},q{"}"},q{StructuredEOF}],
-					[q{"("},q{structuredList},q{Error("] }") ~ EntryTransitions},q{")"},q{StructuredEOF}],
-					[q{"["},q{structuredIndex},q{Error(") }") ~ EntryTransitions},q{"]"},q{StructuredEOF}],
-					[q{"//"},q{slashComment},q{Pop(NewLineTokens)},q{},q{Pop(EOFTokens)}],
-					[q{"/*"},q{vComment},q{Push("/*", vComment)},q{"*/"},q{EOF}],
-					[q{"r'"},q{rChar},q{},q{`'`},q{EOF}],
-					[q{"c'"},q{ccChar},q{Ignore(`\\ \'`)},q{CWD(`'`)},q{EOF}],
-					[q{"js'"},q{jsChar},q{Ignore(`\\ \'`)},q{CWD(`'`)},q{EOF}],
-					[q{"'"},q{vChar},q{Ignore(`\\ \'`)},q{CWD(`'`)},q{EOF}],
-					[q{`r"`},q{rString},q{},q{CWD(`"`)},q{EOF}],
-					[q{`c"`},q{ccString},q{Ignore(`\\ \"`)},q{CWD(`"`)},q{EOF}],
-					[q{`js"`},q{jsString},q{Ignore(`\\ \"`)},q{CWD(`"`)},q{EOF}],
-					[q{`"`},q{vString},q{Push("${", vInterpolationBlock) ~ Ignore(`\\ \" \$`)},q{CWD(`"`)},q{EOF}],
-					[q{"${"},q{vInterpolationBlock},q{Error("] )") ~ EntryTransitions},q{"}"},q{StructuredEOF}],
-					[q{},q{unstructured},q{Trans("", unstructured)},q{},q{}],
-				]))
-			).GEN!q{
-				GEN_StructureScanner
-				(
-					q{
-						enum NewLineTokens 	= "\r\n \r \n \u2028 \u2029",
-						EOFTokens 	= "\0" /+"\x1A" not supported because pcmpstri limit.+/
-						,EOF 	= Trans(EOFTokens, State.unstructured),
-						StructuredEOF 	= Trans(EOFTokens /+~ " __EOF__"+/, State.unstructured)
-							/+Todo: __EOF__ is only valid when it is a complete keyword.+/; 
-						
-						string CWD(string s)
-						{
-							//append all string literal character size specifiers to a token
-							return s.split(" ").map!((a)=>([a~"c", a~"w", a~"d", a])).join.join(" "); 
-						} 
-					}
-				)
-				
-				/+
-			Enter	A single /+Code: string+/ literal or nothing.  The are used to generate 
-				EntryTransitions. These tokens can start scopes from structural blocks.
-			State	The /+Code: identifier+/ of the enum member.
-			Transitions 	An expression of type /+Code: Transition[]+/
-					Error(sym)	If symbol is found, the scanning stops and an error raised.
-					Ignore(sym)	Step over these symbols, do nothing.
-					Trans(sym, state)	If symbol found, it will transition to the new state.
-					Push(sym, state)	If symbol found, enters a new nested scope.
-					Pop(sym)	If symbol found, exists the current scope.
-					sym	Can be a single symbol or multiple symbols 
-					separated by space.
-						If the symbol is an empty string, it means the 
-						whole remaining text.
-						Examples: /+Code: "+" "+= +"+/ //the order is important.
-			Leave	An expression of a symbol string.  It's generates a Pop() transition.
-			EOF handling 	An expression of type /+Code: Transition[]+/.
-		+/
-			}); 
-		} 
-	+/
 	
 	bool isValidDLang(string src)
 	{ return DLangScanner(src).all!"a.valid"; } 
@@ -4769,5 +4755,53 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 			).調!GEN_StructureScanner
 		); 
 	} 
+	
 	
+	
+	
+	
+	
+	
+	
+	
+	
+	alias VLangScanner = StructureScanner_VLang.scanner; 
+	struct StructureScanner_VLang
+	{
+		mixin((
+			(表([
+				[q{/+Note: Enter+/},q{/+Note: State+/},q{/+Note: Transitions+/},q{/+Note: Leave+/},q{/+Note: EOF handling+/}],
+				[q{"{"},q{vStructuredBlock},q{Error("] )") ~ EntryTransitions},q{"}"},q{EOF}],
+				[q{"("},q{vStructuredList},q{Error("] }") ~ EntryTransitions},q{")"},q{EOF}],
+				[q{"["},q{vStructuredIndex},q{Error(") }") ~ EntryTransitions},q{"]"},q{EOF}],
+				[],
+				[q{"//"},q{vSlashComment},q{Pop(NewLineTokens)},q{},q{Pop(EOFTokens)}],
+				[q{"/*"},q{vComment},q{
+					Push("/*", vComment) ~ Ignore(`//`)
+					/+-> vlib\v\tests\nested_multiline_comments_test.v+/
+				},q{"*/"},q{EOF}],
+				[],
+				[q{"`"},q{vRune},q{Ignore(r"\\ \`")},q{"`"},q{EOF}],
+				[q{`r'`},q{vRawString1},q{},q{`'`},q{EOF}],
+				[q{`r"`},q{vRawString2},q{},q{`"`},q{EOF}],
+				[q{"'"},q{vString1},q{Push("${", vInterpolationBlock) ~ Ignore(`\\ \' \$`)},q{"'"},q{EOF}],
+				[q{`"`},q{vString2},q{Push("${", vInterpolationBlock) ~ Ignore(`\\ \" \$`)},q{`"`},q{EOF}],
+				[q{"${"},q{vInterpolationBlock},q{Error("] )") ~ EntryTransitions},q{"}"},q{EOF}],
+				[],
+				[q{},q{unstructured},q{Trans("", unstructured)},q{},q{}],
+			]))
+		) .GEN!q{
+			GEN_StructureScanner
+			(
+				q{
+					enum NewLineTokens 	= "\r\n \r \n \u2028 \u2029",
+					EOFTokens 	= "\0",
+					EOF 	= Trans(EOFTokens, State.unstructured); 
+				}
+			)
+		}); 
+	} 
+	
+	bool isValidVLang(string src)
+	{ return VLangScanner(src).all!"a.valid"; } 
 }
