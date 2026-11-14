@@ -2265,7 +2265,152 @@ version(/+$DIDE_REGION Tokenizer+/all)
 		*/
 		
 	} 
-}
+	
+	
+}string preprocessMultilineCMacros	(string sourceText, File file = File.init)
+{
+	/+Removes backslashes from line ends and enfolds multiline macros into {} blocks that are compatible with DLangScanner.+/
+	
+	if(file && !file.extIs("c", "cpp", "h", "hpp", "glsl", "ino")) return sourceText; 
+	
+	enum PossibleMultilineDirectives = ["define", "if", "elif"]; 
+	
+	///It checks if it's on a line ending `\` and the previous line is NOT ending with `\`.
+	bool atMultilineMacro(size_t i)
+	{
+		assert(i+1 < sourceText.length, "Must ensure this from outside!"); 
+		if(sourceText[i]=='\\' && sourceText[i+1].among('\n', '\r'))
+		{
+			foreach_reverse(j; 0..i)
+			{
+				/+Supports: \n \r\n \r+/
+				if(sourceText[j]=='\n')	return sourceText.get(j-1-(sourceText.get(j-1)=='\r'))!='\\'; 
+				else if(sourceText[j]=='\r')	return sourceText.get(j-1)!='\\'; 
+			}
+			return true/+This is the very first line, so it can be a start.+/; 
+		}
+		return false; 
+	} 
+	
+	
+	auto multilineMacroPositions = 	iota((cast(sizediff_t)(sourceText.length))-1)
+		.filter!atMultilineMacro.cache
+	/+
+		This range returns all the positions of sourceText rows 
+		that ends with \ and contains a #.
+		The returned position is at the \ character, the last char in the row.
+	+/; 
+	
+	if(multilineMacroPositions.empty) return sourceText/+nothing to change+/; 
+	
+	char[] res = sourceText.dup; 
+	
+	foreach(pos; multilineMacroPositions)
+	{
+		try
+		{
+			enforce(sourceText.get(pos)=='\\', "Backslash expected."); 
+			
+			sizediff_t findMarkPos()
+			{
+				sizediff_t markPos = -1; 
+				foreach_reverse(j; 0..pos)
+				{
+					const ch = sourceText[j]; 
+					if(ch=='#') markPos = j; 
+					else if(ch.among('\r', '\n')) break; 
+				}
+				return markPos; 
+			} 
+			
+			const startPos = findMarkPos; 
+			enforce(startPos>=0, "Can't find start of macro."); 
+			
+			//Only process valid directives.  Other #things can be parameters.
+			if(!startsWithKeyword!(PossibleMultilineDirectives)(sourceText[startPos+1..$]))
+			continue; 
+			
+			sizediff_t seekNextLine(sizediff_t start)
+			{
+				foreach(j; start..sourceText.length)
+				{
+					const ch = sourceText[j]; 
+					if(ch=='\n') return j+1; 
+					if(ch=='\r') return j+1+(sourceText.get(j+1)=='\n'); 
+				}
+				return sourceText.length; /+eof+/
+			} 
+			
+			string stripNL(string s)
+			=> s.withoutEnding('\n').withoutEnding('\r'); 
+			
+			bool hasBackslashAtEnd(size_t pos)
+			=> stripNL(sourceText[0..pos]).endsWith('\\'); 
+			
+			size_t[] linePositions = [startPos]; 
+			do {
+				const nextPos = seekNextLine(linePositions.back); 
+				if(nextPos<=linePositions.back/+eof+/) break; 
+				linePositions ~= nextPos; 
+			}
+			while(hasBackslashAtEnd(linePositions.back)); 
+			
+			static if((常!(bool)(0)))
+			LOG(
+				file, "\n--------------------\n"~
+				linePositions.slide!(No.withPartial)(2)
+				.map!((a)=>(stripNL(sourceText[a[0]..a[1]]))).join('\n')
+				~"\n--------------------"
+			); 
+			
+			enforce(linePositions.length>=3, "Can't find at least 2 macro lines."); 
+			
+			{
+				size_t openingPos; 
+				foreach(i; linePositions[0]..linePositions[1])
+				if(res[i].among(' ', '\t', '\\')) { openingPos = i; break; }
+				enforce(openingPos, "Can't locate opening pos."); 
+				res[openingPos] = '{'; 
+			}
+			
+			void stepBackNL(ref size_t p)
+			{
+				const p0 = p; 
+				if(p>0 && res[p]=='\n') p--; 
+				if(p>0 && res[p]=='\r') p--; 
+				enforce(p!=p0, "Unable to step back on NewLine."); 
+			} 
+			
+			size_t backslashPos; 
+			foreach(a; linePositions[1..$-1])
+			{
+				backslashPos = a-1; 
+				stepBackNL(backslashPos); 
+				if(res[backslashPos]!='\\') backslashPos = 0; 
+				
+				if(backslashPos) res[backslashPos] = ' '; 
+			}
+			
+			enforce(backslashPos, "Can't locate ending pos"); 
+			
+			size_t endPos = linePositions.back-1; 
+			stepBackNL(endPos); 
+			res[backslashPos..endPos+1] = res[backslashPos+1..endPos+1]~'}'; 
+			
+			static if((常!(bool)(0)))
+			LOG(
+				file, "\n--------------------\n"~
+				res[linePositions.front..linePositions.back].idup~
+				"\n--------------------"
+			); 
+			
+		}
+		catch(Exception e) { WARN("Error processing macro: ", file, pos, e.simpleMsg); }
+	}
+	
+	
+	return (cast(string)(res)); 
+} 
 
 version(/+$DIDE_REGION Syntax Presets+/all)
 {
@@ -4242,16 +4387,12 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 														{
 															//transition
 															state = dstState; 
-															if(
-																true || (tokenStr!="" || src!="")
-																/+
-																	261110: This is there to omit the 
-																	very last transition to unstructured.
-																	It happens in math.d for example,
-																	but adds no extra information at all.
-																	Update!!! 261111 I'm having linker errors!!!!
-																+/
-															)
+															const meaninglessTransition =
+																(
+																tokenStr=="" /+If there was no token+/
+																&& src=="" /+and we're at EOF+/
+															); 
+															if(!meaninglessTransition)
 															yield(ScanResult(ScanOp.trans, tokenStr)); 
 														}
 													}else
@@ -4318,7 +4459,7 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x2087E899FD657).檢(0x1D64BFDEAC48D)); 
+			((0x21882899FD657).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 

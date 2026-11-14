@@ -14914,7 +14914,7 @@ version(/+$DIDE_REGION Date Time handling+/all)
 			
 			size_t extIs(in string[] exts...)const
 			{
-				//Todo: ez full ganyolas...
+				//Todo: ez full ganyolas... es lassu is mert allokal.
 				string e0 = lc(ext); 
 				foreach(i, s; exts) {
 					string e = s; 
