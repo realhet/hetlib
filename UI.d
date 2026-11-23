@@ -4390,6 +4390,8 @@ version(/+$DIDE_REGION+/all)
 				DateTime* timeLimit=null	/+If this is reached, it will call Fiber.yield;+/
 			)
 			{
+				/+Bug: searching whole words for `long` will find it is `__c_longlong` too!+/
+				
 				enum MeasureStack = false; /+measured: 24K, level:84+/
 				
 				static struct SearchContext
@@ -4539,9 +4541,9 @@ version(/+$DIDE_REGION+/all)
 		
 		
 		private enum genSetChanged = q{
-			if(!flags.changed#) {
-				flags.changed# = true; 
-				if(auto p = getParent) if(p) p.setChanged#; 
+			if(!flags.changed$) {
+				flags.changed$ = true; 
+				if(auto p = getParent) if(p) p.setChanged$; 
 			}
 		}; 
 		
@@ -4549,9 +4551,9 @@ version(/+$DIDE_REGION+/all)
 		
 		/// Sets flags.changed* if needed. Also sets it for the parents recursively.
 		void setChangedCreated()
-		{ mixin(genSetChanged.replace("#", "Created")); } 
+		{ mixin(genSetChanged.replace("$", "Created")); } 
 		void setChangedRemoved()
-		{ mixin(genSetChanged.replace("#", "Removed")); } //Ditto
+		{ mixin(genSetChanged.replace("$", "Removed")); } //Ditto
 		
 		void setChanged()
 		{
@@ -4560,17 +4562,17 @@ version(/+$DIDE_REGION+/all)
 		} 
 		
 		private enum genClearChanged = q{
-			if(flags.changed#) {
-				flags.changed# = false; 
-				subContainers.each!"a.clearChanged#"; 
+			if(flags.changed$) {
+				flags.changed$ = false; 
+				subContainers.each!"a.clearChanged$"; 
 			}
 		}; 
 		
 		/// Clears flags.changed* if needed. Also clears it for all the children recursively.
 		void clearChangedCreated()
-		{ mixin(genClearChanged.replace("#", "Created")); } 
+		{ mixin(genClearChanged.replace("$", "Created")); } 
 		void clearChangedRemoved()
-		{ mixin(genClearChanged.replace("#", "Removed")); } 
+		{ mixin(genClearChanged.replace("$", "Removed")); } 
 		
 		@property int changedMask() const
 		{ return (flags.changedCreated?1:0) | (flags.changedRemoved?2:0); } 
@@ -8972,7 +8974,7 @@ struct im
 							imStorage!string(combine(Id.init, "a macska rúgja meg!😠"), life: 200) = "Hello World".replicate(10000); 
 							imStorage!string(combine(Id.init, "a manóba!😬")) = "Hello World".replicate(100000); 
 						}
-						((0x3E97DEB16D5C4).檢 (ImStorageManager.stats)); 
+						((0x3E9D6EB16D5C4).檢 (ImStorageManager.stats)); 
 					}
 				}
 				
@@ -10281,16 +10283,17 @@ struct im
 			//container delegates
 			
 			private auto _ContainerProp(string name)
-			=> q{
-				auto #()
-				=> thisContainer.#; auto #(typeof(thisContainer.#) val)
-				{ thisContainer.# = val; return val; } 
-			}.replace("#", name); 
+			=> iq{
+				auto $(name)()
+				=> thisContainer.$(name); auto $(name)(typeof(thisContainer.$(name)) val)
+				{ thisContainer.$(name) = val; return val; } 
+			}.text; 
 			private auto _ContainerRef(string name)
-			=> q{
-				ref auto #()
-				=> thisContainer.#; 
-			}.replace("#", name); 
+			=> iq{
+				ref auto $(name)()
+				=> thisContainer.$(name); 
+			}.text; 
+			
 			@property
 			{
 				mixin(

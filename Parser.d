@@ -3928,9 +3928,10 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 			
 			static if(tokens.length==1)
 			{
-				 //trivial case: only 1 token
+				//trivial case: only 1 token
 				return (cast(ubyte[])s).startsWith(cast(ubyte[])tokens[0]) ? 0 : DefaultResult; 
-			}else
+			}
+			else
 			{
 				//own version of startsWith is dealing with ubytes instead of codepoints.
 				static bool startsWith(string s, string what)
@@ -3992,6 +3993,33 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 				}
 				return DefaultResult; 
 			}
+		} 
+		
+		//detect the validity of a C Preprocessor Macro definition.
+		bool shouldIgnoreCMacro(string src, size_t pos, size_t len)
+		{
+			if(len==1 && src[pos]=='#')
+			{
+				bool inComment; 
+				outer: //it must backtract until the prev newLine, skipping /**/ comments.
+				for(long i = (cast(long)(pos))-1; i>=0; --i)
+				{
+					const ch = src[i]; 
+					if(inComment)
+					{ if(ch=='*' && src.get(i-1)=='/') { inComment = false; --i; }}
+					else
+					{
+						if(ch=='/' && src.get(i-1)=='*')	{ inComment = true; --i; }
+						else if(ch.among(' ', '\t', '\v'))	continue; 
+						else if(ch.among('\n', '\r'))	break outer; 
+						else return true/+This can be a concat operator. Ignore it!+/; 
+					}
+				}
+				const ch = src.get(pos+1); 
+				const valid = ch.isAlpha; //to the right there must be a keyword
+				return !valid /+Ignore if invalid!+/; 
+			}
+			return false /+It's something else so don't ignore!+/; 
 		} 
 		
 		size_t skipUntilTokens(string[] tokens)(string s)
@@ -4000,22 +4028,23 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 			static assert(tokens.all!"a.length"); 
 			static immutable charSet = tokens.map!"ubyte(a[0])".array.sort.uniq.array; 
 			
-			static if(0)
+			enum EnableSSE = (常!(bool)(1)); 
+			enum sseLengthLimit = 16; //SSE vector size limit
+			
+			static if(EnableSSE && charSet.length <= sseLengthLimit)
 			{
-				//reference version
-				return s.length - (cast(ubyte[])s).findAmong(charSet).length; 
-			}else
-			{
-				enum sseLengthLimit = 16; //SSE vector size limit
+				/+Opt: This is only a bit faster: 6.9s vs 7.5s+/
 				
 				//generate charSetVector: It contains all the chars the tokens can start with.
-				static assert(charSet.length <= sseLengthLimit); 
 				static immutable ubyte16 charSetVector = mixin(charSet.padRight(0, sseLengthLimit).text); 
 				
 				auto remaining = s.length, p0 = s.ptr, p = p0; 
 				while(remaining>=16)
 				{
-					//Note: this padding solves the unaligned read from a 4k page boundary at the end of the string. No masked reads needed.
+					/+
+						Note: this padding solves the unaligned read from a 
+						4k page boundary at the end of the string. No masked reads needed.
+					+/
 					const tmp = __asm!size_t(
 						//no 16byte align needed.
 						"pcmpestri $5,$3,$1"
@@ -4029,6 +4058,11 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 					remaining -= tmp; 
 				}
 				return p-p0; 
+			}
+			else
+			{
+				//reference version
+				return s.length - (cast(ubyte[])s).findAmong(charSet).length; 
 			}
 		} 
 		
@@ -4073,7 +4107,8 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 					const tIdx = startsWithToken!tokens(s[startIdx..$]); 
 					if(tIdx>=0)
 					return IndexOfTokenResult(tIdx, tokens[tIdx].length, startIdx); 
-				}while(startIdx++ < s.length); 
+				}
+				while(startIdx++ < s.length); 
 			}
 			
 			//return a physical eof: 	Seek to the very end of the string, tokenLength is 0
@@ -4106,7 +4141,7 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 		} 
 		
 		enum isScannerRange(R) = isInputRange!R && is(ElementType!R==ScanResult); 
-		
+		
 		mixin template prologue()
 		{
 			static: 
@@ -4203,7 +4238,11 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 								{
 									static immutable	transitions	 = StateTransitions[caseState],
 										tokens	 = transitions.map!"a.token".array; 
-									//pragma(msg, caseState, "\n", transitions.map!(a => a.format!"  %s").join("\n"));
+									static if((常!(bool)(0)))
+									pragma(msg,i"$(caseState): $(transitions.enumerate.map
+!(a => a.index.text~" "~a.value.token.quoted).join("   "))".text.注); 
+									
+									
 									static if(log)
 									{
 										print("------------------------------------"); 
@@ -4219,10 +4258,23 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 										auto match = indexOfToken!tokens(src, 0); 
 										
 										//skip ignored tokens
-										enum ignoreTokenIdx = transitions.countUntil!(t => t.isIgnore); 
-										static if(ignoreTokenIdx>=0)
+										enum hasIgnoredTransitions 	= transitions.countUntil!(t => t.isIgnore)>=0,
+										hasCMacros 	= __traits(compiles, { static assert(EnableCMacroDetection==true); }); 
+										static if(hasIgnoredTransitions || hasCMacros)
 										{
-											while(match && transitions[match.tokenIdx].isIgnore)
+											bool shouldIgnore()
+											{
+												if(match)
+												{
+													static if(hasIgnoredTransitions)
+													if(transitions[match.tokenIdx].isIgnore) return true; 
+													static if(hasCMacros)
+													if(shouldIgnoreCMacro	(src, match.tokenStartIdx, match.tokenLen)) return true; 
+												}
+												return false; 
+											} 
+											
+											while(shouldIgnore)
 											match = indexOfToken!tokens(src, match.tokenEndIdx); 
 										}
 										
@@ -4250,7 +4302,8 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 												{
 													stack ~= dstState; 
 													yield(ScanResult(ScanOp.push, tokenStr)); 
-												}else
+												}
+												else
 												{
 													//pop or trans. Both needs a non-empty stack.
 													if(isError)
@@ -4264,7 +4317,8 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 														{
 															stack.popBack; 
 															yield(ScanResult(ScanOp.pop, tokenStr)); 
-														}else
+														}
+														else
 														{
 															//transition
 															if(
@@ -4277,6 +4331,7 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 																/+Todo: Find the cause of this.+/
 															}
 															else if(
+																/+Delimited string handling+/
 																tokenStr.among("\n", "\r\n")
 																&& state.text	=="qStringBegin"
 																&& dstState.text	=="qStringMain"
@@ -4293,6 +4348,22 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 																	a bad Delimited String Literal trashes it anyways
 																+/
 															}
+															else if(
+																hasCMacros &&//slashCommand in CMacro
+																(
+																	tokenStr=="//"
+																	&& state.text	=="cMacro"
+																	&& dstState.text 	=="slashComment"
+																)
+															)
+															{
+																static if(hasCMacros)
+																{
+																	yield(ScanResult(ScanOp.pop, tokenStr[0..0])); 
+																	state = dstState; 
+																	yield(ScanResult(ScanOp.push, tokenStr)); 
+																}
+															}
 															else
 															{
 																state = dstState; 
@@ -4301,7 +4372,8 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 																yield(ScanResult(ScanOp.trans, tokenStr)); 
 															}
 														}
-													}else
+													}
+													else
 													{
 														yield(ScanResult(ScanOp.error_underflow, tokenStr ~ src)); 
 														return; 
@@ -4365,7 +4437,7 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 				}); 
 				res ~= format!"%10d %016x %s\n"(size, hash, f.fullName); 
 			}
-			((0x20F62899FD657).檢(0x1D64BFDEAC48D)); 
+			((0x2185B899FD657).檢(0x1D64BFDEAC48D)); 
 			print("hash =", res.hashOf); 
 			enforceDiff(3757513907, res.hashOf, "StructureScanner functional test failed."); 
 		} 
@@ -4619,7 +4691,97 @@ version(/+$DIDE_REGION Syntax Presets+/all)
 	
 	
 	
+	alias DLangScanner_V2 = StructureScanner_DLang_V2.scanner; 
 	
+	struct StructureScanner_DLang_V2
+	{
+		mixin((
+			(表([
+				[q{/+Note: Enter+/},q{/+Note: State+/},q{/+Note: Transitions+/},q{/+Note: Leave+/},q{/+Note: EOF handling+/}],
+				[q{"{"},q{structuredBlock},q{Error("] )") ~ EntryTransitions},q{"}"},q{EOF}],
+				[q{"("},q{structuredList},q{Error("] }") ~ EntryTransitions},q{")"},q{EOF}],
+				[q{"["},q{structuredIndex},q{Error(") }") ~ EntryTransitions},q{"]"},q{EOF}],
+				[q{"q{"},q{structuredString},q{Error("] )") ~ EntryTransitions},q{CWD(`}`)},q{EOF}],
+				[],
+				[q{"//"},q{slashComment},q{Pop(NewLineTokens)},q{},q{Pop(EOFTokens)}],
+				[q{"/*"},q{cComment},q{},q{"*/"},q{EOF}],
+				[q{"/+"},q{dComment},q{Push("/+", dComment)},q{"+/"},q{EOF}],
+				[],
+				[q{"'"},q{cChar},q{Ignore(`\\ \'`)},q{CWD(`'`)},q{EOF}],
+				[q{`"`},q{cString},q{Ignore(`\\ \"`)},q{CWD(`"`)},q{EOF}],
+				[q{`r"`},q{rString},q{},q{CWD(`"`)},q{EOF}],
+				[q{"`"},q{dString},q{},q{CWD("`")},q{EOF}],
+				[],
+				[q{`q"/`},q{qStringSlash},q{},q{CWD(`/"`)},q{EOF}],
+				[],
+				[q{`q"{`},q{qStringCurly},q{Push("{", qStringCurlyInner)},q{CWD(`}"`)},q{EOF}],
+				[q{},q{qStringCurlyInner},q{Push("{", qStringCurlyInner)},q{`}`},q{EOF}],
+				[q{`q"(`},q{qStringRound},q{Push("(", qStringRoundInner)},q{CWD(`)"`)},q{EOF}],
+				[q{},q{qStringRoundInner},q{Push("(", qStringRoundInner)},q{`)`},q{EOF}],
+				[q{`q"[`},q{qStringSquare},q{Push("[", qStringSquareInner)},q{CWD(`]"`)},q{EOF}],
+				[q{},q{qStringSquareInner},q{Push("[", qStringSquareInner)},q{`]`},q{EOF}],
+				[q{`q"<`},q{qStringAngle},q{Push("<", qStringAngleInner)},q{CWD(`>"`)},q{EOF}],
+				[q{},q{qStringAngleInner},q{Push("<", qStringAngleInner)},q{`>`},q{EOF}],
+				[],
+				[q{`q"`},q{qStringBegin},q{Trans(NewLineTokens, qStringMain)},q{},q{EOF}],
+				[q{},q{qStringMain},q{/+Delimited String Literals are handled inside scan()+/},q{},q{EOF}],
+				[],
+				[q{`x"`},q{hexString},q{},q{CWD(`"`)},q{EOF}],
+				[],
+				[q{`i"`},q{interpolatedCString},q{Push("$(", interpolationBlock) ~ Ignore(`\\ \" \$`)},q{CWD(`"`)},q{EOF}],
+				[q{"i`"},q{interpolatedDString},q{Push("$(", interpolationBlock)},q{CWD("`")},q{EOF}],
+				[q{"iq{"},q{interpolatedStructuredString},q{Error("] )") ~ EntryTransitions},q{CWD(`}`)},q{EOF}],
+				[q{"$("},q{interpolationBlock},q{Error("] }") ~ EntryTransitions},q{")"},q{EOF}],
+				[],
+				[q{"#"},q{cMacro},q{
+					Push("{", structuredBlock) 	~ Push("(", structuredList)~
+					Push("[", structuredIndex) 	~ Push("$(", interpolationBlock)~
+					Push(`"`, cString) 	~ Push(`'`, cChar) ~
+					Push("/*", cComment) 	~ Trans("//", slashComment)~
+					Ignore("\\\n \\\r\n") ~ Pop(NewLineTokens)
+				},q{},q{Pop(EOFTokens)}],
+				[],
+				[q{},q{unstructured},q{Trans("", unstructured)},q{},q{}],
+			]))
+		) .GEN!q{
+			GEN_StructureScanner
+			(
+				q{
+					enum EnableCMacroDetection = true; 
+					
+					enum NewLineTokens 	= "\r\n \r \n \u2028 \u2029",
+					EOFTokens 	= "\0" /+"\x1A" not supported because pcmpstri limit.+/,
+					EOF 	= Trans(EOFTokens, State.unstructured)
+					/+Note: This is NOT the place to implement __EOF__ handling.+/; 
+					
+					string CWD(string s)
+					{
+						//append all string literal character size specifiers to a token
+						return s.split(" ").map!((a)=>([a~"c", a~"w", a~"d", a])).join.join(" "); 
+					} 
+				}
+			)
+			
+			/+
+				Enter	A single /+Code: string+/ literal or nothing.  The are used to generate 
+					EntryTransitions. These tokens can start scopes from structural blocks.
+				State	The /+Code: identifier+/ of the enum member.
+				Transitions 	An expression of type /+Code: Transition[]+/
+						Error(sym)	If symbol is found, the scanning stops and an error raised.
+						Ignore(sym)	Step over these symbols, do nothing.
+						Trans(sym, state)	If symbol found, it will transition to the new state.
+						Push(sym, state)	If symbol found, enters a new nested scope.
+						Pop(sym)	If symbol found, exists the current scope.
+						sym	Can be a single symbol or multiple symbols 
+						separated by space.
+							If the symbol is an empty string, it means the 
+							whole remaining text.
+							Examples: /+Code: "+" "+= +"+/ //the order is important.
+				Leave	An expression of a symbol string.  It's generates a Pop() transition.
+				EOF handling 	An expression of type /+Code: Transition[]+/.
+			+/
+		}); 
+	} 
 	
 	
 	alias VLangScanner = StructureScanner_VLang.scanner; 

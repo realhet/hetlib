@@ -801,7 +801,7 @@ version(/+$DIDE_REGION+/all)
 		}
 	}
 	
-	//define aliases for colors
+	//define more aliases for colors
 	alias RG8	= RG,
 	RGB8	= RGB,
 	RGBA8 	= RGBA; 
@@ -1704,7 +1704,7 @@ version(/+$DIDE_REGION+/all)
 		{
 			static foreach(M; matrixSizes)
 			mixin(format!q{alias %smat%sx%s = Matrix!(%s, %s, %s); }(ComponentTypePrefix!T, N, M, T.stringof, N, M)); 
-				
+			
 			//symmetric matrices
 			mixin(format!q{alias %smat%s = %smat%sx%s; }(ComponentTypePrefix!T, N, ComponentTypePrefix!T, N, N)); 
 		}
@@ -3380,18 +3380,19 @@ version(/+$DIDE_REGION+/all)
 		
 		/// Mixins an std.math funct that will work on scalar or vector data. Cast the parameter at least to a float and calls fun()
 		private enum UnaryStdMathFunct(string name) = 
-		q{
-			auto #(A)(in A a) {
+		iq{
+			auto $(name)(A)(in A a)
+			{
 				static if(isComplex!A)
-				{ return std.complex.#(a); }
+				{ return std.complex.$(name)(a); }
 				else
 				{
 					alias CT = CommonScalarType!(A, float); 
-					alias fun = a => std.math.#(cast(CT) a); 
+					alias fun = a => std.math.$(name)(cast(CT) a); 
 					return a.generateVector!(CT, fun); 
 				}
 			} 
-		}.replace('#', name); 
+		}.text; 
 		
 		static foreach(s; "sin cos tan asin acos sinh cosh tanh asinh acosh atan".split(' '))
 		mixin(UnaryStdMathFunct!s); 
