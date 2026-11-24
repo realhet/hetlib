@@ -824,6 +824,7 @@ version(/+$DIDE_REGION+/all) {
 							[q{subtype_of},q{(常!(bool)(1))},q{(常!(bool)(0))},q{"is a subtype of"},q{["subtype of", "is a", "is an"]}],
 							[q{inverse_verb},q{(常!(bool)(1))},q{(常!(bool)(0))},q{"inverse verb"},q{[]}],
 							[q{instance_of},q{(常!(bool)(0))},q{(常!(bool)(1))},q{"is an instance of"},q{["instance of", "is a", "is an"]}],
+							[q{modified_to},q{(常!(bool)(0))},q{(常!(bool)(1))},q{"modified to"},q{["modified to"]}],
 							[q{/+
 								Regardless of processing schema or data, all SysVerbs must be the same!
 								Because `mode` must not select different sets of verbs, the sentence
@@ -882,7 +883,8 @@ version(/+$DIDE_REGION+/all) {
 					String, Int, Bool, Float, Double, 
 					Decimal, Money,
 					DateTime, Date, Time,
-					Blob, Bitmap, Audio, Video
+					Blob, Bitmap, Audio, Video,
+					DAG //Directed Acyclic Graph: A compact representation of hierarchic data.
 				} 
 				
 				static immutable 	sysTypeNames = EnumMemberNames!SysType,
@@ -969,10 +971,10 @@ version(/+$DIDE_REGION+/all) {
 				
 				
 				Idx[string] 	TypeIdx_by_name,
-						ETypeIdx_by_name,
-						DTypeIdxByName; string[Idx] 	TypeName_by_idx,
-						ETypeName_by_idx,
-						DTypeName_by_dx; 
+					ETypeIdx_by_name,
+					DTypeIdxByName; string[Idx] 	TypeName_by_idx,
+					ETypeName_by_idx,
+					DTypeName_by_dx; 
 				/+
 					EType: Entity,  DType: Data,  Type: EType ∪ DType
 					AType: Attribute type, not included in Type
@@ -1155,6 +1157,7 @@ version(/+$DIDE_REGION+/all) {
 				}
 				return idx; 
 			} 
+			
 			
 			version(/+$DIDE_REGION+/all) {
 				auto associations_by_SVT()
@@ -1172,200 +1175,198 @@ version(/+$DIDE_REGION+/all) {
 					const tvsPos = associations_by_TVS.lowerBound(assocIdx).length; 
 					indices.associations_by_TVS_impl.insertInPlace(tvsPos, assocIdx); 
 				} 
-				
-				Idx findAssociation(in Idx sourceIdx, in Idx verbIdx, in Idx targetIdx)
-				{
-					bool assocLessThan_SVT(Idx a)
+				
+				/+
+					static protected void repositionItem(alias pred = "a < b", T)(ref T[] arr, size_t index, T newValue)
 					{
-						const assocA = explore(a).assoc; 
-						if(assocA.source != sourceIdx) return assocA.source < sourceIdx; 
-						if(assocA.verb != verbIdx) return assocA.verb < verbIdx; 
-						return assocA.target < targetIdx; 
+						alias less = binaryFun!pred; 
+						auto oldValue = arr[index]; 
+						if(less(newValue, oldValue))
+						{
+							arr[index] = newValue; 
+							auto targetIdx = arr[0 .. index].assumeSorted!less.lowerBound(newValue).length; 
+							bringToFront(arr[targetIdx .. index], arr[index .. index + 1]); 
+						}
+						else if(less(oldValue, newValue))
+						{
+							arr[index] = newValue; 
+							auto offset = arr[index + 1 .. $].assumeSorted!less.lowerBound(newValue).length; 
+							auto targetIdx = index + 1 + offset; 
+							bringToFront(arr[index .. index + 1], arr[index + 1 .. targetIdx]); 
+						}
 					} 
 					
-					auto items = associations_by_SVT; 
 					
-					//Binary search implementation
+					void updateAssociationTarget(in Idx assocIdx, in Idx oldTargetIdx, in Idx newTargetIdx)
+					{
+						const svtPos = associations_by_SVT.lowerBound(assocIdx).length; 
+						assert(indices.associations_by_SVT_impl.get(svtPos)==assocIdx);
+						
+						const tvsPos = associations_by_TVS.lowerBound(assocIdx).length; 
+						assert(indices.associations_by_TVS_impl.get(tvsPos)==assocIdx);
+						
+						
+						if(oldTargetIdx == newTargetIdx) return; 
+					} 
+				+/
+				
+				
+				enum AssociationSearchMode : ubyte
+				{
+					exact,	//Returns matching array index, or -1 if not found
+					lowerBound, 	//Returns first array index where assoc >= target
+					upperBound 	//Returns first array index where assoc > target
+				}  enum AssociationSearchOrder : ubyte
+				{
+					SVT,	//Source, Verb, Target
+					TVS	//Target, Verb, Source
+				} 
+				
+				sizediff_t searchAssociationIdx(
+					AssociationSearchMode mode, 
+					AssociationSearchOrder order
+				)
+					(in Idx sourceIdx, in Idx verbIdx, in Idx targetIdx)
+				{
+					static assert(Idx.sizeof < long.sizeof); 
+					alias Mode = AssociationSearchMode, Order = AssociationSearchOrder; 
+					
+					static if(order==Order.SVT)
+					{
+						const items = indices.associations_by_SVT_impl; 
+						long compareAssoc(const ref Association a)
+						{
+							if(const d = long(a.source) - sourceIdx) return d; 
+							if(const d = long(a.verb) - verbIdx) return d; 
+							return long(a.target) - targetIdx; 
+						} 
+					}
+					else static if(order==Order.TVS)
+					{
+						const items = indices.associations_by_TVS_impl; 
+						long compareAssoc(const ref Association a)
+						{
+							if(const d = long(a.target) - targetIdx) return d; 
+							if(const d = long(a.verb) - verbIdx) return d; 
+							return long(a.source) - sourceIdx; 
+						} 
+					}
+					else static assert(0, "unhandled order"); 
+					
+					size_t low = 0, high = items.length; 
+					
+					while(low < high)
+					{
+						size_t mid = low + (high - low) / 2; 
+						const currentAssoc = explore(items[mid]).assoc; 
+						const cmp = compareAssoc(currentAssoc); 
+						
+						static if(mode == Mode.exact)
+						{
+							if(cmp == 0) return mid; 
+							else if(cmp < 0) low = mid + 1; 
+							else high = mid; 
+						}
+						else static if(mode == Mode.lowerBound)
+						{
+							if(cmp < 0) low = mid + 1; 
+							else high = mid; 
+						}
+						else static if(mode == Mode.upperBound)
+						{
+							if(cmp <= 0) low = mid + 1; 
+							else high = mid; 
+						}
+						else static assert(0, "unhandled mode"); 
+					}
+					
+					static if(mode == Mode.exact)	return -1; 
+					static if(
+						mode.among(
+							Mode.lowerBound,
+							Mode.upperBound
+						)
+					)	return low; 
+				} 
+				
+				Idx findAssociation(in Idx sourceIdx, in Idx verbIdx, in Idx targetIdx)
+				=> indices.associations_by_SVT_impl.get
+				(
+					searchAssociationIdx!(
+						AssociationSearchMode.exact, 
+						AssociationSearchOrder.SVT
+					)(sourceIdx, verbIdx, targetIdx)
+				); 
+			}
+			
+			
+			
+			enum CODE_LowerUpperSearch =
+			q{
+				static assert(Idx.sizeof < long.sizeof); 
+				version(/+$DIDE_REGION Find lower bound (first matching element)+/all)
+				{
 					size_t low = 0, high = items.length; 
 					while(low < high)
 					{
 						size_t mid = low + (high - low) / 2; 
 						const currentAssoc = explore(items[mid]).assoc; 
-						
-						// Check for exact match
-						if(
-							currentAssoc.source 	== sourceIdx 	&&
-							currentAssoc.verb 	== verbIdx 	&&
-							currentAssoc.target 	== targetIdx
-						) { return items[mid]; }
-						
-						// Determine which half to search
-						if(assocLessThan_SVT(items[mid]))	{ low = mid + 1; }
-						else	{ high = mid; }
+						if(compareAssoc(currentAssoc) < 0) { low = mid + 1; }
+						else { high = mid; }
 					}
-					
-					return 0; // Not found
-				} 
-			}
+					size_t lowerBound = low; 
+				}version(/+$DIDE_REGION Find upper bound (first element beyond matching range)+/all)
+				{
+					high = items.length; 
+					while(low < high)
+					{
+						size_t mid = low + (high - low) / 2; 
+						const currentAssoc = explore(items[mid]).assoc; 
+						if(compareAssoc(currentAssoc) <= 0) { low = mid + 1; }
+						else { high = mid; }
+					}
+					size_t upperBound = low; 
+				}
+				return items[lowerBound..upperBound]; 
+			}; 
 			
 			auto findAssociationsBySourceVerb(in Idx sourceIdx, in Idx verbIdx)
 			{
-				bool assocLessThan_SV(in Idx idx)
+				long compareAssoc(const ref Association a)
 				{
-					const assoc = explore(idx).assoc; 
-					if(assoc.source != sourceIdx) return assoc.source < sourceIdx; 
-					return assoc.verb < verbIdx; 
-				} 
-				
-				bool assocLessThanOrEqual_SV(in Idx idx)
-				{
-					const assoc = explore(idx).assoc; 
-					if(assoc.source != sourceIdx) return assoc.source <= sourceIdx; 
-					return assoc.verb <= verbIdx; 
+					if(const d = long(a.source) - sourceIdx) return d; 
+					return long(a.verb) - verbIdx; 
 				} 
 				
 				auto items = associations_by_SVT; 
-				
-				version(/+$DIDE_REGION Find lower bound (first matching element)+/all)
-				{
-					size_t low = 0, high = items.length; 
-					while(low < high)
-					{
-						size_t mid = low + (high - low) / 2; 
-						if(assocLessThan_SV(items[mid]))	{ low = mid + 1; }
-						else	{ high = mid; }
-					}
-					size_t lowerBound = low; 
-				}
-				
-				version(/+$DIDE_REGION Find upper bound (first element beyond matching range)+/all)
-				{
-					high = items.length; 
-					while(low < high)
-					{
-						size_t mid = low + (high - low) / 2; 
-						if(assocLessThanOrEqual_SV(items[mid]))	{ low = mid + 1; }
-						else	{ high = mid; }
-					}
-					size_t upperBound = low; 
-				}
-				
-				return ((lowerBound < upperBound)?(items[lowerBound..upperBound]) :(items[0..0])); 
-			} auto findAssociationsByVerbTarget(in Idx verbIdx, in Idx targetIdx)
+				mixin(CODE_LowerUpperSearch); 
+			} 	auto findAssociationsByVerbTarget(in Idx verbIdx, in Idx targetIdx)
 			{
-				bool assocLessThan_TV(in Idx idx)
+				long compareAssoc(const ref Association a)
 				{
-					const assoc = explore(idx).assoc; 
-					if(assoc.target != targetIdx) return assoc.target < targetIdx; 
-					return assoc.verb < verbIdx; 
-				} 
-				
-				bool assocLessThanOrEqual_TV(in Idx idx)
-				{
-					const assoc = explore(idx).assoc; 
-					if(assoc.target != targetIdx) return assoc.target <= targetIdx; 
-					return assoc.verb <= verbIdx; 
+					if(const d = long(a.target) - targetIdx) return d; 
+					return long(a.verb) - verbIdx; 
 				} 
 				
 				auto items = associations_by_TVS; 
-				
-				version(/+$DIDE_REGION Find lower bound (first matching element)+/all)
-				{
-					size_t low = 0, high = items.length; 
-					while(low < high)
-					{
-						size_t mid = low + (high - low) / 2; 
-						if(assocLessThan_TV(items[mid]))	{ low = mid + 1; }
-						else	{ high = mid; }
-					}
-					size_t lowerBound = low; 
-				}
-				
-				version(/+$DIDE_REGION Find upper bound (first element beyond matching range)+/all)
-				{
-					high = items.length; 
-					while(low < high)
-					{
-						size_t mid = low + (high - low) / 2; 
-						if(assocLessThanOrEqual_TV(items[mid]))	{ low = mid + 1; }
-						else	{ high = mid; }
-					}
-					size_t upperBound = low; 
-				}
-				
-				return ((lowerBound < upperBound)?(items[lowerBound..upperBound]) :(items[0..0])); 
+				mixin(CODE_LowerUpperSearch); 
 			} 
-			
 			auto findAssociationsBySource(in Idx sourceIdx)
 			{
-				bool assocLessThan_S(in Idx idx)
-				=> explore(idx).assoc.source < sourceIdx; 
-				
-				bool assocLessThanOrEqual_S(in Idx idx)
-				=> explore(idx).assoc.source <= sourceIdx; 
+				long compareAssoc(const ref Association a)
+				=> long(a.source) - sourceIdx; 
 				
 				auto items = associations_by_SVT; 
-				version(/+$DIDE_REGION Find lower bound (first matching element)+/all)
-				{
-					size_t low = 0, high = items.length; 
-					while(low < high)
-					{
-						size_t mid = low + (high - low) / 2; 
-						if(assocLessThan_S(items[mid])) { low = mid + 1; }
-						else { high = mid; }
-					}
-					size_t lowerBound = low; 
-				}
-				
-				version(/+$DIDE_REGION Find upper bound (first element beyond matching range)+/all)
-				{
-					high = items.length; 
-					while(low < high)
-					{
-						size_t mid = low + (high - low) / 2; 
-						if(assocLessThanOrEqual_S(items[mid])) { low = mid + 1; }
-						else { high = mid; }
-					}
-					size_t upperBound = low; 
-				}
-				
-				return ((lowerBound < upperBound)?(items[lowerBound..upperBound]) :(items[0..0])); 
-			} auto findAssociationsByTarget(in Idx targetIdx)
+				mixin(CODE_LowerUpperSearch); 
+			} 	auto findAssociationsByTarget(in Idx targetIdx)
 			{
-				bool assocLessThan_T(in Idx idx)
-				=> explore(idx).assoc.target < targetIdx; 
-				
-				bool assocLessThanOrEqual_T(in Idx idx)
-				=> explore(idx).assoc.target <= targetIdx; 
+				long compareAssoc(const ref Association a)
+				=> long(a.target) - targetIdx; 
 				
 				auto items = associations_by_TVS; 
-				version(/+$DIDE_REGION Find lower bound (first matching element)+/all)
-				{
-					size_t low = 0, high = items.length; 
-					while(low < high)
-					{
-						size_t mid = low + (high - low) / 2; 
-						if(assocLessThan_T(items[mid])) { low = mid + 1; }
-						else { high = mid; }
-					}
-					size_t lowerBound = low; 
-				}
-				
-				version(/+$DIDE_REGION Find upper bound (first element beyond matching range)+/all)
-				{
-					high = items.length; 
-					while(low < high)
-					{
-						size_t mid = low + (high - low) / 2; 
-						if(assocLessThanOrEqual_T(items[mid])) { low = mid + 1; }
-						else { high = mid; }
-					}
-					size_t upperBound = low; 
-				}
-				
-				return ((lowerBound < upperBound)?(items[lowerBound..upperBound]) :(items[0..0])); 
+				mixin(CODE_LowerUpperSearch); 
 			} 
-			/+Todo: Later when it is well tested, these binary search functions must be templatized.+/
+			
 			static struct Explorer
 			{
 				This db; Idx idx; 
@@ -1485,7 +1486,7 @@ version(/+$DIDE_REGION+/all) {
 					}
 				} 
 			} 
-			
+			
 			auto explore(in Idx idx)
 			=> Explorer(this, idx); 
 			
@@ -2044,6 +2045,55 @@ version(/+$DIDE_REGION+/all) {
 						assert(idx); return idx; 
 					} 
 					
+					Idx modify_attributeTarget(in Idx sourceIdx, in AMToken targetToken)
+					{
+						static if((常!(bool)(1))) print("...ATTRIBUTE modify to", sourceIdx, targetToken); 
+						
+						const vModifiedTo = access(SysVerb.modified_to); 
+						
+						Idx getUnmodifiedAttributeIdx(Idx a)
+						{
+							auto e = explore(a); 
+							while(e.isAssociation && e.verb.idx==vModifiedTo)
+							e = e.source; 
+							return e.idx; 
+						} 
+						const attrIdx = getUnmodifiedAttributeIdx(sourceIdx); 
+						
+						
+						//Todo: this is not good! Don't create new index, just rearrange the indices!
+						
+						Idx idx; 
+						if(isAttribute(attrIdx))
+						{
+							Idx accessTarget(Idx aTypeIdx)
+							{
+								const targetStr = evalStr(targetToken); 
+								auto aType = explore(aTypeIdx); enforce(aType.isAType); 
+								if(aType.target.isEType)	{ return expectEntity(targetToken); }
+								else {
+									//Todo: implement proper type handling
+									return access(asName(targetToken)); 
+								}
+							} 
+							
+							const aTypeIdx = explore(attrIdx).verb.idx; 
+							const targetIdx = accessTarget(aTypeIdx); 
+							
+							print(aTypeIdx, targetIdx); 
+							if(targetIdx != explore(sourceIdx).target.idx)
+							{ idx = access(sourceIdx, vModifiedTo, targetIdx); }
+							else
+							{
+								idx = sourceIdx; //no modification because the values are the same.
+							}
+							print(idx); 
+						}
+						else enforce(0, i"AType expected instead of $(sourceIdx)".text); 
+						
+						assert(idx); return idx; 
+					} 
+					
 					void processDataAssociation(bool canCreate)
 						(in AMToken sourceToken, in AMToken verbToken, in AMToken targetToken)
 					{
@@ -2061,7 +2111,10 @@ version(/+$DIDE_REGION+/all) {
 							{
 								with(SysVerb)
 								switch(sysVerb)
-								{ default: 	enforce(0, i"Invalid verb usage: $(sysVerb)".text); }
+								{
+									case modified_to: 	{ idx = modify_attributeTarget(sourceIdx, targetToken); }	break; 
+									default: 	enforce(0, i"Invalid verb usage: $(sysVerb)".text); 
+								}
 							}
 							else
 							{

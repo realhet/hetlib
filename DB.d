@@ -3099,18 +3099,15 @@ version(/+$DIDE_REGION+/all) {
 				} 
 			} 
 			
-			static assert(
-				(){
-					auto a = new SortedKeyArray!int([8,1,3]); 
-					[0,2,6,5,4,7,9].each!((x)=>(a.insert(x))); 
-					enforce(a[].equal(iota(10))); 
-					enforce(a.lowerBound(5).equal(iota(5))); 
-					enforce(a.upperBound(5).equal([6,7,8,9])); 
-					return true; 
-				}()
-			); 
-			
-			public/+Todo: amdb uses is. Make it accessible!+/ struct SortedAssocArray(K, V)
+			static assert((){
+				auto a = new SortedKeyArray!int([8,1,3]); 
+				[0,2,6,5,4,7,9].each!((x)=>(a.insert(x))); 
+				enforce(a[].equal(iota(10))); 
+				enforce(a.lowerBound(5).equal(iota(5))); 
+				enforce(a.upperBound(5).equal([6,7,8,9])); 
+				return true; 
+			}()); 
+			public struct SortedAssocArray(K, V)
 			{
 				K[] keys/+sorted+/; V[] values; 
 				void clear() { keys = null, values = null; } 
@@ -3146,16 +3143,14 @@ version(/+$DIDE_REGION+/all) {
 			
 			void testSortedAssocArray()
 			{
-				enforce(
-					(){
-						SortedAssocArray!(int, string) a; 
-						a = [8:"8", 1:"1", 3:"3"]; 
-						[0,2,6,5,4,7,9].each!((x)=>(a[x] = x.text)); 
-						enforce(a.byKey.equal(iota(10))); 
-						enforce(a.byKey.all!((k)=>(k.text==*(k in a)))); 
-						return true; 
-					}()
-				); 
+				enforce((){
+					SortedAssocArray!(int, string) a; 
+					a = [8:"8", 1:"1", 3:"3"]; 
+					[0,2,6,5,4,7,9].each!((x)=>(a[x] = x.text)); 
+					enforce(a.byKey.equal(iota(10))); 
+					enforce(a.byKey.all!((k)=>(k.text==*(k in a)))); 
+					return true; 
+				}()); 
 			} 
 			
 		} 
