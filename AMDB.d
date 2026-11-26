@@ -4,6 +4,7 @@ import het;
 
 
 version(/+$DIDE_REGION+/all) {
+	alias Association = AMDB.Association /+Todo: Remove this backlink somehow+/; 
 	struct SER
 	{
 		align(1) static: 
@@ -11,14 +12,7 @@ version(/+$DIDE_REGION+/all) {
 		version(/+$DIDE_REGION+/all)
 		{
 			version(/+$DIDE_REGION+/all)
-			{
-				struct Null {} 
-				struct Bool(bool val) {} 
-				struct FN/+field name+/ { char ch; } 
-				struct Assoc(IT) { IT source, verb, target; } 
-				struct EType(IT) { IT source, verb, target; } 
-				struct AType(IT) { IT source, verb, target; } 
-			}
+			{ struct Null {}  struct Bool(bool val) {}  struct FN/+field name+/ { char ch; }  struct Assoc(uint bitsPerField) {} }
 			enum TypeMatrix = 
 			(表([
 				[q{/+Note:+/},q{/+Note: _0+/},q{/+Note: _1+/},q{/+Note: _2+/},q{/+Note: _3+/},q{/+Note: _4+/},q{/+Note: _5+/},q{/+Note: _6+/},q{/+Note: _7+/},q{/+Note: _8+/},q{/+Note: _9+/},q{/+Note: _A+/},q{/+Note: _B+/},q{/+Note: _C+/},q{/+Note: _D+/},q{/+Note: _E+/},q{/+Note: _F+/}],
@@ -30,8 +24,8 @@ version(/+$DIDE_REGION+/all) {
 				[q{/+Note: 5_+/},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{}],
 				[q{/+Note: 6_+/},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{}],
 				[q{/+Note: 7_+/},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{}],
-				[q{/+Note: 8_+/},q{EType!ubyte},q{EType!ushort},q{EType!uint},q{EType!ulong},q{Assoc!ubyte},q{Assoc!ushort},q{Assoc!uint},q{Assoc!ulong},q{},q{},q{},q{},q{},q{RG},q{RGB},q{RGBA}],
-				[q{/+Note: 9_+/},q{AType!ubyte},q{AType!ushort},q{AType!uint},q{AType!ulong},q{},q{},q{},q{},q{FN[ubyte]},q{FN[ushort]},q{FN[uint]},q{FN[ulong]},q{},q{ivec2},q{ivec3},q{ivec4}],
+				[q{/+Note: 8_+/},q{},q{},q{},q{},q{Assoc!13},q{Assoc!24},q{Assoc!32},q{Assoc!40},q{},q{},q{},q{},q{},q{RG},q{RGB},q{RGBA}],
+				[q{/+Note: 9_+/},q{},q{},q{},q{},q{},q{},q{},q{},q{FN[ubyte]},q{FN[ushort]},q{FN[uint]},q{FN[ulong]},q{},q{ivec2},q{ivec3},q{ivec4}],
 				[q{/+Note: A_+/},q{byte},q{short},q{int},q{long},q{float},q{double},q{Bool!false},q{Bool!true},q{char[ubyte]},q{char[ushort]},q{char[uint]},q{char[ulong]},q{},q{vec2},q{vec3},q{vec4}],
 				[q{/+Note: B_+/},q{ubyte},q{ushort},q{uint},q{ulong},q{},q{},q{DateTime},q{Date},q{ubyte[ubyte]},q{ubyte[ushort]},q{ubyte[uint]},q{ubyte[ulong]},q{},q{dvec2},q{dvec3},q{dvec4}],
 				[q{/+Note: C_+/},q{char[0]},q{char[1]},q{char[2]},q{char[3]},q{char[4]},q{char[5]},q{char[6]},q{char[7]},q{char[8]},q{char[9]},q{char[10]},q{char[11]},q{char[12]},q{char[13]},q{char[14]},q{char[15]}],
@@ -132,39 +126,12 @@ version(/+$DIDE_REGION+/all) {
 				static if(is(T==DateTime)) { stream.put((cast(ubyte*)(&data.raw))[0..8]); }
 				else static if(is(T==Date)) { stream.put((cast(ubyte*)(&data.raw))[0..3/+⚠ not 4!+/]); }
 				else static assert(0, "Unhandled type: "~T.stringof); 
-			} 
+			} 
+			
 			static serializeVector(R, CT, int N)(R stream, in Vector!(CT, N) data)
 			{
 				alias VT = typeof(data); 
 				stream.put(TypeCode!VT); stream.put((cast(ubyte*)(&data))[0..VT.sizeof]); 
-			} 
-			
-			static serializeAssoc(R, T)(R stream, in T data)
-			{
-				alias AT = mixin(Unqual!T.stringof.split('!')[0]); 
-				static if(is(T==AT!Idx, Idx))
-				{
-					static if(OptimizeSerialization)
-					{
-						static maxIndex(T)(in T a) => max(a.source, a.verb, a.target); 
-						auto downgrade(Idx)()
-						=> AT!Idx((cast(Idx)(data.source)), (cast(Idx)(data.verb)), (cast(Idx)(data.target))); 
-						alias Types=AliasSeq!(uint, ushort, ubyte); 
-						static foreach(i; 0..Types.length-1)
-						static if(is(Idx==Types[i]))
-						{
-							if(maxIndex(data)<=Types[i+1].max)
-							{
-								const tmp = downgrade!(Types[i+1]); 
-								serializeAssoc(stream, tmp); return; 
-							}
-						}
-					}
-					
-					stream.put(TypeCode!T); 
-					stream.put((cast(ubyte*)(&data))[0..T.sizeof]); 
-				}
-				else static assert(0, "Unhandled type: "~T.stringof); 
 			} 
 			
 			static serialize(R, T)(R stream, in T data)
@@ -183,11 +150,239 @@ version(/+$DIDE_REGION+/all) {
 				)	{ serializeDateTime(stream, data); }
 				else static if(isVector!T)	{ serializeVector(stream, data); }
 				else static if(
-					is(T==Assoc!X, X)||
-					is(T==EType!X, X)||
-					is(T==AType!X, X)
-				)	{ serializeAssoc(stream, data); }
+					false && is(T==Assoc!X, X)
+					/+
+						||is(T==EType!X, X)||
+						is(T==AType!X, X)
+					+/
+				)	{/+serializeAssoc(stream, data); +/}
 				else static assert(0, "Unhandled type: "~T.stringof); 
+			} 
+			enum TCA13 	= TypeCode!(Assoc!13), 
+			TCA24 	= TypeCode!(Assoc!24), 
+			TCA32 	= TypeCode!(Assoc!32),
+			TCA40 	= TypeCode!(Assoc!40)/+Todo: support this! 1TiB max size.+/; 
+			
+			bool typeCodeIsAssociation(in ubyte typeCode)
+			=> mixin(界3(q{TCA13},q{typeCode},q{TCA40})); 
+			
+			auto serializeAssoc(R)(R stream, in uint source, in uint verb, in uint target)
+			{
+				const m = max(source, verb).max(target); 
+				if(m < (1U<<13))
+				{
+					//8 bit type, 13 bit source, 13 bit verb, 13 bit target, 1 bit unused
+					ulong raw = TCA13 	| (ulong(source)<<8) 
+						| (ulong(verb)<<(8+13)) 
+						| (ulong(target)<<(8+13*2)); 
+					stream.put((cast(ubyte*)(&raw))[0..6]); 
+				}
+				else if(m < (1U<<24))
+				{
+					//8 bit type, 24 bit source, 24 bit verb, 24 bit target
+					ulong[2] raw; 
+					raw[0] = TCA24 	| (ulong(source)<<8) 
+						| (ulong(verb)<<(8+24)) 
+						| (ulong(target)<<(8+24*2)),
+					raw[1] = 	ulong(target)>>8; 
+					stream.put((cast(ubyte*)(raw.ptr))[0..10]); 
+				}
+				else
+				{
+					//8 bit type, 32 bit source, 32 bit verb, 32 bit target
+					ulong[2] raw; 
+					raw[0] = TCA32 	| (ulong(source) <<  8)
+						| (ulong(verb)   << (8+32)),
+					raw[1] = 	 (ulong(verb) >> 24) 
+						| (ulong(target) << (8)); 
+					stream.put((cast(ubyte*)raw.ptr)[0..13]); 
+				}
+			} 
+			
+			Association decodeAssoc(in const(ubyte)[] stream)
+			{
+				if(
+					stream.length < 6 /+
+						Smallest length 
+						for fieldBits=13
+					+/
+				) return Association.init; 
+				
+				const ubyte* p = stream.ptr; 
+				const ubyte type = p[0]; 
+				
+				switch(type)
+				{
+					case TCA13: /+size already checked.+/
+					{
+						const ulong raw = *cast(const uint*)(p + 1)
+						| (cast(ulong) *cast(const ushort*)(p + 5) << 32); 
+						return Association(
+							cast(uint)((raw  ) & 0x1FFF),
+							cast(uint)((raw >> 13) & 0x1FFF),
+							cast(uint)((raw >> 26) & 0x1FFF)
+						); 
+					}
+					
+					case TCA24: if(stream.length < 10) return Association.init; 
+					{
+						const ulong w0 = *cast(const ulong*)(p + 1); 
+						const uint  w1 = *cast(const ushort*)(p + 9); 
+						return Association(
+							cast(uint)( w0 & 0x00FFFFFF),
+							cast(uint)((w0 >> 24)  & 0x00FFFFFF),
+							cast(uint)((w0 >> 48)   )
+							| (w1 & 0xFF) << 16
+						); 
+					}
+					
+					case TCA32: if(stream.length < 13) return Association.init; 
+					{
+						const ulong w0 = *cast(const ulong*)(p + 1); 
+						const uint  w1 = *cast(const uint*)(p + 9); 
+						return Association(
+							cast(uint) w0,
+							cast(uint)(w0 >> 32),
+							w1
+						); 
+					}
+					
+					default: 
+					return Association.init; 
+				}
+			} 
+			
+			
+			static void test_assoc()
+			{
+				void check(string name, uint source, uint verb, uint target, in ubyte[] expected)
+				{
+					auto s = appender!(ubyte[]); 
+					
+					serializeAssoc(s, source, verb, target); 
+					
+					if(!equal(s[], expected))
+					{
+						writefln!"FAIL %s  input=(0x%08X, 0x%08X, 0x%08X)"(name, source, verb, target); 
+						writefln!"  got : %(%02X %)"(s.data); 
+						writefln!"  expected: %(%02X %)"(expected); 
+					}
+					else
+					{
+						writefln!"  ok   %s  (%d bytes)"(name, s.data.length); 
+						
+						auto a = decodeAssoc(s[]); 
+						if(!(a.source==source && a.verb==verb && a.target==target))
+						{
+							writefln!"Decoder FAIL   got : =(0x%08X, 0x%08X, 0x%08X)"(a.source, a.verb, a.target); 
+								writefln!"   expected: =(0x%08X, 0x%08X, 0x%08X)"(  source,   verb,   target); 
+						}
+					}
+				} 
+				
+				check(
+					"01 zero",
+					0x00000000, 0x00000000, 0x00000000,
+					[TCA13, 0x00, 0x00, 0x00, 0x00, 0x00]
+				); 
+				
+				check(
+					"02 S=max13",
+					0x00001FFF, 0x00000000, 0x00000000,
+					[TCA13, 0xFF, 0x1F, 0x00, 0x00, 0x00]
+				); 
+				
+				check(
+					"03 V=max13",
+					0x00000000, 0x00001FFF, 0x00000000,
+					[TCA13, 0x00, 0xE0, 0xFF, 0x03, 0x00]
+				); 
+				
+				check(
+					"04 T=max13",
+						0x00000000, 0x00000000, 0x00001FFF,
+					[TCA13, 0x00, 0x00, 0x00, 0xFC, 0x7F]
+				); 
+				
+				check(
+					"05 promote 13->24 by S",
+					0x00002000, 0x00000000, 0x00000000,
+					[TCA24, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+				); 
+				
+				check(
+					"06 promote 13->24 by V",
+					0x00000000, 0x00002000, 0x00000000,
+					[TCA24, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00]
+				); 
+				
+				check(
+					"07 promote 13->24 by T",
+					0x00000000, 0x00000000, 0x00002000,
+					[TCA24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00]
+				); 
+				
+				check(
+					"08 S=max24",
+					0x00FFFFFF, 0x00000000, 0x00000000,
+					[TCA24, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+				); 
+				
+				check(
+					"09 V=max24",
+					0x00000000, 0x00FFFFFF, 0x00000000,
+					[TCA24, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00]
+				); 
+				
+				check(
+					"10 T=max24",
+					0x00000000, 0x00000000, 0x00FFFFFF,
+					[TCA24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF]
+				); 
+				
+				check(
+					"11 promote 24->32 by S",
+					0x01000000, 0x00000000, 0x00000000,
+					[TCA32, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+				); 
+				
+				check(
+					"12 promote 24->32 by V",
+					0x00000000, 0x01000000, 0x00000000,
+					[TCA32, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00]
+				); 
+				
+				check(
+					"13 promote 24->32 by T",
+					0x00000000, 0x00000000, 0x01000000,
+					[TCA32, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01]
+				); 
+				
+				check(
+					"14 all max uint",
+					0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
+					[TCA32, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
+				); 
+				
+				check(
+					"15 random high-entropy",
+					0xDEADBEEF, 0xCAFEBABE, 0xFEEDFACE,
+					[TCA32, 0xEF, 0xBE, 0xAD, 0xDE, 0xBE, 0xBA, 0xFE, 0xCA, 0xCE, 0xFA, 0xED, 0xFE]
+				); 
+				
+				check(
+					"16 high bytes zero, tier=13",
+					0x00001FFF, 0x00000000, 0x00000000,
+					[TCA13, 0xFF, 0x1F, 0x00, 0x00, 0x00]
+				); 
+				
+				check(
+					"17 mixed 24-bit, V triggers",
+					0x000000FF, 0x0000ABCD, 0x00001234,
+					[TCA24, 0xFF, 0x00, 0x00, 0xCD, 0xAB, 0x00, 0x34, 0x12, 0x00]
+				); 
+				
+				writeln("all tests passed"); 
 			} 
 		}
 		version(/+$DIDE_REGION Deserialization+/all)
@@ -565,15 +760,16 @@ version(/+$DIDE_REGION+/all) {
 		with(SER)
 		{
 			auto 試(A...)(A args) { auto arr = appender!(ubyte[]); serialize(arr, args); return arr[].hexDump; } 
-			((0x49FCEB4AA1C7).檢 (試("a"w))),((0x4A1FEB4AA1C7).檢 (試("abcá"))),((0x4A45EB4AA1C7).檢 (試("Hello 🌍!\0"w.replicate(2)))),
-			((0x4A86EB4AA1C7).檢 (試(false))),((0x4AAAEB4AA1C7).檢 (試(true))),((0x4ACDEB4AA1C7).檢 (試(Null()))),
-			((0x4AF7EB4AA1C7).檢 (試(42))),((0x4B18EB4AA1C7).檢 (試(7848))),((0x4B3BEB4AA1C7).檢 (試(437928932))),((0x4B63EB4AA1C7).檢 (試(437928932437928932))),
-			((0x4B99EB4AA1C7).檢 (試(-42))),((0x4BBBEB4AA1C7).檢 (試(-7848))),((0x4BDFEB4AA1C7).檢 (試(-437928932))),((0x4C08EB4AA1C7).檢 (試(-437928932437928932))),
-			((0x4C3FEB4AA1C7).檢 (試(1.5))),((0x4C61EB4AA1C7).檢 (試(1.51))),((0x4C84EB4AA1C7).檢 (試(1.51f))),
-			((0x4CADEB4AA1C7).檢 (試(now))),((0x4CCFEB4AA1C7).檢 (試(now.date))),
-			((0x4CFBEB4AA1C7).檢 (試(vec2(1, 2)))),((0x4D24EB4AA1C7).檢 (試((RGB(54,60,175))))),((0x4D53EB4AA1C7).檢 (試(ivec4(1, 2, 3, 4)))),((0x4D83EB4AA1C7).檢 (試(dvec2((sqrt(π)), ((π)^^(2)))))),
-			((0x4DC5EB4AA1C7).檢 (試(AType!ubyte(1, 2, 3)))),((0x4DF8EB4AA1C7).檢 (試(Assoc!ushort(4, 256, 6)))),((0x4E2EEB4AA1C7).檢 (試(EType!uint(7, 8, 65536)))),
-			((0x4E69EB4AA1C7).檢 (試(Assoc!ubyte(1, 2, 3)))),((0x4E9CEB4AA1C7).檢 (試(EType!ushort(4, 5, 6)))),((0x4ED0EB4AA1C7).檢 (試(AType!uint(7, 8, 9)))); 
+			auto 試A(A...)(A args) { auto arr = appender!(ubyte[]); serializeAssoc(arr, args); return arr[].hexDump; } 
+			((0x5F80EB4AA1C7).檢 (試("a"w))),((0x5FA3EB4AA1C7).檢 (試("abcá"))),((0x5FC9EB4AA1C7).檢 (試("Hello 🌍!\0"w.replicate(2)))),
+			((0x600AEB4AA1C7).檢 (試(false))),((0x602EEB4AA1C7).檢 (試(true))),((0x6051EB4AA1C7).檢 (試(Null()))),
+			((0x607BEB4AA1C7).檢 (試(42))),((0x609CEB4AA1C7).檢 (試(7848))),((0x60BFEB4AA1C7).檢 (試(437928932))),((0x60E7EB4AA1C7).檢 (試(437928932437928932))),
+			((0x611DEB4AA1C7).檢 (試(-42))),((0x613FEB4AA1C7).檢 (試(-7848))),((0x6163EB4AA1C7).檢 (試(-437928932))),((0x618CEB4AA1C7).檢 (試(-437928932437928932))),
+			((0x61C3EB4AA1C7).檢 (試(1.5))),((0x61E5EB4AA1C7).檢 (試(1.51))),((0x6208EB4AA1C7).檢 (試(1.51f))),
+			((0x6231EB4AA1C7).檢 (試(now))),((0x6253EB4AA1C7).檢 (試(now.date))),
+			((0x627FEB4AA1C7).檢 (試(vec2(1, 2)))),((0x62A8EB4AA1C7).檢 (試((RGB(54,60,175))))),((0x62D7EB4AA1C7).檢 (試(ivec4(1, 2, 3, 4)))),((0x6307EB4AA1C7).檢 (試(dvec2((sqrt(π)), ((π)^^(2)))))),
+			((0x6349EB4AA1C7).檢 (試A(1, 2, 3))),((0x6370EB4AA1C7).檢 (試A(4, 256, 6))),((0x6399EB4AA1C7).檢 (試A(7, 8, 65536))),
+			((0x63C9EB4AA1C7).檢 (試A(1, 2, 3))),((0x63F0EB4AA1C7).檢 (試A(4, 5, 6))),((0x6417EB4AA1C7).檢 (試A(7, 8, 9))); 
 		}
 	} 
 	
@@ -734,7 +930,7 @@ Mary Davis  customer of  Amazon
 			auto am = new AMDBTest; 
 			am.schema(schemaSrc); 
 			am.data(dataSrc); 
-			((0x5E87EB4AA1C7).檢 (am.dump)); 
+			((0x73C3EB4AA1C7).檢 (am.dump)); 
 		}
 	} 
 }
@@ -948,7 +1144,11 @@ version(/+$DIDE_REGION+/all) {
 				} 
 				
 				Idx append(in Idx source, in Idx verb, in Idx target)
-				=> append(SER.Assoc!Idx(source, verb, target)); 
+				{
+					const res = stream[].length.to!Idx; 
+					SER.serializeAssoc(stream, source, verb, target); 
+					return res; 
+				} 
 				
 				string hexDump() const => stream[].hexDump; 
 			} 
@@ -1305,11 +1505,11 @@ version(/+$DIDE_REGION+/all) {
 			{
 				Idx idx = findAssociation(sourceIdx, verbIdx, targetIdx); 
 				if(!idx) {
-					idx = stream.append(SER.Assoc!Idx(sourceIdx, verbIdx, targetIdx)); 
+					idx = stream.append(sourceIdx, verbIdx, targetIdx); 
 					insertAssociation(idx); 
 				}
 				return idx; 
-			} 
+			} 
 			
 			version(/+$DIDE_REGION+/all) {
 				auto associations_by_SVT()
@@ -1384,11 +1584,12 @@ version(/+$DIDE_REGION+/all) {
 mert ha novekszik a merete, akkor elrontja az utana kovetkezo stream-et."
 					); 
 					
-					ubyte[] assoc = stream.stream[][assocIdx..$][0..1+3*2]; 
-					assoc.hexDump.print; 
-					enforce(assoc[0]==0x85 /+16bit*3+/); 
-					(cast(ushort[])(assoc[5..7]))[0] = newTargetIdx.to!ushort; 
-					
+					/+
+						ubyte[] assoc = stream.stream[][assocIdx..$][0..1+3*2]; 
+						assoc.hexDump.print; 
+						enforce(assoc[0]==0x85 /+16bit*3+/); 
+						(cast(ushort[])(assoc[5..7]))[0] = newTargetIdx.to!ushort; 
+					+/
 				} 
 				
 				
@@ -1407,40 +1608,11 @@ mert ha novekszik a merete, akkor elrontja az utana kovetkezo stream-et."
 				=> !idx;  bool opCast(B : bool)()
 				=> !isNull; 
 				
-				bool isAssociation() const => mixin(界3(q{
-					SER.TypeCode!
-					(SER.Assoc!ubyte)
-				},q{db.stream.stream[][idx]},q{
-					SER.TypeCode!
-					(SER.Assoc!uint)
-				})); 
+				bool isAssociation() const
+				=> SER.typeCodeIsAssociation(db.stream.stream[].get(idx)); 
 				
-				auto assoc() const
-				{
-					Association res; 
-					if(!isNull)
-					{
-						const 	st = db.stream.stream[],
-							type = st[idx]; 
-						switch(type)
-						{
-							case SER.TypeCode!
-							(SER.Assoc!ubyte): 	res.source 	= st[idx+1+0],
-							res.verb 	= st[idx+1+1],
-							res.target 	= st[idx+1+2]; 	break; 
-							case SER.TypeCode!
-							(SER.Assoc!ushort): 	res.source 	= *(cast(ushort*)(&st[idx+1+0])),
-							res.verb 	= *(cast(ushort*)(&st[idx+1+2])),
-							res.target 	= *(cast(ushort*)(&st[idx+1+4])); 	break; 
-							case SER.TypeCode!
-							(SER.Assoc!uint): 	res.source 	= *(cast(uint*)(&st[idx+1+0])),
-							res.verb 	= *(cast(uint*)(&st[idx+1+4])),
-							res.target 	= *(cast(uint*)(&st[idx+1+8])); 	break; 
-							default: 
-						}
-					}
-					return res; 
-				} 
+				Association assoc() const
+				=> ((isNull)?(Association.init) :(SER.decodeAssoc(db.stream.stream[][idx..$]))); 
 				
 				version(/+$DIDE_REGION+/all) {
 					auto source() => Explorer(db, assoc.source); 
@@ -1474,10 +1646,7 @@ mert ha novekszik a merete, akkor elrontja az utana kovetkezo stream-et."
 						{
 							case SER.TypeCode!
 							(SER.Null): 	return "null"; 
-							case SER.TypeCode!
-							(SER.Assoc!ubyte): case SER.TypeCode!
-							(SER.Assoc!ushort): case SER.TypeCode!
-							(SER.Assoc!uint): 	return i"assoc($(idx))".text; 
+							case SER.TCA13: .. case SER.TCA40: 	return i"assoc($(idx))".text; 
 							case SER.TypeCode!
 							(char[0]): .. case SER.TypeCode!
 							(char[SER.TinyStringMaxLength]): 	return (cast(string)(
@@ -1500,10 +1669,7 @@ mert ha novekszik a merete, akkor elrontja az utana kovetkezo stream-et."
 					{
 						case SER.TypeCode!
 						(SER.Null): 	return id~"null"; 
-						case SER.TypeCode!
-						(SER.Assoc!ubyte): case SER.TypeCode!
-						(SER.Assoc!ushort): case SER.TypeCode!
-						(SER.Assoc!uint): 	return id~i"assoc($(source.dump), $(verb.dump), $(target.dump))".text; 
+						case SER.TCA13: .. case SER.TCA40: 	return id~i"assoc($(source.dump), $(verb.dump), $(target.dump))".text; 
 						case SER.TypeCode!
 						(char[0]): .. case SER.TypeCode!
 						(char[SER.TinyStringMaxLength]): 	return id~(cast(string)(
@@ -2139,12 +2305,12 @@ mert ha novekszik a merete, akkor elrontja az utana kovetkezo stream-et."
 						if(oldTargetIdx != newTargetIdx)
 						{
 							enforce(!findAssociation(sourceIdx, aTypeIdx, newTargetIdx), "Association's newTarget already exists."); 
-							stream.append(SER.Assoc!Idx(attrIdx, access(SysVerb.modified_to), newTargetIdx)); 
+							stream.append(attrIdx, access(SysVerb.modified_to), newTargetIdx); 
 							updateAssociationTarget(attrIdx, sourceIdx, aTypeIdx, oldTargetIdx, newTargetIdx); 
 						}
 						
 						return attrIdx; 
-					} 
+					} 
 					
 					void processDataAssociation(bool canCreate)
 						(in AMToken sourceToken, in AMToken verbToken, in AMToken targetToken)
