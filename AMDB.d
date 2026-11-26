@@ -12,7 +12,11 @@ version(/+$DIDE_REGION+/all) {
 		version(/+$DIDE_REGION+/all)
 		{
 			version(/+$DIDE_REGION+/all)
-			{ struct Null {}  struct Bool(bool val) {}  struct FN/+field name+/ { char ch; }  struct Assoc(uint bitsPerField) {} }
+			{
+				struct Null {}  struct Bool(bool val) {}  struct FN/+field name+/ { char ch; }  
+				struct Assoc(uint bitsPerField) { ubyte[(bitsPerField*3+7)/8] raw; } 
+				struct Redirect { uint lo; ubyte hi; } static assert(Redirect.sizeof <= Assoc!13.sizeof); 
+			}
 			enum TypeMatrix = 
 			(表([
 				[q{/+Note:+/},q{/+Note: _0+/},q{/+Note: _1+/},q{/+Note: _2+/},q{/+Note: _3+/},q{/+Note: _4+/},q{/+Note: _5+/},q{/+Note: _6+/},q{/+Note: _7+/},q{/+Note: _8+/},q{/+Note: _9+/},q{/+Note: _A+/},q{/+Note: _B+/},q{/+Note: _C+/},q{/+Note: _D+/},q{/+Note: _E+/},q{/+Note: _F+/}],
@@ -25,7 +29,7 @@ version(/+$DIDE_REGION+/all) {
 				[q{/+Note: 6_+/},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{}],
 				[q{/+Note: 7_+/},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{},q{}],
 				[q{/+Note: 8_+/},q{},q{},q{},q{},q{Assoc!13},q{Assoc!24},q{Assoc!32},q{Assoc!40},q{},q{},q{},q{},q{},q{RG},q{RGB},q{RGBA}],
-				[q{/+Note: 9_+/},q{},q{},q{},q{},q{},q{},q{},q{},q{FN[ubyte]},q{FN[ushort]},q{FN[uint]},q{FN[ulong]},q{},q{ivec2},q{ivec3},q{ivec4}],
+				[q{/+Note: 9_+/},q{},q{},q{},q{},q{Redirect},q{},q{},q{},q{FN[ubyte]},q{FN[ushort]},q{FN[uint]},q{FN[ulong]},q{},q{ivec2},q{ivec3},q{ivec4}],
 				[q{/+Note: A_+/},q{byte},q{short},q{int},q{long},q{float},q{double},q{Bool!false},q{Bool!true},q{char[ubyte]},q{char[ushort]},q{char[uint]},q{char[ulong]},q{},q{vec2},q{vec3},q{vec4}],
 				[q{/+Note: B_+/},q{ubyte},q{ushort},q{uint},q{ulong},q{},q{},q{DateTime},q{Date},q{ubyte[ubyte]},q{ubyte[ushort]},q{ubyte[uint]},q{ubyte[ulong]},q{},q{dvec2},q{dvec3},q{dvec4}],
 				[q{/+Note: C_+/},q{char[0]},q{char[1]},q{char[2]},q{char[3]},q{char[4]},q{char[5]},q{char[6]},q{char[7]},q{char[8]},q{char[9]},q{char[10]},q{char[11]},q{char[12]},q{char[13]},q{char[14]},q{char[15]}],
@@ -149,13 +153,7 @@ version(/+$DIDE_REGION+/all) {
 					is(T==Date)
 				)	{ serializeDateTime(stream, data); }
 				else static if(isVector!T)	{ serializeVector(stream, data); }
-				else static if(
-					false && is(T==Assoc!X, X)
-					/+
-						||is(T==EType!X, X)||
-						is(T==AType!X, X)
-					+/
-				)	{/+serializeAssoc(stream, data); +/}
+				else static if(is(T==Association))	{ serializeAssoc(stream, data.source, data.verb, data.target); }
 				else static assert(0, "Unhandled type: "~T.stringof); 
 			} 
 			enum TCA13 	= TypeCode!(Assoc!13), 
@@ -199,52 +197,56 @@ version(/+$DIDE_REGION+/all) {
 				}
 			} 
 			
-			Association decodeAssoc(in const(ubyte)[] stream)
+			Association decodeAssoc(const(ubyte)[] stream, size_t idx)
 			{
-				if(
-					stream.length < 6 /+
-						Smallest length 
-						for fieldBits=13
-					+/
-				) return Association.init; 
+				enum smallestLen = Assoc!13.sizeof+1; 
+				if(idx+smallestLen > stream.length) return Association.init; 
 				
-				const ubyte* p = stream.ptr; 
+				auto s = stream[idx..$]; 
+				
+				const ubyte* p = s.ptr; 
 				const ubyte type = p[0]; 
 				
 				switch(type)
 				{
 					case TCA13: /+size already checked.+/
 					{
-						const ulong raw = *cast(const uint*)(p + 1)
-						| (cast(ulong) *cast(const ushort*)(p + 5) << 32); 
+						const ulong raw = *(cast(const uint*)(p + 1))
+						| (cast(ulong) *(cast(const ushort*)(p + 5)) << 32); 
 						return Association(
-							cast(uint)((raw  ) & 0x1FFF),
-							cast(uint)((raw >> 13) & 0x1FFF),
-							cast(uint)((raw >> 26) & 0x1FFF)
+							(cast(uint)((raw  ) & 0x1FFF)),
+							(cast(uint)((raw >> 13) & 0x1FFF)),
+							(cast(uint)((raw >> 26) & 0x1FFF))
 						); 
 					}
 					
-					case TCA24: if(stream.length < 10) return Association.init; 
+					case TCA24: if(s.length < 10) return Association.init; 
 					{
-						const ulong w0 = *cast(const ulong*)(p + 1); 
-						const uint  w1 = *cast(const ushort*)(p + 9); 
+						const ulong w0 = *(cast(const ulong*)(p + 1)); 
+						const uint  w1 = *(cast(const ushort*)(p + 9)); 
 						return Association(
-							cast(uint)( w0 & 0x00FFFFFF),
-							cast(uint)((w0 >> 24)  & 0x00FFFFFF),
-							cast(uint)((w0 >> 48)   )
+							(cast(uint)( w0 & 0x00FFFFFF)),
+							(cast(uint)((w0 >> 24) & 0x00FFFFFF)),
+							(cast(uint)((w0 >> 48)))
 							| (w1 & 0xFF) << 16
 						); 
 					}
 					
-					case TCA32: if(stream.length < 13) return Association.init; 
+					case TCA32: if(s.length < 13) return Association.init; 
 					{
-						const ulong w0 = *cast(const ulong*)(p + 1); 
-						const uint  w1 = *cast(const uint*)(p + 9); 
+						const ulong w0 = *(cast(const ulong*)(p + 1)); 
+						const uint  w1 = *(cast(const uint*)(p + 9)); 
 						return Association(
-							cast(uint) w0,
-							cast(uint)(w0 >> 32),
+							(cast(uint)(w0)),
+							(cast(uint)(w0 >> 32)),
 							w1
 						); 
+					}
+					
+					case TypeCode!Redirect: 
+					{
+						auto r = (cast(const Redirect*)(p + 1)); 
+						return decodeAssoc(stream, r.lo + (ulong(r.hi)<<32)); 
 					}
 					
 					default: 
@@ -271,7 +273,7 @@ version(/+$DIDE_REGION+/all) {
 					{
 						writefln!"  ok   %s  (%d bytes)"(name, s.data.length); 
 						
-						auto a = decodeAssoc(s[]); 
+						auto a = decodeAssoc(s[], 0); 
 						if(!(a.source==source && a.verb==verb && a.target==target))
 						{
 							writefln!"Decoder FAIL   got : =(0x%08X, 0x%08X, 0x%08X)"(a.source, a.verb, a.target); 
@@ -760,16 +762,16 @@ version(/+$DIDE_REGION+/all) {
 		with(SER)
 		{
 			auto 試(A...)(A args) { auto arr = appender!(ubyte[]); serialize(arr, args); return arr[].hexDump; } 
-			auto 試A(A...)(A args) { auto arr = appender!(ubyte[]); serializeAssoc(arr, args); return arr[].hexDump; } 
-			((0x5F80EB4AA1C7).檢 (試("a"w))),((0x5FA3EB4AA1C7).檢 (試("abcá"))),((0x5FC9EB4AA1C7).檢 (試("Hello 🌍!\0"w.replicate(2)))),
-			((0x600AEB4AA1C7).檢 (試(false))),((0x602EEB4AA1C7).檢 (試(true))),((0x6051EB4AA1C7).檢 (試(Null()))),
-			((0x607BEB4AA1C7).檢 (試(42))),((0x609CEB4AA1C7).檢 (試(7848))),((0x60BFEB4AA1C7).檢 (試(437928932))),((0x60E7EB4AA1C7).檢 (試(437928932437928932))),
-			((0x611DEB4AA1C7).檢 (試(-42))),((0x613FEB4AA1C7).檢 (試(-7848))),((0x6163EB4AA1C7).檢 (試(-437928932))),((0x618CEB4AA1C7).檢 (試(-437928932437928932))),
-			((0x61C3EB4AA1C7).檢 (試(1.5))),((0x61E5EB4AA1C7).檢 (試(1.51))),((0x6208EB4AA1C7).檢 (試(1.51f))),
-			((0x6231EB4AA1C7).檢 (試(now))),((0x6253EB4AA1C7).檢 (試(now.date))),
-			((0x627FEB4AA1C7).檢 (試(vec2(1, 2)))),((0x62A8EB4AA1C7).檢 (試((RGB(54,60,175))))),((0x62D7EB4AA1C7).檢 (試(ivec4(1, 2, 3, 4)))),((0x6307EB4AA1C7).檢 (試(dvec2((sqrt(π)), ((π)^^(2)))))),
-			((0x6349EB4AA1C7).檢 (試A(1, 2, 3))),((0x6370EB4AA1C7).檢 (試A(4, 256, 6))),((0x6399EB4AA1C7).檢 (試A(7, 8, 65536))),
-			((0x63C9EB4AA1C7).檢 (試A(1, 2, 3))),((0x63F0EB4AA1C7).檢 (試A(4, 5, 6))),((0x6417EB4AA1C7).檢 (試A(7, 8, 9))); 
+			auto 試A(A...)(A args) { auto arr = appender!(ubyte[]); serialize(arr, Association(args)); return arr[].hexDump; } 
+			((0x60B2EB4AA1C7).檢 (試("a"w))),((0x60D5EB4AA1C7).檢 (試("abcá"))),((0x60FBEB4AA1C7).檢 (試("Hello 🌍!\0"w.replicate(2)))),
+			((0x613CEB4AA1C7).檢 (試(false))),((0x6160EB4AA1C7).檢 (試(true))),((0x6183EB4AA1C7).檢 (試(Null()))),
+			((0x61ADEB4AA1C7).檢 (試(42))),((0x61CEEB4AA1C7).檢 (試(7848))),((0x61F1EB4AA1C7).檢 (試(437928932))),((0x6219EB4AA1C7).檢 (試(437928932437928932))),
+			((0x624FEB4AA1C7).檢 (試(-42))),((0x6271EB4AA1C7).檢 (試(-7848))),((0x6295EB4AA1C7).檢 (試(-437928932))),((0x62BEEB4AA1C7).檢 (試(-437928932437928932))),
+			((0x62F5EB4AA1C7).檢 (試(1.5))),((0x6317EB4AA1C7).檢 (試(1.51))),((0x633AEB4AA1C7).檢 (試(1.51f))),
+			((0x6363EB4AA1C7).檢 (試(now))),((0x6385EB4AA1C7).檢 (試(now.date))),
+			((0x63B1EB4AA1C7).檢 (試(vec2(1, 2)))),((0x63DAEB4AA1C7).檢 (試((RGB(54,60,175))))),((0x6409EB4AA1C7).檢 (試(ivec4(1, 2, 3, 4)))),((0x6439EB4AA1C7).檢 (試(dvec2((sqrt(π)), ((π)^^(2)))))),
+			((0x647BEB4AA1C7).檢 (試A(1, 2, 3))),((0x64A2EB4AA1C7).檢 (試A(4, 256, 6))),((0x64CBEB4AA1C7).檢 (試A(7, 8, 65536))),
+			((0x64FBEB4AA1C7).檢 (試A(1, 2, 3))),((0x6522EB4AA1C7).檢 (試A(4, 5, 6))),((0x6549EB4AA1C7).檢 (試A(7, 8, 9))); 
 		}
 	} 
 	
@@ -930,7 +932,7 @@ Mary Davis  customer of  Amazon
 			auto am = new AMDBTest; 
 			am.schema(schemaSrc); 
 			am.data(dataSrc); 
-			((0x73C3EB4AA1C7).檢 (am.dump)); 
+			((0x74F5EB4AA1C7).檢 (am.dump)); 
 		}
 	} 
 }
@@ -1612,7 +1614,7 @@ mert ha novekszik a merete, akkor elrontja az utana kovetkezo stream-et."
 				=> SER.typeCodeIsAssociation(db.stream.stream[].get(idx)); 
 				
 				Association assoc() const
-				=> ((isNull)?(Association.init) :(SER.decodeAssoc(db.stream.stream[][idx..$]))); 
+				=> ((isNull)?(Association.init) :(SER.decodeAssoc(db.stream.stream[], idx))); 
 				
 				version(/+$DIDE_REGION+/all) {
 					auto source() => Explorer(db, assoc.source); 
