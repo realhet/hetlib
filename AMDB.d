@@ -1079,6 +1079,159 @@ version(/+$DIDE_REGION+/all) {
 			}
 		} 
 		version(/+$DIDE_REGION+/all) {
+			enum AssociationSearchMode : ubyte
+			{
+				exact,	//Returns matching array index, or -1 if not found
+				lowerBound, 	//Returns first array index where assoc >= target
+				upperBound 	//Returns first array index where assoc > target
+			}  enum AssociationSearchOrder : ubyte
+			{
+				SVT,	//Source, Verb, Target
+				TVS	//Target, Verb, Source
+			} 
+			
+			sizediff_t searchAssociationIdx(
+				AssociationSearchMode mode, 
+				AssociationSearchOrder order
+			)
+				(in Idx sourceIdx, in Idx verbIdx, in Idx targetIdx)
+			{
+				static assert(Idx.sizeof < long.sizeof); 
+				alias Mode = AssociationSearchMode, Order = AssociationSearchOrder; 
+				
+				static if(order==Order.SVT)
+				{
+					const items = indices.associations_by_SVT_impl; 
+					long compareAssoc(const ref Association a)
+					{
+						if(const d = long(a.source) - sourceIdx) return d; 
+						if(const d = long(a.verb) - verbIdx) return d; 
+						return long(a.target) - targetIdx; 
+					} 
+				}
+				else static if(order==Order.TVS)
+				{
+					const items = indices.associations_by_TVS_impl; 
+					long compareAssoc(const ref Association a)
+					{
+						if(const d = long(a.target) - targetIdx) return d; 
+						if(const d = long(a.verb) - verbIdx) return d; 
+						return long(a.source) - sourceIdx; 
+					} 
+				}
+				else static assert(0, "unhandled order"); 
+				
+				size_t low = 0, high = items.length; 
+				
+				while(low < high)
+				{
+					size_t mid = low + (high - low) / 2; 
+					const currentAssoc = explore(items[mid]).assoc; 
+					const cmp = compareAssoc(currentAssoc); 
+					
+					static if(mode == Mode.exact)
+					{
+						if(cmp == 0) return mid; 
+						else if(cmp < 0) low = mid + 1; 
+						else high = mid; 
+					}
+					else static if(mode == Mode.lowerBound)
+					{
+						if(cmp < 0) low = mid + 1; 
+						else high = mid; 
+					}
+					else static if(mode == Mode.upperBound)
+					{
+						if(cmp <= 0) low = mid + 1; 
+						else high = mid; 
+					}
+					else static assert(0, "unhandled mode"); 
+				}
+				
+				static if(mode == Mode.exact)	return -1; 
+				static if(
+					mode.among(
+						Mode.lowerBound,
+						Mode.upperBound
+					)
+				)	return low; 
+			} 
+			
+			Idx findAssociation(in Idx sourceIdx, in Idx verbIdx, in Idx targetIdx)
+			=> indices.associations_by_SVT_impl.get
+			(
+				searchAssociationIdx!(
+					AssociationSearchMode.exact, 
+					AssociationSearchOrder.SVT
+				)(sourceIdx, verbIdx, targetIdx)
+			); 
+			
+			enum CODE_LowerUpperSearch =
+			q{
+				static assert(Idx.sizeof < long.sizeof); 
+				version(/+$DIDE_REGION Find lower bound (first matching element)+/all)
+				{
+					size_t low = 0, high = items.length; 
+					while(low < high)
+					{
+						size_t mid = low + (high - low) / 2; 
+						const currentAssoc = explore(items[mid]).assoc; 
+						if(compareAssoc(currentAssoc) < 0) { low = mid + 1; }
+						else { high = mid; }
+					}
+					size_t lowerBound = low; 
+				}version(/+$DIDE_REGION Find upper bound (first element beyond matching range)+/all)
+				{
+					high = items.length; 
+					while(low < high)
+					{
+						size_t mid = low + (high - low) / 2; 
+						const currentAssoc = explore(items[mid]).assoc; 
+						if(compareAssoc(currentAssoc) <= 0) { low = mid + 1; }
+						else { high = mid; }
+					}
+					size_t upperBound = low; 
+				}
+				return items[lowerBound..upperBound]; 
+			}; 
+			
+			auto findAssociationsBySourceVerb(in Idx sourceIdx, in Idx verbIdx)
+			{
+				long compareAssoc(const ref Association a)
+				{
+					if(const d = long(a.source) - sourceIdx) return d; 
+					return long(a.verb) - verbIdx; 
+				} 
+				
+				auto items = associations_by_SVT; 
+				mixin(CODE_LowerUpperSearch); 
+			} 	auto findAssociationsByVerbTarget(in Idx verbIdx, in Idx targetIdx)
+			{
+				long compareAssoc(const ref Association a)
+				{
+					if(const d = long(a.target) - targetIdx) return d; 
+					return long(a.verb) - verbIdx; 
+				} 
+				
+				auto items = associations_by_TVS; 
+				mixin(CODE_LowerUpperSearch); 
+			} 
+			auto findAssociationsBySource(in Idx sourceIdx)
+			{
+				long compareAssoc(const ref Association a)
+				=> long(a.source) - sourceIdx; 
+				
+				auto items = associations_by_SVT; 
+				mixin(CODE_LowerUpperSearch); 
+			} 	auto findAssociationsByTarget(in Idx targetIdx)
+			{
+				long compareAssoc(const ref Association a)
+				=> long(a.target) - targetIdx; 
+				
+				auto items = associations_by_TVS; 
+				mixin(CODE_LowerUpperSearch); 
+			} 
+			
 			Idx get(string data)
 			{
 				if(auto a = data in indices.strings)	return *a; 
@@ -1158,7 +1311,6 @@ version(/+$DIDE_REGION+/all) {
 				return idx; 
 			} 
 			
-			
 			version(/+$DIDE_REGION+/all) {
 				auto associations_by_SVT()
 				=> indices.associations_by_SVT_impl
@@ -1176,196 +1328,76 @@ version(/+$DIDE_REGION+/all) {
 					indices.associations_by_TVS_impl.insertInPlace(tvsPos, assocIdx); 
 				} 
 				
-				/+
-					static protected void repositionItem(alias pred = "a < b", T)(ref T[] arr, size_t index, T newValue)
+				void updateAssociationTarget(
+					in Idx assocIdx, in Idx sourceIdx, in Idx verbIdx,
+					in Idx oldTargetIdx, in Idx newTargetIdx
+				)
+				{
+					alias Mode  = AssociationSearchMode, Order = AssociationSearchOrder; 
+					
+					// ---------- 1. Where is the element today? (data is still old) ----------
+					const oldSvtPos = searchAssociationIdx	!(Mode.exact, Order.SVT)
+						(sourceIdx, verbIdx, oldTargetIdx); 
+					const oldTvsPos = searchAssociationIdx	!(Mode.exact, Order.TVS)
+						(sourceIdx, verbIdx, oldTargetIdx); 
+					
+					assert(oldSvtPos != -1 && oldTvsPos != -1); 
+					
+					// ---------- 2. Where does it *belong* after the change? ----------
+					//   The arrays are still sorted for the OLD data, so lowerBound
+					//   with the NEW target is well defined and correct.
+					const newSvtPos = searchAssociationIdx	!(Mode.lowerBound, Order.SVT)
+						(sourceIdx, verbIdx, newTargetIdx); 
+					const newTvsPos = searchAssociationIdx	!(Mode.lowerBound, Order.TVS)
+						(sourceIdx, verbIdx, newTargetIdx); 
+					
+					// ---------- 3. Physically move it in both arrays ----------
+					void relocate(ref Idx[] arr, size_t oldPos, size_t newPos)
 					{
-						alias less = binaryFun!pred; 
-						auto oldValue = arr[index]; 
-						if(less(newValue, oldValue))
+						if(newPos > oldPos + 1)
 						{
-							arr[index] = newValue; 
-							auto targetIdx = arr[0 .. index].assumeSorted!less.lowerBound(newValue).length; 
-							bringToFront(arr[targetIdx .. index], arr[index .. index + 1]); 
+							// shift the gap [oldPos+1 .. newPos) one slot to the left,
+							// then drop the element at newPos-1
+							auto tmp = arr[oldPos]; 
+							arr[oldPos .. newPos-1] = arr[oldPos+1 .. newPos]; 
+							arr[newPos-1] = tmp; 
 						}
-						else if(less(oldValue, newValue))
+						else if(newPos < oldPos)
 						{
-							arr[index] = newValue; 
-							auto offset = arr[index + 1 .. $].assumeSorted!less.lowerBound(newValue).length; 
-							auto targetIdx = index + 1 + offset; 
-							bringToFront(arr[index .. index + 1], arr[index + 1 .. targetIdx]); 
+							// shift the gap [newPos .. oldPos) one slot to the right,
+							// then drop the element at newPos
+							auto tmp = arr[oldPos]; 
+							arr[newPos+1 .. oldPos+1] = arr[newPos .. oldPos]; 
+							arr[newPos] = tmp; 
 						}
+						// else: already in place — do nothing
 					} 
 					
+					relocate(indices.associations_by_SVT_impl, oldSvtPos, newSvtPos); 
+					relocate(indices.associations_by_TVS_impl, oldTvsPos, newTvsPos); 
 					
-					void updateAssociationTarget(in Idx assocIdx, in Idx oldTargetIdx, in Idx newTargetIdx)
-					{
-						const svtPos = associations_by_SVT.lowerBound(assocIdx).length; 
-						assert(indices.associations_by_SVT_impl.get(svtPos)==assocIdx);
-						
-						const tvsPos = associations_by_TVS.lowerBound(assocIdx).length; 
-						assert(indices.associations_by_TVS_impl.get(tvsPos)==assocIdx);
-						
-						
-						if(oldTargetIdx == newTargetIdx) return; 
-					} 
-				+/
+					// ---------- 4. Now commit the change to the stream ----------
+					
+					/+Todo: explore(...).assoc.target = newTargetIdx;   // whatever your accessor is+/
+					NOTIMPL(
+						"Ez egy qrvanagy pofon volt, amibe beleszaladtam... Nem irhatom felul, 
+mert ha novekszik a merete, akkor elrontja az utana kovetkezo stream-et."
+					); 
+					
+					ubyte[] assoc = stream.stream[][assocIdx..$][0..1+3*2]; 
+					assoc.hexDump.print; 
+					enforce(assoc[0]==0x85 /+16bit*3+/); 
+					(cast(ushort[])(assoc[5..7]))[0] = newTargetIdx.to!ushort; 
+					
+				} 
 				
 				
-				enum AssociationSearchMode : ubyte
-				{
-					exact,	//Returns matching array index, or -1 if not found
-					lowerBound, 	//Returns first array index where assoc >= target
-					upperBound 	//Returns first array index where assoc > target
-				}  enum AssociationSearchOrder : ubyte
-				{
-					SVT,	//Source, Verb, Target
-					TVS	//Target, Verb, Source
-				} 
 				
-				sizediff_t searchAssociationIdx(
-					AssociationSearchMode mode, 
-					AssociationSearchOrder order
-				)
-					(in Idx sourceIdx, in Idx verbIdx, in Idx targetIdx)
-				{
-					static assert(Idx.sizeof < long.sizeof); 
-					alias Mode = AssociationSearchMode, Order = AssociationSearchOrder; 
-					
-					static if(order==Order.SVT)
-					{
-						const items = indices.associations_by_SVT_impl; 
-						long compareAssoc(const ref Association a)
-						{
-							if(const d = long(a.source) - sourceIdx) return d; 
-							if(const d = long(a.verb) - verbIdx) return d; 
-							return long(a.target) - targetIdx; 
-						} 
-					}
-					else static if(order==Order.TVS)
-					{
-						const items = indices.associations_by_TVS_impl; 
-						long compareAssoc(const ref Association a)
-						{
-							if(const d = long(a.target) - targetIdx) return d; 
-							if(const d = long(a.verb) - verbIdx) return d; 
-							return long(a.source) - sourceIdx; 
-						} 
-					}
-					else static assert(0, "unhandled order"); 
-					
-					size_t low = 0, high = items.length; 
-					
-					while(low < high)
-					{
-						size_t mid = low + (high - low) / 2; 
-						const currentAssoc = explore(items[mid]).assoc; 
-						const cmp = compareAssoc(currentAssoc); 
-						
-						static if(mode == Mode.exact)
-						{
-							if(cmp == 0) return mid; 
-							else if(cmp < 0) low = mid + 1; 
-							else high = mid; 
-						}
-						else static if(mode == Mode.lowerBound)
-						{
-							if(cmp < 0) low = mid + 1; 
-							else high = mid; 
-						}
-						else static if(mode == Mode.upperBound)
-						{
-							if(cmp <= 0) low = mid + 1; 
-							else high = mid; 
-						}
-						else static assert(0, "unhandled mode"); 
-					}
-					
-					static if(mode == Mode.exact)	return -1; 
-					static if(
-						mode.among(
-							Mode.lowerBound,
-							Mode.upperBound
-						)
-					)	return low; 
-				} 
-				
-				Idx findAssociation(in Idx sourceIdx, in Idx verbIdx, in Idx targetIdx)
-				=> indices.associations_by_SVT_impl.get
-				(
-					searchAssociationIdx!(
-						AssociationSearchMode.exact, 
-						AssociationSearchOrder.SVT
-					)(sourceIdx, verbIdx, targetIdx)
-				); 
 			}
 			
 			
 			
-			enum CODE_LowerUpperSearch =
-			q{
-				static assert(Idx.sizeof < long.sizeof); 
-				version(/+$DIDE_REGION Find lower bound (first matching element)+/all)
-				{
-					size_t low = 0, high = items.length; 
-					while(low < high)
-					{
-						size_t mid = low + (high - low) / 2; 
-						const currentAssoc = explore(items[mid]).assoc; 
-						if(compareAssoc(currentAssoc) < 0) { low = mid + 1; }
-						else { high = mid; }
-					}
-					size_t lowerBound = low; 
-				}version(/+$DIDE_REGION Find upper bound (first element beyond matching range)+/all)
-				{
-					high = items.length; 
-					while(low < high)
-					{
-						size_t mid = low + (high - low) / 2; 
-						const currentAssoc = explore(items[mid]).assoc; 
-						if(compareAssoc(currentAssoc) <= 0) { low = mid + 1; }
-						else { high = mid; }
-					}
-					size_t upperBound = low; 
-				}
-				return items[lowerBound..upperBound]; 
-			}; 
 			
-			auto findAssociationsBySourceVerb(in Idx sourceIdx, in Idx verbIdx)
-			{
-				long compareAssoc(const ref Association a)
-				{
-					if(const d = long(a.source) - sourceIdx) return d; 
-					return long(a.verb) - verbIdx; 
-				} 
-				
-				auto items = associations_by_SVT; 
-				mixin(CODE_LowerUpperSearch); 
-			} 	auto findAssociationsByVerbTarget(in Idx verbIdx, in Idx targetIdx)
-			{
-				long compareAssoc(const ref Association a)
-				{
-					if(const d = long(a.target) - targetIdx) return d; 
-					return long(a.verb) - verbIdx; 
-				} 
-				
-				auto items = associations_by_TVS; 
-				mixin(CODE_LowerUpperSearch); 
-			} 
-			auto findAssociationsBySource(in Idx sourceIdx)
-			{
-				long compareAssoc(const ref Association a)
-				=> long(a.source) - sourceIdx; 
-				
-				auto items = associations_by_SVT; 
-				mixin(CODE_LowerUpperSearch); 
-			} 	auto findAssociationsByTarget(in Idx targetIdx)
-			{
-				long compareAssoc(const ref Association a)
-				=> long(a.target) - targetIdx; 
-				
-				auto items = associations_by_TVS; 
-				mixin(CODE_LowerUpperSearch); 
-			} 
 			
 			static struct Explorer
 			{
@@ -1981,8 +2013,8 @@ version(/+$DIDE_REGION+/all) {
 					auto expect(alias fun, Args...)(in Args args)
 					=> fun(args).enforce(i"AMDB.data: Failed to get $(fun.stringof)($(args.text))".text); 
 					
-					Idx expectEntity(T)(in T a) => expect!getEntity(a); 
-					Idx getEntity(T)(in T name_)
+					Idx expectEntityIdx(T)(in T a) => expect!getEntityIdx(a); 
+					Idx getEntityIdx(T)(in T name_)
 					{
 						static if(is(T==Idx))
 						{
@@ -1995,103 +2027,123 @@ version(/+$DIDE_REGION+/all) {
 						{
 							const 	name 	= asName(name_),
 								nameIdx 	= get(name); 
-							return getEntity(nameIdx); 
+							return getEntityIdx(nameIdx); 
 						}
 						return 0; 
 					} 
 					
-					Idx access_attribute(in AMToken sourceToken, in string verbStr, in AMToken targetToken)
-					=> access_attribute(expectEntity(sourceToken), verbStr, targetToken); 
+					auto getETypeIdxOfEntity(in Idx entityIdx)
+					=> ((isEntity(entityIdx))?(explore(entityIdx).target.idx):(Idx.init)); 
+					auto getATypeIdxOfAttribute(in Idx attrIdx)
+					=> ((isAttribute(attrIdx))?(explore(attrIdx).verb.idx):(Idx.init)); 
 					
-					Idx access_attribute(in Idx sourceIdx, in string verbStr, in AMToken targetToken)
+					auto expectATypeIdxOfEntityOrAttribute(in Idx sourceIdx, in Idx verbIdx)
 					{
-						static if((常!(bool)(0))) print("...ATTRIBUTE", sourceIdx, verbStr, targetToken); 
-						
-						Idx accessTarget(Idx aTypeIdx)
-						{
-							const targetStr = evalStr(targetToken); 
-							auto aType = explore(aTypeIdx); enforce(aType.isAType); 
-							if(aType.target.isEType)	{ return expectEntity(targetToken); }
-							else {
-								//Todo: implement proper type handling
-								return access(asName(targetToken)); 
-							}
-						} 
+						if(const eTypeIdx = getETypeIdxOfEntity(sourceIdx))
+						return *(
+							([eTypeIdx, verbIdx] in indices.ATypeIdx_by_sourceVerbIdx)
+							.enforce(i"Unknown AType for Entity [$(explore(eTypeIdx).sourceOrThis)].[$(explore(verbIdx))]".text)
+						); 
+						if(const prevATypeIdx = getATypeIdxOfAttribute(sourceIdx))
+						return *(
+							([prevATypeIdx, verbIdx] in indices.ATypeIdx_by_sourceVerbIdx)
+							.enforce(i"Unknown AType for Association [$(explore(prevATypeIdx).verb)]...[$(explore(verbIdx))]".text)
+						); 
+						raise(
+							i"Unable to get AType of source:[$(explore(sourceIdx))] and verb:[$(explore(verbIdx))]".text
+							~", source is not an Entity, neither an Association."
+						); 
+						assert(0); 
+					} 
+					
+					Idx expectVerbIdx(in string verbStr)
+					=> get(verbStr).enforce(i"Unknown verb: [$(verbStr)]".text); 
+					Idx accessTarget(in Idx aTypeIdx, in AMToken targetToken)
+					{
+						const targetStr = evalStr(targetToken); 
+						auto aType = explore(aTypeIdx); enforce(aType.isAType); 
+						if(aType.target.isEType)	{ return expectEntityIdx(targetToken); }
+						else {
+							//Todo: implement proper type handling
+							return access(asName(targetToken)); 
+						}
+					} 
+					
+					Idx accessAttribute(in AMToken sourceToken, in string verbStr, in AMToken targetToken)
+					=> accessAttribute(expectEntityIdx(sourceToken), verbStr, targetToken); 
+					Idx accessAttribute(in Idx sourceIdx, in string verbStr, in AMToken targetToken)
+					{
+						static if((常!(bool)(1))) print("...ATTRIBUTE", sourceIdx, verbStr, targetToken); 
 						
 						Idx idx; 
-						if(isEntity(sourceIdx))
+						if(const aTypeIdx = expectATypeIdxOfEntityOrAttribute(sourceIdx, expectVerbIdx(verbStr)))
 						{
-							const eTypeIdx = explore(sourceIdx).target.idx; 
-							const verbIdx = get(verbStr)/+it should exists because the AType defined it already+/; 
-							const aTypeIdx = ([eTypeIdx, verbIdx] in indices.ATypeIdx_by_sourceVerbIdx)
-								.enforce(i"Unknown association [$(explore(eTypeIdx).sourceOrThis)].[$(verbStr)]".text); 
-							
 							//Todo: check cardinality
-							const targetIdx = accessTarget(*aTypeIdx); 
-							idx = access(sourceIdx, *aTypeIdx, targetIdx); 
-						}
-						else if(isAttribute(sourceIdx))
-						{
-							const verbIdx = get(verbStr)/+it should exists because the AType defined it already+/; 
-							const prevATypeIdx = explore(sourceIdx).verb.idx; 
-							const aTypeIdx = ([prevATypeIdx, verbIdx] in indices.ATypeIdx_by_sourceVerbIdx)
-								.enforce(i"Unknown association [$(explore(prevATypeIdx).verb)]...[$(verbStr)]".text); 
 							
-							//Todo: check cardinality
-							const targetIdx = accessTarget(*aTypeIdx); 
-							idx = access(sourceIdx, *aTypeIdx, targetIdx); 
-						}
-						else enforce(0, i"EType or AType expected instead of $(sourceIdx)".text); 
-						assert(idx); return idx; 
-					} 
-					
-					Idx modify_attributeTarget(in Idx sourceIdx, in AMToken targetToken)
-					{
-						static if((常!(bool)(1))) print("...ATTRIBUTE modify to", sourceIdx, targetToken); 
-						
-						const vModifiedTo = access(SysVerb.modified_to); 
-						
-						Idx getUnmodifiedAttributeIdx(Idx a)
-						{
-							auto e = explore(a); 
-							while(e.isAssociation && e.verb.idx==vModifiedTo)
-							e = e.source; 
-							return e.idx; 
-						} 
-						const attrIdx = getUnmodifiedAttributeIdx(sourceIdx); 
-						
-						
-						//Todo: this is not good! Don't create new index, just rearrange the indices!
-						
-						Idx idx; 
-						if(isAttribute(attrIdx))
-						{
-							Idx accessTarget(Idx aTypeIdx)
+							enum MultipleCardinality = true; //Todo: It must be enabled because Job.grade has multiple cardinality!!!
+							
+							if(MultipleCardinality)
 							{
-								const targetStr = evalStr(targetToken); 
-								auto aType = explore(aTypeIdx); enforce(aType.isAType); 
-								if(aType.target.isEType)	{ return expectEntity(targetToken); }
-								else {
-									//Todo: implement proper type handling
-									return access(asName(targetToken)); 
-								}
-							} 
-							
-							const aTypeIdx = explore(attrIdx).verb.idx; 
-							const targetIdx = accessTarget(aTypeIdx); 
-							
-							print(aTypeIdx, targetIdx); 
-							if(targetIdx != explore(sourceIdx).target.idx)
-							{ idx = access(sourceIdx, vModifiedTo, targetIdx); }
+								const targetIdx = accessTarget(aTypeIdx, targetToken); 
+								idx = access(sourceIdx, aTypeIdx, targetIdx); 
+							}
 							else
 							{
-								idx = sourceIdx; //no modification because the values are the same.
+								//single cardinality  (work in progress!!!)
+								auto existing = findAssociationsBySourceVerb(sourceIdx, aTypeIdx); 
+								if(existing.length==0)
+								{
+									const targetIdx = accessTarget(aTypeIdx, targetToken); 
+									idx = access(sourceIdx, aTypeIdx, targetIdx); 
+								}
+								else if(existing.length==1)
+								{
+									const targetIdx = accessTarget(aTypeIdx, targetToken); 
+									enforce(
+										explore(existing[0]).target.idx==targetIdx,
+										i"A different attribute already exists. Use verb: [modified to] $(existing)".text
+									); 
+									/+
+										Todo: If there is an exception, then targetIdx was allocated for nothing. 
+										There sould be a compare operation.
+									+/
+									idx = existing[0]; 
+								}
+								else
+								{ enforce(0, i"There are too more attributes already. ($(existing))".text); }
 							}
-							print(idx); 
 						}
-						else enforce(0, i"AType expected instead of $(sourceIdx)".text); 
-						
 						assert(idx); return idx; 
+					} 
+					
+					Idx modifyAttributeTarget(in Idx attrIdx, in AMToken targetToken)
+					{
+						static if((常!(bool)(1))) print("...ATTRIBUTE MODIFY TO", attrIdx, targetToken); 
+						
+						auto attr = explore(attrIdx); 
+						enforce(attr.isAttribute, i"Attribute expected, not [$(attr)]".text); 
+						const 	assoc 	= attr.assoc,
+							sourceIdx 	= assoc.source,
+							aTypeIdx 	= assoc.verb,
+							oldTargetIdx 	= assoc.target; 
+						
+						/+
+							auto existing = findAssociationsBySourceVerb(assoc.source, assoc.verb); 
+							enforce(existing.length==1, i"Existing attribute count is not 1 ($(existing.length))".text); 
+							
+							print(explore(assoc.source).dump); 
+							print(explore(assoc.verb).dump); 
+						+/
+						
+						const newTargetIdx = accessTarget(aTypeIdx, targetToken); //Todo: This can be left unused on error.
+						if(oldTargetIdx != newTargetIdx)
+						{
+							enforce(!findAssociation(sourceIdx, aTypeIdx, newTargetIdx), "Association's newTarget already exists."); 
+							stream.append(SER.Assoc!Idx(attrIdx, access(SysVerb.modified_to), newTargetIdx)); 
+							updateAssociationTarget(attrIdx, sourceIdx, aTypeIdx, oldTargetIdx, newTargetIdx); 
+						}
+						
+						return attrIdx; 
 					} 
 					
 					void processDataAssociation(bool canCreate)
@@ -2112,14 +2164,14 @@ version(/+$DIDE_REGION+/all) {
 								with(SysVerb)
 								switch(sysVerb)
 								{
-									case modified_to: 	{ idx = modify_attributeTarget(sourceIdx, targetToken); }	break; 
+									case modified_to: 	{ idx = modifyAttributeTarget(sourceIdx, targetToken); }	break; 
 									default: 	enforce(0, i"Invalid verb usage: $(sysVerb)".text); 
 								}
 							}
 							else
 							{
 								/+Todo: inverse verbs!+/
-								idx = access_attribute(sourceIdx, verbStr, targetToken); 
+								idx = accessAttribute(sourceIdx, verbStr, targetToken); 
 							}
 						}
 						else
@@ -2137,7 +2189,7 @@ version(/+$DIDE_REGION+/all) {
 							else
 							{
 								/+Todo: inverse verb+/
-								idx = access_attribute(sourceToken, verbStr, targetToken); 
+								idx = accessAttribute(sourceToken, verbStr, targetToken); 
 							}
 						}
 						
