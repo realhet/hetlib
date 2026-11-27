@@ -156,16 +156,51 @@ version(/+$DIDE_REGION+/all) {
 				else static if(is(T==Association))	{ serializeAssoc(stream, data.source, data.verb, data.target); }
 				else static assert(0, "Unhandled type: "~T.stringof); 
 			} 
-			enum TCA13 	= TypeCode!(Assoc!13), 
+			enum TCA13 	= TypeCode!(Assoc!13), TCASmallest = TCA13,
 			TCA24 	= TypeCode!(Assoc!24), 
 			TCA32 	= TypeCode!(Assoc!32),
-			TCA40 	= TypeCode!(Assoc!40)/+Todo: support this! 1TiB max size.+/; 
+			TCA40 	= TypeCode!(Assoc!40), TCALargest = TCA40
+			/+
+				Todo: 40bit has just partial support. 
+				Must complete it, but only after 32 bit works.
+			+/; 
 			
 			bool typeCodeIsAssociation(in ubyte typeCode)
-			=> mixin(界3(q{TCA13},q{typeCode},q{TCA40})); 
+			=> mixin(界3(q{TCASmallest},q{typeCode},q{TCALargest})); 
 			
-			auto serializeAssoc(R)(R stream, in uint source, in uint verb, in uint target)
+			uint getAssocBits(ubyte tc)
+			=> tc.predSwitch
+			(
+				TCA13, 13, 
+				TCA24, 24, 
+				TCA32, 32, 
+				TCA40, 40, 
+				0
+			); uint getAssocSizeBytes(ubyte tc)
+			=> (cast(uint)(
+				tc.predSwitch
+				(
+					TCA13, 1+Assoc!13.sizeof, 
+					TCA24, 1+Assoc!24.sizeof, 
+					TCA32, 1+Assoc!32.sizeof, 
+					TCA40, 1+Assoc!40.sizeof, 
+					0
+				)
+			)); 
+			
+			enum smallestAssocSizeBytes = getAssocSizeBytes(TCASmallest); 
+			
+			ubyte chooseAssocTypeCodeFor(uint maxVal)
 			{
+				if(maxVal < (1U<<13)) return TCA13; 
+				if(maxVal < (1U<<24)) return TCA24; 
+				return TCA32; //Input is uint, so TCA40 is impossible
+			} 
+			
+			uint serializeAssoc(R)(R stream, in uint source, in uint verb, in uint target)
+				if(isOutputRange!(R, ubyte))
+			{
+				const res = stream[].length.to!uint /+Todo: TCA40 support+/; 
 				const m = max(source, verb).max(target); 
 				if(m < (1U<<13))
 				{
@@ -195,12 +230,13 @@ version(/+$DIDE_REGION+/all) {
 						| (ulong(target) << (8)); 
 					stream.put((cast(ubyte*)raw.ptr)[0..13]); 
 				}
+				return res; 
 			} 
+			
 			
-			Association decodeAssoc(const(ubyte)[] stream, size_t idx)
+			Association decodeAssoc(const(ubyte)[] stream, in uint idx)
 			{
-				enum smallestLen = Assoc!13.sizeof+1; 
-				if(idx+smallestLen > stream.length) return Association.init; 
+				if(idx+smallestAssocSizeBytes > stream.length) return Association.init; 
 				
 				auto s = stream[idx..$]; 
 				
@@ -246,7 +282,7 @@ version(/+$DIDE_REGION+/all) {
 					case TypeCode!Redirect: 
 					{
 						auto r = (cast(const Redirect*)(p + 1)); 
-						return decodeAssoc(stream, r.lo + (ulong(r.hi)<<32)); 
+						return decodeAssoc(stream, r.lo/+Todo: 40bit support+/); 
 					}
 					
 					default: 
@@ -254,8 +290,7 @@ version(/+$DIDE_REGION+/all) {
 				}
 			} 
 			
-			
-			static void test_assoc()
+			void test_assoc()
 			{
 				void check(string name, uint source, uint verb, uint target, in ubyte[] expected)
 				{
@@ -282,109 +317,300 @@ version(/+$DIDE_REGION+/all) {
 					}
 				} 
 				
-				check(
-					"01 zero",
-					0x00000000, 0x00000000, 0x00000000,
-					[TCA13, 0x00, 0x00, 0x00, 0x00, 0x00]
-				); 
+				mixin((
+					(表([
+						[q{/+Note: Test+/},q{/+Note: Input+/},q{/+Note: Output+/}],
+						[q{"01 zero"},q{0x00000000, 0x00000000, 0x00000000},q{TCA13, 0x00, 0x00, 0x00, 0x00, 0x00}],
+						[q{"02 S=max13"},q{0x00001FFF, 0x00000000, 0x00000000},q{TCA13, 0xFF, 0x1F, 0x00, 0x00, 0x00}],
+						[q{"03 V=max13"},q{0x00000000, 0x00001FFF, 0x00000000},q{TCA13, 0x00, 0xE0, 0xFF, 0x03, 0x00}],
+						[q{"04 T=max13"},q{0x00000000, 0x00000000, 0x00001FFF},q{TCA13, 0x00, 0x00, 0x00, 0xFC, 0x7F}],
+						[q{"05 promote 13->24 by S"},q{0x00002000, 0x00000000, 0x00000000},q{TCA24, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}],
+						[q{"06 promote 13->24 by V"},q{0x00000000, 0x00002000, 0x00000000},q{TCA24, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00}],
+						[q{"07 promote 13->24 by T"},q{0x00000000, 0x00000000, 0x00002000},q{TCA24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00}],
+						[q{"08 S=max24"},q{0x00FFFFFF, 0x00000000, 0x00000000},q{TCA24, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}],
+						[q{"09 V=max24"},q{0x00000000, 0x00FFFFFF, 0x00000000},q{TCA24, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00}],
+						[q{"10 T=max24"},q{0x00000000, 0x00000000, 0x00FFFFFF},q{TCA24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF}],
+						[q{"11 promote 24->32 by S"},q{0x01000000, 0x00000000, 0x00000000},q{TCA32, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}],
+						[q{"12 promote 24->32 by V"},q{0x00000000, 0x01000000, 0x00000000},q{TCA32, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00}],
+						[q{"13 promote 24->32 by T"},q{0x00000000, 0x00000000, 0x01000000},q{TCA32, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}],
+						[q{"14 all max uint"},q{0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF},q{TCA32, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}],
+						[q{"15 random high-entropy"},q{0xDEADBEEF, 0xCAFEBABE, 0xFEEDFACE},q{TCA32, 0xEF, 0xBE, 0xAD, 0xDE, 0xBE, 0xBA, 0xFE, 0xCA, 0xCE, 0xFA, 0xED, 0xFE}],
+						[q{"16 high bytes zero, tier=13"},q{0x00001FFF, 0x00000000, 0x00000000},q{TCA13, 0xFF, 0x1F, 0x00, 0x00, 0x00}],
+						[q{"17 mixed 24-bit, V triggers"},q{0x000000FF, 0x0000ABCD, 0x00001234},q{TCA24, 0xFF, 0x00, 0x00, 0xCD, 0xAB, 0x00, 0x34, 0x12, 0x00}],
+					]))
+				) .GEN!q{mixin(求map(q{r},q{rows},q{iq{check($(r[0]), $(r[1]), [$(r[2])]); }.text})).join('\n')}); 
 				
-				check(
-					"02 S=max13",
-					0x00001FFF, 0x00000000, 0x00000000,
-					[TCA13, 0xFF, 0x1F, 0x00, 0x00, 0x00]
-				); 
+				writeln("all tests passed"); 
 				
-				check(
-					"03 V=max13",
-					0x00000000, 0x00001FFF, 0x00000000,
-					[TCA13, 0x00, 0xE0, 0xFF, 0x03, 0x00]
-				); 
+			} 
+			uint modifyAssocTarget(R)(R stream, in uint assoc, in uint target) if(isOutputRange!(R, ubyte))
+			{
+				if(!assoc || assoc+smallestAssocSizeBytes > stream.length) return 0; 
 				
-				check(
-					"04 T=max13",
-						0x00000000, 0x00000000, 0x00001FFF,
-					[TCA13, 0x00, 0x00, 0x00, 0xFC, 0x7F]
-				); 
+				const ubyte existingType = stream[][assoc]; 
 				
-				check(
-					"05 promote 13->24 by S",
-					0x00002000, 0x00000000, 0x00000000,
-					[TCA24, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-				); 
+				if(existingType==TypeCode!Redirect /+recursively jump over redirections+/)
+				{
+					auto r = (cast(const Redirect*)(&stream[][assoc+1])); 
+					return modifyAssocTarget(stream, r.lo/+Todo: 40 bit support+/, target); 
+				}
 				
-				check(
-					"06 promote 13->24 by V",
-					0x00000000, 0x00002000, 0x00000000,
-					[TCA24, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00]
-				); 
+				if(!typeCodeIsAssociation(existingType)) return 0; 
 				
-				check(
-					"07 promote 13->24 by T",
-					0x00000000, 0x00000000, 0x00002000,
-					[TCA24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00]
-				); 
+				/+
+					Todo: What if it is already a redirection?!!!  
+					Must travel forward on the links until it reaches the last assoc
+				+/
 				
-				check(
-					"08 S=max24",
-					0x00FFFFFF, 0x00000000, 0x00000000,
-					[TCA24, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-				); 
+				const ubyte newType = max(existingType, chooseAssocTypeCodeFor(target)); 
 				
-				check(
-					"09 V=max24",
-					0x00000000, 0x00FFFFFF, 0x00000000,
-					[TCA24, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00]
-				); 
+				static if((常!(bool)(1))/+Verification+/)
+				{
+					print("Verifying association target modification ", assoc); 
+					const orig = decodeAssoc(stream[], assoc); 
+					scope(exit) {
+						const expected = Association(orig.source, orig.verb, target); 
+						const modified = decodeAssoc(stream[], assoc); 
+						if(expected!=modified)
+						{
+							print("  expected: ", expected); 
+							print("  modified: ", modified); 
+							enforce(0, "FAILED modifyAssocTarget()"); 
+						}
+					}
+				}
 				
+				if(newType==existingType)
+				{
+					//inplace modification possible
+					const existingSizeBytes = getAssocSizeBytes(existingType); 
+					ubyte[] s = stream[][assoc .. assoc + existingSizeBytes]; 
+					switch(newType)
+					{
+						case TCA13: 	(*(cast(ushort*)(&s[$-2]))).BITS[2..15].as!uint = target
+							/+last bit in TCA13 is unused!+/; 	break; 
+						case TCA24: 	(*(cast(uint*)(&s[$-4]))).BITS[8..32].as!uint = target; 	break; 
+						case TCA32: 	(*(cast(uint*)(&s[$-4]))) = target; 	break; 
+						case TCA40: 	(*(cast(ulong*)(&s[$-8]))).BITS[24..64].as!ulong = target; 	break; 
+						default: return 0; 
+					}
+					return assoc/+The same index+/; 
+				}
+				else
+				{
+					//this is a redirection
+					assert(newType>existingType); assert(newType>TCASmallest); 
+					
+					const 	newAddress 	= stream.length.to!uint /+will throw over 32 bits+/,
+						redirect 	= Redirect(newAddress),
+						newSize 	= getAssocSizeBytes(newType); 
+					
+					if(stream.length+newSize>=uint.max)
+					return 0 /+32bit overflow prevention+/; 
+					
+					/+Save original association right BEFORE the overwrite+/
+					auto association = decodeAssoc(stream[], assoc); 
+					assert(association != Association.init); 
+					
+					/+
+						Overwrite the association with the 
+						Redirection record containing 40bit addres
+					+/
+					auto s = stream[]; 
+					s[assoc] = TypeCode!Redirect; 
+					s[assoc+1..$][0..Redirect.sizeof] = (cast(ubyte*)(&redirect))	[0..Redirect.sizeof]; 
+					
+					/+Append new association+/
+					serializeAssoc(stream, association.source, association.verb, target/+this is new+/); 
+					return newAddress; 
+				}
+			} 
+			
+			void test_modifyAssocTarget()
+			{
+				void check(
+					string name, uint source, uint verb, uint oldTarget, uint newTarget,
+					uint expectedReturn, in ubyte[] expected
+				)
+				{
+					// Initial stream: one null byte at offset 0.
+					auto s = appender!(ubyte[]); s.put(ubyte(0x00)); 
+					
+					// Write the initial association; capture its offset.
+					const assoc = serializeAssoc(s, source, verb, oldTarget); 
+					assert(assoc == 1, name);   // serializeAssoc must return 1 here
+					
+					// Sanity: the initial stream must round-trip.
+					{
+						auto a = decodeAssoc(s[], assoc); 
+						assert(a.source == source && a.verb == verb && a.target == oldTarget, name); 
+					}
+					
+					// Apply the modification.
+					const got = modifyAssocTarget(s, assoc, newTarget); 
+					
+					bool ok = (got == expectedReturn); 
+					ok = ok && equal(s[], expected); 
+					
+					// Structural check: decoding the returned index must give (source, verb, newTarget).
+					if(ok && got != 0)
+					{
+						auto a = decodeAssoc(s[], got); 
+						ok = ok && a.source == source && a.verb == verb && a.target == newTarget; 
+					}
+					
+					if(!ok)
+					{
+						writefln!"FAIL %s"(name); 
+						writefln!"  input    : S=0x%08X V=0x%08X oldT=0x%08X newT=0x%08X"
+						(source, verb, oldTarget, newTarget); 
+						writefln!"  got len  : %d   expected len: %d"(s[].length, expected.length); 
+						writefln!"  got      : %(%02X %)"(s[]); 
+						writefln!"  expected : %(%02X %)"(expected); 
+						writefln!"  returned : %d   expected: %d"(got, expectedReturn); 
+					}
+					else
+					{ writefln!"  ok   %s  (%d bytes, returned %d)"(name, s[].length, got); }
+				} 
+				
+				enum ubyte TCREDIR = TypeCode!Redirect; 
 				check(
-					"10 T=max24",
-					0x00000000, 0x00000000, 0x00FFFFFF,
-					[TCA24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF]
+					"01 inplace TCA13",
+					0x00000001, 0x00000002, 0x00000003, 0x00000004,
+					1, [0x00, TCA13, 0x01, 0x40, 0x00, 0x10, 0x00]
 				); 
-				
 				check(
-					"11 promote 24->32 by S",
-					0x01000000, 0x00000000, 0x00000000,
-					[TCA32, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+					"02 inplace TCA13 -> max13",
+					0x00000001, 0x00000002, 0x00000003, 0x00001FFF,
+					1, [0x00, TCA13, 0x01, 0x40, 0x00, 0xFC, 0x7F]
 				); 
-				
 				check(
-					"12 promote 24->32 by V",
-					0x00000000, 0x01000000, 0x00000000,
-					[TCA32, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00]
+					"03 inplace TCA13, target decreases",
+					0x00000001, 0x00000002, 0x00001FFF, 0x00000003,
+					1, [0x00, TCA13, 0x01, 0x40, 0x00, 0x0C, 0x00]
 				); 
-				
 				check(
-					"13 promote 24->32 by T",
-					0x00000000, 0x00000000, 0x01000000,
-					[TCA32, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01]
+					"04 promote TCA13 -> TCA24",
+					0x00000001, 0x00000002, 0x00000003, 0x00002000,
+					7, [
+						0x00,
+						 TCREDIR, 0x07, 0x00, 0x00, 0x00, 0x00,
+						 TCA24,   0x01, 0x00, 0x00,
+						   0x02, 0x00, 0x00,
+						   0x00, 0x20, 0x00
+					]
 				); 
-				
 				check(
-					"14 all max uint",
-					0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
-					[TCA32, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
+					"05 promote TCA13 -> TCA24 at boundary",
+					0x00000001, 0x00000002, 0x00001FFF, 0x00002000,
+					7, [
+						0x00,
+						 TCREDIR, 0x07, 0x00, 0x00, 0x00, 0x00,
+						 TCA24,   0x01, 0x00, 0x00,
+						   0x02, 0x00, 0x00,
+						   0x00, 0x20, 0x00
+					]
 				); 
-				
 				check(
-					"15 random high-entropy",
-					0xDEADBEEF, 0xCAFEBABE, 0xFEEDFACE,
-					[TCA32, 0xEF, 0xBE, 0xAD, 0xDE, 0xBE, 0xBA, 0xFE, 0xCA, 0xCE, 0xFA, 0xED, 0xFE]
+					"06 inplace TCA24",
+					0x00ABCDEF, 0x00123456, 0x0000AAAA, 0x0000BBBB,
+					1, [
+						0x00,
+						 TCA24, 0xEF, 0xCD, 0xAB,
+						 0x56, 0x34, 0x12,
+						 0xBB, 0xBB, 0x00
+					]
 				); 
-				
 				check(
-					"16 high bytes zero, tier=13",
-					0x00001FFF, 0x00000000, 0x00000000,
-					[TCA13, 0xFF, 0x1F, 0x00, 0x00, 0x00]
+					"07 inplace TCA24 -> max24",
+					0x00ABCDEF, 0x00123456, 0x0000AAAA, 0x00FFFFFF,
+					1, [
+						0x00,
+						 TCA24, 0xEF, 0xCD, 0xAB,
+						 0x56, 0x34, 0x12,
+						 0xFF, 0xFF, 0xFF
+					]
 				); 
-				
 				check(
-					"17 mixed 24-bit, V triggers",
-					0x000000FF, 0x0000ABCD, 0x00001234,
-					[TCA24, 0xFF, 0x00, 0x00, 0xCD, 0xAB, 0x00, 0x34, 0x12, 0x00]
+					"08 promote TCA24 -> TCA32",
+					0x00ABCDEF, 0x00123456, 0x0000AAAA, 0x01000000,
+					11, [
+						0x00,
+						 // redirect at offset 1 -> new record at offset 11 (0x0B)
+						 TCREDIR, 0x0B, 0x00, 0x00, 0x00, 0x00,
+						 // tail of old TCA24: old bytes 6..9 = V_hi T_lo T_mid T_hi
+						 0x12, 0xAA, 0xAA, 0x00,
+						 // new TCA32 at offset 11
+						 TCA32, 0xEF, 0xCD, 0xAB, 0x00,
+						 0x56, 0x34, 0x12, 0x00,
+						 0x00, 0x00, 0x00, 0x01
+					]
 				); 
+				check(
+					"09 inplace TCA32",
+					0xDEADBEEF, 0xCAFEBABE, 0x11111111, 0x22222222,
+					1, [
+						0x00,
+						 TCA32, 0xEF, 0xBE, 0xAD, 0xDE,
+						 0xBE, 0xBA, 0xFE, 0xCA,
+						 0x22, 0x22, 0x22, 0x22
+					]
+				); 
+				check(
+					"10 inplace TCA32, extreme values",
+					0xDEADBEEF, 0xCAFEBABE, 0xFFFFFFFF, 0xFEEDFACE,
+					1, [
+						0x00,
+						 TCA32, 0xEF, 0xBE, 0xAD, 0xDE,
+						 0xBE, 0xBA, 0xFE, 0xCA,
+						 0xCE, 0xFA, 0xED, 0xFE
+					]
+				); 
 				
-				writeln("all tests passed"); 
+				// ---- 11 ---- (double modification through redirect)
+				// This one is checked manually, not via the generic `check` helper,
+				// because it takes two modifications.
+				{
+					auto s = appender!(ubyte[]); s.put(ubyte(0x00)); 
+					
+					const assoc1 = serializeAssoc(s, 0x00000001, 0x00000002, 0x00000003); 
+					assert(assoc1 == 1); 
+					
+					const r1 = modifyAssocTarget(s, assoc1, 0x00002000); 
+					assert(r1 == 7, "first modification return"); 
+					
+					const r2 = modifyAssocTarget(s, assoc1, 0x01000000); 
+					assert(r2 == 17, "second modification return"); 
+					
+					const expected =
+					[
+						0x00,
+						// redirect 1 at offset 1 -> 7
+						TCREDIR, 0x07, 0x00, 0x00, 0x00, 0x00,
+						// redirect 2 at offset 7 -> 17
+						TCREDIR, 0x11, 0x00, 0x00, 0x00, 0x00,
+						// tail of old TCA24 at offset 7: old bytes 6..9 = V_hi T_lo T_mid T_hi
+						0x00, 0x00, 0x20, 0x00,
+						// final TCA32 at offset 17
+						TCA32, 0x01, 0x00, 0x00, 0x00,
+						0x02, 0x00, 0x00, 0x00,
+						0x00, 0x00, 0x00, 0x01
+					]; 
+					
+					if(!equal(s[], expected))
+					{
+						writefln!"FAIL 11 double modify"; 
+						writefln!"  got      : %(%02X %)"(s[]); 
+						writefln!"  expected : %(%02X %)"(expected); 
+					}
+					else
+					{
+						writefln!"  ok   11 double modify  (%d bytes, returned %d)"
+						(s[].length, r2); 
+					}
+				}
+				
+				writeln("all modifyAssocTarget tests passed"); 
 			} 
 		}
 		version(/+$DIDE_REGION Deserialization+/all)
@@ -763,15 +989,15 @@ version(/+$DIDE_REGION+/all) {
 		{
 			auto 試(A...)(A args) { auto arr = appender!(ubyte[]); serialize(arr, args); return arr[].hexDump; } 
 			auto 試A(A...)(A args) { auto arr = appender!(ubyte[]); serialize(arr, Association(args)); return arr[].hexDump; } 
-			((0x60B2EB4AA1C7).檢 (試("a"w))),((0x60D5EB4AA1C7).檢 (試("abcá"))),((0x60FBEB4AA1C7).檢 (試("Hello 🌍!\0"w.replicate(2)))),
-			((0x613CEB4AA1C7).檢 (試(false))),((0x6160EB4AA1C7).檢 (試(true))),((0x6183EB4AA1C7).檢 (試(Null()))),
-			((0x61ADEB4AA1C7).檢 (試(42))),((0x61CEEB4AA1C7).檢 (試(7848))),((0x61F1EB4AA1C7).檢 (試(437928932))),((0x6219EB4AA1C7).檢 (試(437928932437928932))),
-			((0x624FEB4AA1C7).檢 (試(-42))),((0x6271EB4AA1C7).檢 (試(-7848))),((0x6295EB4AA1C7).檢 (試(-437928932))),((0x62BEEB4AA1C7).檢 (試(-437928932437928932))),
-			((0x62F5EB4AA1C7).檢 (試(1.5))),((0x6317EB4AA1C7).檢 (試(1.51))),((0x633AEB4AA1C7).檢 (試(1.51f))),
-			((0x6363EB4AA1C7).檢 (試(now))),((0x6385EB4AA1C7).檢 (試(now.date))),
-			((0x63B1EB4AA1C7).檢 (試(vec2(1, 2)))),((0x63DAEB4AA1C7).檢 (試((RGB(54,60,175))))),((0x6409EB4AA1C7).檢 (試(ivec4(1, 2, 3, 4)))),((0x6439EB4AA1C7).檢 (試(dvec2((sqrt(π)), ((π)^^(2)))))),
-			((0x647BEB4AA1C7).檢 (試A(1, 2, 3))),((0x64A2EB4AA1C7).檢 (試A(4, 256, 6))),((0x64CBEB4AA1C7).檢 (試A(7, 8, 65536))),
-			((0x64FBEB4AA1C7).檢 (試A(1, 2, 3))),((0x6522EB4AA1C7).檢 (試A(4, 5, 6))),((0x6549EB4AA1C7).檢 (試A(7, 8, 9))); 
+			((0x84E8EB4AA1C7).檢 (試("a"w))),((0x850BEB4AA1C7).檢 (試("abcá"))),((0x8531EB4AA1C7).檢 (試("Hello 🌍!\0"w.replicate(2)))),
+			((0x8572EB4AA1C7).檢 (試(false))),((0x8596EB4AA1C7).檢 (試(true))),((0x85B9EB4AA1C7).檢 (試(Null()))),
+			((0x85E3EB4AA1C7).檢 (試(42))),((0x8604EB4AA1C7).檢 (試(7848))),((0x8627EB4AA1C7).檢 (試(437928932))),((0x864FEB4AA1C7).檢 (試(437928932437928932))),
+			((0x8685EB4AA1C7).檢 (試(-42))),((0x86A7EB4AA1C7).檢 (試(-7848))),((0x86CBEB4AA1C7).檢 (試(-437928932))),((0x86F4EB4AA1C7).檢 (試(-437928932437928932))),
+			((0x872BEB4AA1C7).檢 (試(1.5))),((0x874DEB4AA1C7).檢 (試(1.51))),((0x8770EB4AA1C7).檢 (試(1.51f))),
+			((0x8799EB4AA1C7).檢 (試(now))),((0x87BBEB4AA1C7).檢 (試(now.date))),
+			((0x87E7EB4AA1C7).檢 (試(vec2(1, 2)))),((0x8810EB4AA1C7).檢 (試((RGB(54,60,175))))),((0x883FEB4AA1C7).檢 (試(ivec4(1, 2, 3, 4)))),((0x886FEB4AA1C7).檢 (試(dvec2((sqrt(π)), ((π)^^(2)))))),
+			((0x88B1EB4AA1C7).檢 (試A(1, 2, 3))),((0x88D8EB4AA1C7).檢 (試A(4, 256, 6))),((0x8901EB4AA1C7).檢 (試A(7, 8, 65536))),
+			((0x8931EB4AA1C7).檢 (試A(1, 2, 3))),((0x8958EB4AA1C7).檢 (試A(4, 5, 6))),((0x897FEB4AA1C7).檢 (試A(7, 8, 9))); 
 		}
 	} 
 	
@@ -932,7 +1158,7 @@ Mary Davis  customer of  Amazon
 			auto am = new AMDBTest; 
 			am.schema(schemaSrc); 
 			am.data(dataSrc); 
-			((0x74F5EB4AA1C7).檢 (am.dump)); 
+			((0x992BEB4AA1C7).檢 (am.dump)); 
 		}
 	} 
 }
@@ -1579,19 +1805,8 @@ version(/+$DIDE_REGION+/all) {
 					relocate(indices.associations_by_TVS_impl, oldTvsPos, newTvsPos); 
 					
 					// ---------- 4. Now commit the change to the stream ----------
-					
-					/+Todo: explore(...).assoc.target = newTargetIdx;   // whatever your accessor is+/
-					NOTIMPL(
-						"Ez egy qrvanagy pofon volt, amibe beleszaladtam... Nem irhatom felul, 
-mert ha novekszik a merete, akkor elrontja az utana kovetkezo stream-et."
-					); 
-					
-					/+
-						ubyte[] assoc = stream.stream[][assocIdx..$][0..1+3*2]; 
-						assoc.hexDump.print; 
-						enforce(assoc[0]==0x85 /+16bit*3+/); 
-						(cast(ushort[])(assoc[5..7]))[0] = newTargetIdx.to!ushort; 
-					+/
+					SER.modifyAssocTarget(stream.stream, assocIdx, newTargetIdx)
+					.enforce(i"modifyAssocTarget($(assocIdx), $(newTargetIdx)) returned with null.".text); 
 				} 
 				
 				
@@ -2290,23 +2505,29 @@ mert ha novekszik a merete, akkor elrontja az utana kovetkezo stream-et."
 						
 						auto attr = explore(attrIdx); 
 						enforce(attr.isAttribute, i"Attribute expected, not [$(attr)]".text); 
+						/+
+							Note: The [source  modified to  target] association is NOT an attribute.
+							This function will return the updated attribute index.
+							
+							attribute 
+								...modified to  A 
+								...modified to  B 
+									...modified to  C  //this is valid too and will not create nesting depth.
+						+/
+						
 						const 	assoc 	= attr.assoc,
 							sourceIdx 	= assoc.source,
 							aTypeIdx 	= assoc.verb,
 							oldTargetIdx 	= assoc.target; 
 						
-						/+
-							auto existing = findAssociationsBySourceVerb(assoc.source, assoc.verb); 
-							enforce(existing.length==1, i"Existing attribute count is not 1 ($(existing.length))".text); 
-							
-							print(explore(assoc.source).dump); 
-							print(explore(assoc.verb).dump); 
-						+/
-						
 						const newTargetIdx = accessTarget(aTypeIdx, targetToken); //Todo: This can be left unused on error.
 						if(oldTargetIdx != newTargetIdx)
 						{
-							enforce(!findAssociation(sourceIdx, aTypeIdx, newTargetIdx), "Association's newTarget already exists."); 
+							enforce(
+								!findAssociation(sourceIdx, aTypeIdx, newTargetIdx), 
+								"Index inconsistence: Association's newTarget already exists."
+								/+Opt: if Index is consistently tested, this can never happen+/
+							); 
 							stream.append(attrIdx, access(SysVerb.modified_to), newTargetIdx); 
 							updateAssociationTarget(attrIdx, sourceIdx, aTypeIdx, oldTargetIdx, newTargetIdx); 
 						}
